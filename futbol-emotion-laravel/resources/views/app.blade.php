@@ -517,7 +517,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 // ── CONFIGURACIÓN DEL SERVIDOR ────────────────────────────────────────────────
 // Cuando tengas el servidor, cambia null por la URL:
 // Ejemplo: const SERVIDOR = 'http://tudominio.com'
-const SERVIDOR = null;
+const SERVIDOR = window.location.origin;
 const MODO_SERVIDOR = !!SERVIDOR;
 
 // ── CAPA DE DATOS (localStorage o Laravel según el modo) ──────────────────────
@@ -613,14 +613,24 @@ function iniciarApp(){
 async function cargarDatosServidor(){
   toast('Cargando datos del servidor...');
   try{
-    [camisetas,pedidos,envios,devoluciones,ventas,transacciones]=await Promise.all([
+    const [c,p,e,d,v,t,act]=await Promise.all([
       apiCall('GET','/camisetas'),
       apiCall('GET','/pedidos'),
       apiCall('GET','/envios'),
       apiCall('GET','/devoluciones'),
       apiCall('GET','/ventas'),
       apiCall('GET','/transacciones'),
+      apiCall('GET','/actividad?rol='+role),
     ]);
+    camisetas = c;
+    pedidos = p.map(x=>({id:x.id,provId:x.proveedor_id,lineas:x.lineas,notas:x.notas,estado:x.estado,fecha:x.fecha}));
+    envios = e.map(x=>({id:x.id,cliente:x.cliente,prods:x.productos,origen:x.origen,trans:x.transportista,dir:x.direccion,imp:parseFloat(x.importe),estado:x.estado,notas:x.notas,fecha:x.fecha}));
+    devoluciones = d.map(x=>({id:x.id,cliente:x.cliente,motivo:x.motivo,dev:x.camiseta_devuelta,sol:x.camiseta_solicitada,imp:parseFloat(x.importe),estado:x.estado,fecha:x.fecha}));
+    ventas = v.map(x=>({id:x.id,camId:x.camiseta_id,equipo:x.equipo,talla:x.talla,cant:x.cantidad,canal:x.canal,cliente:x.cliente,numeroVenta:x.numero_venta,imp:parseFloat(x.importe),fecha:x.fecha}));
+    transacciones = t.map(x=>({id:x.id,tipo:x.tipo,desc:x.descripcion,imp:parseFloat(x.importe),canal:x.canal,fecha:x.fecha}));
+    actividad = act.actividad;
+    notifsVistas = act.vistas;
+    actualizarBadgeNotif();
     toast('✓ Datos cargados');
   }catch(e){
     toast('Error cargando datos — usando datos locales');
@@ -1776,14 +1786,17 @@ function registrarActividad(tipo, descripcion, extra=''){
     desc: descripcion,
     extra,
     rol: role,
-    quien: role==='manager'?'Encargado':'Dueña',
+    quien: role==='manager'?'Encargado':'Dueño',
     fecha: hoy(),
     hora: new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}),
     visto: false,
   };
+  if(MODO_SERVIDOR){
+    apiCall('POST','/actividad',{tipo,descripcion,extra,rol:role}).catch(()=>{});
+  }
   actividad.unshift(evento);
   if(actividad.length>200) actividad=actividad.slice(0,200); // máximo 200 registros
-  sd('actividad', actividad);
+  if(!MODO_SERVIDOR) sd('actividad', actividad);
   actualizarBadgeNotif();
 }
 
@@ -1804,7 +1817,8 @@ function marcarNotifsVistas(){
   const nuevos = actividad.filter(a=>a.rol!==role && !notifsVistas.includes(a.id)).map(a=>a.id);
   notifsVistas = [...notifsVistas, ...nuevos];
   if(notifsVistas.length>500) notifsVistas=notifsVistas.slice(-500);
-  sd('notifsVistas', notifsVistas);
+  if(MODO_SERVIDOR) apiCall('POST','/actividad/vistas',{rol:role}).catch(()=>{});
+  else sd('notifsVistas', notifsVistas);
   actualizarBadgeNotif();
 }
 
