@@ -9,6 +9,7 @@ use App\Http\Controllers\EnvioController;
 use App\Http\Controllers\DevolucionController;
 use App\Http\Controllers\TransaccionController;
 use App\Http\Controllers\MigracionController;
+use App\Http\Controllers\ActividadController;
 
 // ── AUTH ─────────────────────────────────────────────────────────────────────
 Route::post('/login', [AuthController::class, 'login']);
@@ -52,6 +53,11 @@ Route::middleware('auth.pin')->group(function () {
     Route::get('/transacciones',      [TransaccionController::class, 'index']);
     Route::post('/transacciones',     [TransaccionController::class, 'store']);
     Route::get('/transacciones/cierre', [TransaccionController::class, 'cierre']);
+
+    // Actividad / Notificaciones (historial compartido entre encargado y dueño)
+    Route::get('/actividad',          [ActividadController::class, 'index']);
+    Route::post('/actividad',         [ActividadController::class, 'store']);
+    Route::post('/actividad/vistas',  [ActividadController::class, 'marcarVistas']);
 
     // Migración de datos
     Route::post('/migrar',            [MigracionController::class, 'importar']);
