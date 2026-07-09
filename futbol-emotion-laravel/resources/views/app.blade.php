@@ -1091,18 +1091,31 @@ async function saveNuevaCamiseta(){
     prov:+document.getElementById('nc-prov').value||1,
   };
   const editId=+document.getElementById('nc-id').value;
-  if(editId){
-    const i=camisetas.findIndex(c=>c.id===editId);
-    if(i>=0) camisetas[i]={...camisetas[i],...data};
-    toast('Camiseta actualizada ✓');
-  } else {
-    data.id=ids.c++;
-    camisetas.push(data);
-    toast(`${equipo} añadida al inventario ✓`);
+  const payload={equipo:data.equipo,temporada:data.temp,tipo:data.tipo,tallas:data.tallas,stock_minimo:data.min,proveedor_id:data.prov};
+  try{
+    if(editId){
+      const i=camisetas.findIndex(c=>c.id===editId);
+      if(i>=0) camisetas[i]={...camisetas[i],...data};
+      if(!MODO_SERVIDOR) sd('camisetas',camisetas);
+      await syncCamisetas('update',payload,editId);
+      toast('Camiseta actualizada ✓');
+    } else {
+      if(MODO_SERVIDOR){
+        const creada=await syncCamisetas('add',payload);
+        data.id=creada.id;
+      } else {
+        data.id=ids.c++;
+      }
+      camisetas.push(data);
+      if(!MODO_SERVIDOR) sd('camisetas',camisetas);
+      registrarActividad('stock',`Nueva camiseta: ${equipo} ${data.tipo}`,`${data.temp}`);
+      toast(`${equipo} añadida al inventario ✓`);
+    }
+    closeM('m-nueva-cam');
+    renderStock();
+  }catch(e){
+    toast('No se pudo guardar: '+e.message);
   }
-  sd('camisetas',camisetas);
-  closeM('m-nueva-cam');
-  renderStock();
 }
 async function borrarCamiseta(){
   const id=+document.getElementById('nc-id').value;
@@ -1387,9 +1400,26 @@ async function saveDevolucion(){
   if(!cliente){toast('Escribe el nombre del cliente');return}
   const editId=+document.getElementById('d-id').value;
   const data={cliente,motivo:document.getElementById('d-motivo').value,dev:document.getElementById('d-dev').value.trim(),sol:document.getElementById('d-sol').value.trim(),imp:+document.getElementById('d-imp').value||0,estado:'pendiente',fecha:hoy()};
-  if(editId){const i=devoluciones.findIndex(d=>d.id===editId);if(i>=0)devoluciones[i]={...devoluciones[i],...data}}
-  else{data.id=ids.dev++;devoluciones.push(data)}
-  sd('devoluciones',devoluciones);closeM('m-dev');toast('Cambio registrado ✓');renderDev();
+  try{
+    if(editId){
+      const i=devoluciones.findIndex(d=>d.id===editId);
+      if(i>=0)devoluciones[i]={...devoluciones[i],...data};
+    } else {
+      if(MODO_SERVIDOR){
+        const payload={cliente:data.cliente,motivo:data.motivo,camiseta_devuelta:data.dev,camiseta_solicitada:data.sol,importe:data.imp};
+        const creado=await syncDevolucion('add',payload);
+        data.id=creado.id;
+      } else {
+        data.id=ids.dev++;
+      }
+      devoluciones.push(data);
+      registrarActividad('devolucion',`Cambio registrado: ${cliente}`,`${data.dev} → ${data.sol}`);
+    }
+    if(!MODO_SERVIDOR) sd('devoluciones',devoluciones);
+    closeM('m-dev');toast('Cambio registrado ✓');renderDev();
+  }catch(e){
+    toast('No se pudo guardar: '+e.message);
+  }
 }
 async function completarCambio(id){
   const i=devoluciones.findIndex(d=>d.id===id);
