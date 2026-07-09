@@ -47,6 +47,8 @@ Route::middleware('auth.pin')->group(function () {
     // Devoluciones
     Route::get('/devoluciones',       [DevolucionController::class, 'index']);
     Route::post('/devoluciones',      [DevolucionController::class, 'store']);
+    Route::put('/devoluciones/{id}/aprobar',   [DevolucionController::class, 'aprobar']);
+    Route::put('/devoluciones/{id}/rechazar',  [DevolucionController::class, 'rechazar']);
     Route::put('/devoluciones/{id}/completar', [DevolucionController::class, 'completar']);
 
     // Transacciones / Finanzas
