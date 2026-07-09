@@ -739,6 +739,8 @@ async function syncDevolucion(accion,data,id=null){
   if(MODO_SERVIDOR){
     if(accion==='add')      return apiCall('POST','/devoluciones',data);
     if(accion==='completar')return apiCall('PUT',`/devoluciones/${id}/completar`);
+    if(accion==='aprobar')  return apiCall('PUT',`/devoluciones/${id}/aprobar`);
+    if(accion==='rechazar') return apiCall('PUT',`/devoluciones/${id}/rechazar`);
   } else {
     sd('devoluciones',devoluciones);
   }
@@ -899,6 +901,11 @@ function renderHome(){
       <button class="bigbtn" onclick="goTo('aprobar')">
         <div class="bbico" style="background:${pendPed>0?'var(--al)':'var(--gray)'};color:${pendPed>0?'var(--a)':'var(--txm)'}"><i class="ti ti-clipboard-check"></i></div>
         <div><div class="bbtitle">Pedidos a proveedores</div><div class="bbsub">${pendPed>0?pendPed+' esperando tu aprobación':'Sin pedidos pendientes'}</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
+      </button>
+      <button class="bigbtn" onclick="goTo('dev')">
+        <div class="bbico" style="background:${pendDev>0?'var(--al)':'var(--gray)'};color:${pendDev>0?'var(--a)':'var(--txm)'}"><i class="ti ti-refresh"></i></div>
+        <div><div class="bbtitle">Cambios y devoluciones</div><div class="bbsub">${pendDev>0?pendDev+' esperando tu aprobación':'Sin cambios pendientes'}</div></div>
         <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
       </button>
       <button class="bigbtn" onclick="goTo('historial')">
@@ -1361,10 +1368,8 @@ async function saveVenta(){
 // ── DEVOLUCIONES (encargado) ──────────────────────────────────────────────────
 function renderDev(){
   const cont=document.getElementById('dev-c');
-  const pend=devoluciones.filter(d=>d.estado==='pendiente');
-  const hecho=devoluciones.filter(d=>d.estado==='cambiado');
-  const filters=['todos','pendiente','cambiado'];
-  const labels={todos:'Todos',pendiente:'Pendientes',cambiado:'Completados'};
+  const filters=['todos','pendiente','aprobado','rechazado','cambiado'];
+  const labels={todos:'Todos',pendiente:'Pendientes',aprobado:'Aprobados',rechazado:'Rechazados',cambiado:'Completados'};
   cont.innerHTML=`
     <div class="fbar">${filters.map(f=>`<button class="ftag${devFilter===f?' on':''}" onclick="setDevF('${f}')">${labels[f]}</button>`).join('')}</div>
     <button class="abtn abtn-g abtn-sm" style="margin-top:0;margin-bottom:12px" onclick="openDevModal()"><i class="ti ti-plus"></i> Registrar cambio</button>
@@ -1375,18 +1380,32 @@ function renderDev(){
 }
 function setDevF(f){devFilter=f;renderDev()}
 function devCard(d){
+  const map={pendiente:{cls:'pwarn',lbl:'Pendiente'},aprobado:{cls:'pok',lbl:'Aprobado'},rechazado:{cls:'pbad',lbl:'Rechazado'},cambiado:{cls:'ppurp',lbl:'Completado'}};
+  const em=map[d.estado]||map.pendiente;
   const esP=d.estado==='pendiente';
+  const esAprobado=d.estado==='aprobado';
+  let acciones='';
+  if(esP&&role==='owner'){
+    acciones=`<div style="display:flex;gap:8px;margin-top:8px">
+      <button class="abtn abtn-a" style="flex:1;font-size:14px" onclick="aprobarCambio(${d.id})"><i class="ti ti-check"></i> Aprobar</button>
+      <button class="abtn abtn-r" style="flex:1;font-size:14px" onclick="rechazarCambio(${d.id})"><i class="ti ti-x"></i> Rechazar</button>
+    </div>`;
+  } else if(esAprobado&&role==='manager'){
+    acciones=`<button class="abtn abtn-a" onclick="completarCambio(${d.id})" style="margin-top:8px;font-size:14px"><i class="ti ti-check"></i> Cambio entregado al cliente</button>`;
+  } else if(esP&&role==='manager'){
+    acciones=`<div style="font-size:12px;color:var(--txm);margin-top:8px;font-style:italic">Esperando aprobación del dueño</div>`;
+  }
   return `<div class="card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
       <div><div style="font-size:16px;font-weight:700">${d.cliente}</div><div style="font-size:12px;color:var(--txm)">${d.motivo} · ${d.fecha}</div></div>
-      <span class="pill ${esP?'pwarn':'pok'}">${esP?'Pendiente':'Completado'}</span>
+      <span class="pill ${em.cls}">${em.lbl}</span>
     </div>
     <div style="background:var(--gray);border-radius:10px;padding:10px 12px;font-size:14px">
       <div style="color:var(--r);margin-bottom:4px"><i class="ti ti-arrow-down" style="font-size:13px"></i> Devuelve: <b>${d.dev}</b></div>
       <div style="color:var(--g)"><i class="ti ti-arrow-up" style="font-size:13px"></i> Quiere: <b>${d.sol}</b></div>
     </div>
     <div style="font-size:13px;font-weight:700;color:var(--txm);margin-top:7px">${fmt(d.imp)}</div>
-    ${esP&&role==='manager'?`<button class="abtn abtn-a" onclick="completarCambio(${d.id})" style="margin-top:8px;font-size:14px"><i class="ti ti-check"></i> Cambio entregado al cliente</button>`:''}
+    ${acciones}
   </div>`;
 }
 function openDevModal(){
@@ -1420,6 +1439,25 @@ async function saveDevolucion(){
   }catch(e){
     toast('No se pudo guardar: '+e.message);
   }
+}
+async function aprobarCambio(id){
+  try{
+    await syncDevolucion('aprobar',null,id);
+    const i=devoluciones.findIndex(d=>d.id===id);
+    if(i>=0) devoluciones[i].estado='aprobado';
+    const devUpd=devoluciones.find(d=>d.id===id); if(devUpd) registrarActividad('devolucion',`Cambio aprobado: ${devUpd.cliente}`,`${devUpd.dev} → ${devUpd.sol}`);
+    toast('Cambio aprobado ✓');renderDev();renderHome();
+  }catch(e){ toast('No se pudo aprobar: '+e.message); }
+}
+async function rechazarCambio(id){
+  if(!confirm('¿Rechazar este cambio? El encargado ya no podrá completarlo.')) return;
+  try{
+    await syncDevolucion('rechazar',null,id);
+    const i=devoluciones.findIndex(d=>d.id===id);
+    if(i>=0) devoluciones[i].estado='rechazado';
+    const devUpd=devoluciones.find(d=>d.id===id); if(devUpd) registrarActividad('devolucion',`Cambio rechazado: ${devUpd.cliente}`,`${devUpd.dev} → ${devUpd.sol}`);
+    toast('Cambio rechazado');renderDev();renderHome();
+  }catch(e){ toast('No se pudo rechazar: '+e.message); }
 }
 async function completarCambio(id){
   const i=devoluciones.findIndex(d=>d.id===id);
