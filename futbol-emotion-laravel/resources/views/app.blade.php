@@ -524,13 +524,32 @@ const MODO_SERVIDOR = !!SERVIDOR;
 const ld=(k,d)=>{try{return JSON.parse(localStorage.getItem('fe4_'+k))||d}catch{return d}};
 const sd=(k,v)=>localStorage.setItem('fe4_'+k,JSON.stringify(v));
 
+// Lee el valor de una cookie por nombre
+function getCookie(nombre){
+  const match = document.cookie.match(new RegExp('(^| )'+nombre+'=([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+// Prepara la cookie de seguridad CSRF que exige Laravel Sanctum (una vez por carga de página)
+let csrfListo = null;
+async function asegurarCSRF(){
+  if(!MODO_SERVIDOR) return;
+  if(!csrfListo){
+    csrfListo = fetch(SERVIDOR+'/sanctum/csrf-cookie', {credentials:'include'});
+  }
+  await csrfListo;
+}
+
 // Llamadas al API de Laravel
 async function apiCall(method, endpoint, data=null){
+  if(MODO_SERVIDOR) await asegurarCSRF();
   const opts={
     method,
     headers:{'Content-Type':'application/json','Accept':'application/json'},
     credentials:'include',
   };
+  const xsrf = getCookie('XSRF-TOKEN');
+  if(xsrf) opts.headers['X-XSRF-TOKEN']=xsrf;
   if(data) opts.body=JSON.stringify(data);
   try{
     const res=await fetch(SERVIDOR+'/api'+endpoint, opts);
@@ -1910,15 +1929,15 @@ function renderMisVentas(){
   cont.innerHTML=`
     <!-- RESUMEN -->
     <div class="mgrid" style="margin-bottom:16px">
-      <div class="mc" style="border-left:4px solid var(--g)">
-        <div class="mcl">Ventas físicas</div>
+      <div class="mc" style="border-left:4px solid var(--g);background:#fff">
+        <div class="mcl" style="color:var(--txm)">Ventas físicas</div>
         <div class="mcv" style="color:var(--g)">${fmt(totalFis)}</div>
-        <div class="mcs">${fisicas.length} ventas</div>
+        <div class="mcs" style="color:var(--txm)">${fisicas.length} ventas</div>
       </div>
-      <div class="mc" style="border-left:4px solid var(--b)">
-        <div class="mcl">Ventas online</div>
+      <div class="mc" style="border-left:4px solid var(--b);background:#fff">
+        <div class="mcl" style="color:var(--txm)">Ventas online</div>
         <div class="mcv" style="color:var(--b)">${fmt(totalOnl)}</div>
-        <div class="mcs">${online.length} ventas</div>
+        <div class="mcs" style="color:var(--txm)">${online.length} ventas</div>
       </div>
     </div>
 
