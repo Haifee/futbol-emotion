@@ -1327,6 +1327,9 @@ async function saveVenta(){
     // Guardar venta libre (sin tocar stock)
     const v={id:ids.ven++,camId:null,equipo:nombreCamiseta,talla:'—',cant,canal,cliente,imp,fecha:hoy()};
     ventas.push(v); if(!MODO_SERVIDOR) sd('ventas',ventas);
+    try{
+      if(MODO_SERVIDOR) await syncVenta({camiseta_id:null,equipo:nombreCamiseta,talla:'—',cantidad:cant,canal,cliente,importe:imp});
+    }catch(e){ toast('No se pudo guardar en el servidor: '+e.message); }
     const tx={id:ids.tx++,tipo:'ingreso',desc,imp,canal,fecha:hoy()};
     transacciones.push(tx); if(!MODO_SERVIDOR) sd('transacciones',transacciones);
     registrarActividad('venta',`${tipoVenta==='tienda'?cliente+' —':cliente+' ·'} ${nombreCamiseta}`,`${cant} UND · ${fmt(imp)}`);
