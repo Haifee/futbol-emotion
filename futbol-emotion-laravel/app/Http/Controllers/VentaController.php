@@ -20,31 +20,45 @@ class VentaController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'camiseta_id' => 'required|integer|exists:camisetas,id',
-            'talla'       => 'required|in:S,M,L,XL,XXL',
+            'camiseta_id' => 'nullable|integer|exists:camisetas,id',
+            'equipo'      => 'required_without:camiseta_id|string',
+            'talla'       => 'required|string|max:5',
             'cantidad'    => 'required|integer|min:1',
             'canal'       => 'required|string',
             'importe'     => 'required|numeric|min:0',
         ]);
 
-        $col = 'talla_' . strtolower($request->talla); // talla_s, talla_m...
+        $camiseta = null;
+        $equipoNombre = $request->input('equipo');
+        $col = null;
 
-        // Verificar stock disponible
-        $camiseta = DB::table('camisetas')->find($request->camiseta_id);
-        $stockActual = $camiseta->$col ?? 0;
+        // Si viene camiseta_id, es una venta desde el inventario: validar stock
+        if ($request->camiseta_id) {
+            $camiseta = DB::table('camisetas')->find($request->camiseta_id);
+            if (!$camiseta) {
+                return response()->json(['error' => 'Camiseta no encontrada'], 404);
+            }
 
-        if ($stockActual < $request->cantidad) {
-            return response()->json([
-                'error' => "Solo hay {$stockActual} UND en talla {$request->talla}"
-            ], 422);
+            $col = 'talla_' . strtolower($request->talla);
+            $stockActual = $camiseta->$col ?? 0;
+
+            if ($stockActual < $request->cantidad) {
+                return response()->json([
+                    'error' => "Solo hay {$stockActual} UND en talla {$request->talla}"
+                ], 422);
+            }
+
+            $equipoNombre = $camiseta->equipo . ' ' . $camiseta->tipo . ' ' . $camiseta->temporada;
         }
+        // Si no viene camiseta_id, es una venta libre (escrita a mano): no toca stock
 
         DB::beginTransaction();
         try {
-            // Bajar stock
-            DB::table('camisetas')
-                ->where('id', $request->camiseta_id)
-                ->decrement($col, $request->cantidad);
+            if ($camiseta) {
+                DB::table('camisetas')
+                    ->where('id', $request->camiseta_id)
+                    ->decrement($col, $request->cantidad);
+            }
 
             // Número de venta para tienda física
             $numeroVenta = null;
@@ -63,7 +77,7 @@ class VentaController extends Controller
             // Registrar venta
             $id = DB::table('ventas')->insertGetId([
                 'camiseta_id'   => $request->camiseta_id,
-                'equipo'        => $camiseta->equipo . ' ' . $camiseta->tipo . ' ' . $camiseta->temporada,
+                'equipo'        => $equipoNombre,
                 'talla'         => $request->talla,
                 'cantidad'      => $request->cantidad,
                 'canal'         => $request->canal,
@@ -75,10 +89,10 @@ class VentaController extends Controller
                 'updated_at'    => now(),
             ]);
 
-            // Registrar transacción automáticamente
+            // Registrar transacción automáticamente (para venta con o sin inventario)
             DB::table('transacciones')->insert([
                 'tipo'        => 'ingreso',
-                'descripcion' => "Venta {$camiseta->equipo} {$camiseta->tipo} {$request->talla} x{$request->cantidad}",
+                'descripcion' => "Venta {$equipoNombre} {$request->talla} x{$request->cantidad}",
                 'importe'     => $request->importe,
                 'canal'       => $request->canal,
                 'fecha'       => now()->toDateString(),
@@ -89,7 +103,9 @@ class VentaController extends Controller
             DB::commit();
 
             $venta = DB::table('ventas')->find($id);
-            $stockNuevo = DB::table('camisetas')->find($request->camiseta_id)->$col;
+            $stockNuevo = $camiseta
+                ? DB::table('camisetas')->find($request->camiseta_id)->$col
+                : null;
 
             return response()->json([
                 'venta'       => $venta,
