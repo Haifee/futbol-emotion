@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.sslip.app_115.app_239.app_0.app_162.citbh7xwhgdosi0e69v93gb3.twa",
+        "sha256_cert_fingerprints": ["BA:FC:85:53:D8:6F:E8:BC:2E:DE:DE:3A:20:9D:7D:B8:82:3F:EC:AD:38:08:5A:99:0F:D9:4F:18:95:40:B6:B2"]
+      }
+    }]
