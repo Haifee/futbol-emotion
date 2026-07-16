@@ -10,6 +10,9 @@
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
   --g:#16a34a;--gl:#dcfce7;--gm:#22c55e;--gd:#15803d;--gx:#bbf7d0;
@@ -328,6 +331,25 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <textarea class="fi" id="e-notas" rows="2" style="resize:none" placeholder="Ej: El cliente pidió envolver para regalo"></textarea>
     <input type="hidden" id="e-id">
     <button class="abtn abtn-g" onclick="saveEnvio()"><i class="ti ti-check"></i> Guardar envío</button>
+  </div>
+</div>
+
+<!-- MODAL: EXPORTAR REPORTE -->
+<div class="mbg" id="m-export">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle">Exportar reporte <button class="mclose" onclick="closeM('m-export')"><i class="ti ti-x"></i></button></div>
+    <div style="font-size:14px;color:var(--txm);margin-bottom:14px" id="ex-sub">—</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button onclick="exportarReporte('pdf')" style="padding:18px 10px;border-radius:12px;border:2px solid var(--grayb);background:#fff;cursor:pointer;font-size:14px;font-weight:800;color:var(--txd);display:flex;flex-direction:column;align-items:center;gap:8px">
+        <i class="ti ti-file-type-pdf" style="font-size:32px;color:#e5484d"></i>PDF
+        <span style="font-size:11px;font-weight:600;color:var(--txm)">Para imprimir o enviar</span>
+      </button>
+      <button onclick="exportarReporte('excel')" style="padding:18px 10px;border-radius:12px;border:2px solid var(--grayb);background:#fff;cursor:pointer;font-size:14px;font-weight:800;color:var(--txd);display:flex;flex-direction:column;align-items:center;gap:8px">
+        <i class="ti ti-file-type-xls" style="font-size:32px;color:#16a34a"></i>Excel
+        <span style="font-size:11px;font-weight:600;color:var(--txm)">Para el contador</span>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -2088,7 +2110,7 @@ function renderCaja(){
   const sem=calcPeriodo(inicioSemStr);
   const mes=calcPeriodo(inicioMesStr);
 
-  function bloqueResumen(titulo,icono,color,data,periodo){
+  function bloqueResumen(titulo,icono,color,data,periodo,clave){
     const margen=data.ing>0?Math.round((data.neto/data.ing)*100):0;
     return `
       <div class="card" style="border-left:4px solid ${color};margin-bottom:14px">
@@ -2097,7 +2119,7 @@ function renderCaja(){
             <div style="width:38px;height:38px;border-radius:10px;background:${color}22;display:flex;align-items:center;justify-content:center;font-size:20px;color:${color}"><i class="ti ${icono}"></i></div>
             <div><div style="font-size:16px;font-weight:800">${titulo}</div><div style="font-size:12px;color:var(--txm)">${periodo}</div></div>
           </div>
-          <button onclick="exportarCierre('${titulo}',${JSON.stringify(data).replace(/'/g,"\\'")})" style="background:var(--gray);border:none;border-radius:9px;padding:7px 11px;cursor:pointer;font-size:12px;font-weight:700;color:var(--txm);display:${role==='owner'?'flex':'none'};align-items:center;gap:5px"><i class="ti ti-download" style="font-size:15px"></i> Exportar</button>
+          <button onclick="abrirExport('${clave}')" style="background:var(--gray);border:none;border-radius:9px;padding:7px 11px;cursor:pointer;font-size:12px;font-weight:700;color:var(--txm);display:${role==='owner'?'flex':'none'};align-items:center;gap:5px"><i class="ti ti-download" style="font-size:15px"></i> Exportar</button>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
           <div style="background:var(--gl);border-radius:10px;padding:11px 13px">
@@ -2151,35 +2173,138 @@ function renderCaja(){
   cont.innerHTML=`
     <div style="font-size:19px;font-weight:800;margin-bottom:4px">Cierre de caja</div>
     <div style="font-size:13px;color:var(--txm);margin-bottom:18px">Hoy: ${hoyStr}</div>
-    ${bloqueResumen('Cierre del día','ti-sun','var(--g)',dia,hoyStr)}
-    ${bloqueResumen('Cierre de la semana','ti-calendar-week','var(--b)',sem,`${inicioSemStr} → ${hoyStr}`)}
-    ${bloqueResumen('Cierre del mes','ti-calendar-month','var(--p)',mes,inicioMesStr.slice(0,7))}
+    ${bloqueResumen('Cierre del día','ti-sun','var(--g)',dia,hoyStr,'dia')}
+    ${bloqueResumen('Cierre de la semana','ti-calendar-week','var(--b)',sem,`${inicioSemStr} → ${hoyStr}`,'sem')}
+    ${bloqueResumen('Cierre del mes','ti-calendar-month','var(--p)',mes,inicioMesStr.slice(0,7),'mes')}
   `;
 }
 
-function exportarCierre(titulo,data){
-  const lineas=[
-    `CIERRE: ${titulo}`,
-    `Fecha: ${hoy()}`,
-    ``,
-    `INGRESOS:   ${data.ing.toFixed(2)}`,
-    `GASTOS:     ${data.gas.toFixed(2)}`,
-    `BENEFICIO:  ${data.neto.toFixed(2)}`,
-    `MARGEN:     ${data.ing>0?Math.round((data.neto/data.ing)*100):0}%`,
-    ``,
-    `Ventas físicas: ${data.vFis.length} (${data.vFis.reduce((s,v)=>s+v.imp,0).toFixed(2)})`,
-    `Ventas online:  ${data.vOnl.length} (${data.vOnl.reduce((s,v)=>s+v.imp,0).toFixed(2)})`,
-    `Envíos:         ${data.envs.length}`,
-    ``,
-    `--- MOVIMIENTOS ---`,
-    ...data.txs.map(t=>`${t.fecha} | ${t.tipo==='ingreso'?'+':'-'}${t.imp.toFixed(2)} | ${t.desc} | ${t.canal}`),
+// ── EXPORTAR REPORTES (PDF / Excel) ──────────────────────────────────────────
+let exportPeriodo=null;
+
+// Calcula rango y datos del período (independiente de renderCaja)
+function datosPeriodo(clave){
+  const ahora=new Date(), hoyStr=hoy();
+  const diasSemana=ahora.getDay()===0?6:ahora.getDay()-1;
+  const inicioSem=new Date(ahora); inicioSem.setDate(ahora.getDate()-diasSemana);
+  const rangos={
+    dia:{desde:hoyStr,titulo:'Cierre del día',etiqueta:hoyStr},
+    sem:{desde:inicioSem.toISOString().slice(0,10),titulo:'Cierre de la semana',etiqueta:inicioSem.toISOString().slice(0,10)+' al '+hoyStr},
+    mes:{desde:ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0')+'-01',titulo:'Cierre del mes',etiqueta:hoyStr.slice(0,7)},
+  };
+  const r=rangos[clave];
+  const txs=transacciones.filter(t=>t.fecha>=r.desde&&t.fecha<=hoyStr);
+  const vts=ventas.filter(v=>v.fecha>=r.desde&&v.fecha<=hoyStr);
+  const ing=txs.filter(t=>t.tipo==='ingreso').reduce((s,t)=>s+t.imp,0);
+  const gas=txs.filter(t=>t.tipo==='gasto').reduce((s,t)=>s+t.imp,0);
+  return {...r,txs,vts,ing,gas,neto:ing-gas,margen:ing>0?Math.round((ing-gas)/ing*100):0};
+}
+
+function abrirExport(clave){
+  exportPeriodo=clave;
+  const d=datosPeriodo(clave);
+  document.getElementById('ex-sub').textContent=d.titulo+' · '+d.etiqueta+' · '+d.vts.length+' ventas, '+d.txs.length+' movimientos';
+  openM('m-export');
+}
+
+function exportarReporte(formato){
+  const d=datosPeriodo(exportPeriodo);
+  const nombre='futbol-emotion_'+exportPeriodo+'_'+hoy();
+  try{
+    if(formato==='pdf') generarPDF(d,nombre);
+    else generarExcel(d,nombre);
+    closeM('m-export');
+    toast('Reporte descargado ✓');
+  }catch(e){
+    toast('Error al generar el reporte — revisa tu conexión');
+  }
+}
+
+function generarPDF(d,nombre){
+  const { jsPDF }=window.jspdf;
+  const doc=new jsPDF();
+  const verde=[22,163,74];
+
+  doc.setFillColor(verde[0],verde[1],verde[2]); doc.rect(0,0,210,26,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(16); doc.setFont(undefined,'bold');
+  doc.text('FÚTBOL EMOTION',14,11);
+  doc.setFontSize(11); doc.setFont(undefined,'normal');
+  doc.text(d.titulo+' — '+d.etiqueta,14,19);
+  doc.setTextColor(120,120,120); doc.setFontSize(8);
+  doc.text('Generado: '+new Date().toLocaleString('es'),14,32);
+
+  doc.autoTable({
+    startY:36,
+    head:[['Concepto','Valor']],
+    body:[
+      ['Ingresos','$'+d.ing.toFixed(2)],
+      ['Gastos','$'+d.gas.toFixed(2)],
+      ['Beneficio neto','$'+d.neto.toFixed(2)],
+      ['Margen',d.margen+'%'],
+      ['Ventas del período',''+d.vts.length],
+    ],
+    theme:'grid', headStyles:{fillColor:verde}, styles:{fontSize:9},
+    columnStyles:{1:{halign:'right',fontStyle:'bold'}},
+  });
+
+  if(d.vts.length){
+    doc.autoTable({
+      startY:doc.lastAutoTable.finalY+8,
+      head:[['Fecha','Camiseta','Talla','Cant.','Canal','Cliente','Importe']],
+      body:d.vts.map(v=>[v.fecha,v.equipo,v.talla||'—',v.cant,v.canal,v.cliente||'—','$'+v.imp.toFixed(2)]),
+      foot:[['','','','','','TOTAL','$'+d.vts.reduce((s,v)=>s+v.imp,0).toFixed(2)]],
+      theme:'striped', headStyles:{fillColor:verde}, footStyles:{fillColor:[240,240,240],textColor:[0,0,0],fontStyle:'bold'},
+      styles:{fontSize:8}, columnStyles:{6:{halign:'right'}},
+    });
+  }
+
+  if(d.txs.length){
+    doc.autoTable({
+      startY:doc.lastAutoTable.finalY+8,
+      head:[['Fecha','Tipo','Descripción','Canal','Importe']],
+      body:d.txs.map(t=>[t.fecha,t.tipo==='ingreso'?'Ingreso':'Gasto',t.desc,t.canal,(t.tipo==='ingreso'?'+':'-')+'$'+t.imp.toFixed(2)]),
+      theme:'striped', headStyles:{fillColor:verde},
+      styles:{fontSize:8}, columnStyles:{4:{halign:'right'}},
+    });
+  }
+
+  doc.save(nombre+'.pdf');
+}
+
+function generarExcel(d,nombre){
+  const wb=XLSX.utils.book_new();
+
+  const resumen=[
+    ['FÚTBOL EMOTION — '+d.titulo],
+    ['Período',d.etiqueta],
+    ['Generado',new Date().toLocaleString('es')],
+    [],
+    ['Concepto','Valor'],
+    ['Ingresos',d.ing],
+    ['Gastos',d.gas],
+    ['Beneficio neto',d.neto],
+    ['Margen (%)',d.margen],
+    ['Ventas del período',d.vts.length],
   ];
-  const blob=new Blob([lineas.join('\n')],{type:'text/plain;charset=utf-8'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`futbol-emotion-${titulo.toLowerCase().replace(/ /g,'-')}-${hoy()}.txt`;
-  a.click();
-  toast('Cierre exportado ✓');
+  const ws1=XLSX.utils.aoa_to_sheet(resumen);
+  ws1['!cols']=[{wch:22},{wch:16}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Resumen');
+
+  const ventasFilas=[['Fecha','Camiseta','Talla','Cantidad','Canal','Cliente','Importe']]
+    .concat(d.vts.map(v=>[v.fecha,v.equipo,v.talla||'—',v.cant,v.canal,v.cliente||'—',v.imp]));
+  ventasFilas.push([]);
+  ventasFilas.push(['','','','','','TOTAL',d.vts.reduce((s,v)=>s+v.imp,0)]);
+  const ws2=XLSX.utils.aoa_to_sheet(ventasFilas);
+  ws2['!cols']=[{wch:11},{wch:28},{wch:6},{wch:9},{wch:14},{wch:18},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Ventas');
+
+  const movFilas=[['Fecha','Tipo','Descripción','Canal','Importe']]
+    .concat(d.txs.map(t=>[t.fecha,t.tipo==='ingreso'?'Ingreso':'Gasto',t.desc,t.canal,t.tipo==='ingreso'?t.imp:-t.imp]));
+  const ws3=XLSX.utils.aoa_to_sheet(movFilas);
+  ws3['!cols']=[{wch:11},{wch:9},{wch:38},{wch:14},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Movimientos');
+
+  XLSX.writeFile(wb,nombre+'.xlsx');
 }
 
 // ── AJUSTES ───────────────────────────────────────────────────────────────────
