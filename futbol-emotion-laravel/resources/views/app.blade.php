@@ -2297,6 +2297,14 @@ async function confirmarBorrar(tipo){
   };
   if(!confirm(msgs[tipo]||'¿Seguro?')) return;
 
+  // Reinicio total: doble seguro — escribir BORRAR + respaldo automático antes
+  if(tipo==='todo'){
+    const escrito=prompt('Para confirmar el reinicio total, escribe la palabra:\n\nBORRAR');
+    if(escrito===null) return; // canceló
+    if(escrito.trim().toUpperCase()!=='BORRAR'){toast('Confirmación incorrecta — no se borró nada');return}
+    exportarTodo(); // descarga una copia de seguridad automática antes de borrar
+  }
+
   if(MODO_SERVIDOR){
     // Borrar en el servidor y recargar los datos reales
     try{
