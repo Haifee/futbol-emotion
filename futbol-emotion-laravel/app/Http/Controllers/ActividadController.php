@@ -64,6 +64,35 @@ class ActividadController extends Controller
         return response()->json(['ok' => true, 'id' => $id], 201);
     }
 
+    // Eliminar una entrada del historial (solo dueño)
+    public function destroy(Request $request, $id)
+    {
+        if ($request->input('_rol') !== 'owner') {
+            return response()->json(['error' => 'Solo el dueño puede eliminar del historial'], 403);
+        }
+
+        $fila = DB::table('actividad')->find($id);
+        if (!$fila) return response()->json(['error' => 'No encontrada'], 404);
+
+        DB::table('notificaciones_vistas')->where('actividad_id', $id)->delete();
+        DB::table('actividad')->where('id', $id)->delete();
+
+        return response()->json(['ok' => true]);
+    }
+
+    // Vaciar todo el historial (solo dueño)
+    public function limpiar(Request $request)
+    {
+        if ($request->input('_rol') !== 'owner') {
+            return response()->json(['error' => 'Solo el dueño puede limpiar el historial'], 403);
+        }
+
+        DB::table('notificaciones_vistas')->delete();
+        DB::table('actividad')->delete();
+
+        return response()->json(['ok' => true]);
+    }
+
     // Marca como vistos todos los eventos del otro rol
     public function marcarVistas(Request $request)
     {

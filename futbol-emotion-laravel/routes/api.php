@@ -64,8 +64,13 @@ Route::middleware('auth.pin')->group(function () {
     Route::get('/actividad',          [ActividadController::class, 'index']);
     Route::post('/actividad',         [ActividadController::class, 'store']);
     Route::post('/actividad/vistas',  [ActividadController::class, 'marcarVistas']);
+    Route::delete('/actividad/{id}',  [ActividadController::class, 'destroy']);
+    Route::delete('/actividad',       [ActividadController::class, 'limpiar']);
 
     // Migración de datos
     Route::post('/migrar',            [MigracionController::class, 'importar']);
+
+    // Borrado de datos (reinicio, solo dueño)
+    Route::post('/datos/borrar',      [\App\Http\Controllers\DatosController::class, 'borrar']);
 
 });

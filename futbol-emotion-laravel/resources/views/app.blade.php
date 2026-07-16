@@ -1080,6 +1080,28 @@ async function guardarEdicionVenta(){
   btn.style.pointerEvents='auto'; btn.style.opacity='1';
 }
 
+// ── LIMPIAR HISTORIAL (solo dueño) ───────────────────────────────────────────
+async function eliminarActividad(id){
+  if(!confirm('¿Eliminar esta entrada del historial?')) return;
+  if(MODO_SERVIDOR){
+    try{ await apiCall('DELETE','/actividad/'+id); }catch(e){ return; }
+  }
+  actividad=actividad.filter(a=>a.id!==id);
+  if(!MODO_SERVIDOR) sd('actividad',actividad);
+  renderHistorial();
+  toast('Entrada eliminada ✓');
+}
+async function limpiarHistorial(){
+  if(!confirm('¿Vaciar TODO el historial de actividad? No se puede deshacer.')) return;
+  if(MODO_SERVIDOR){
+    try{ await apiCall('DELETE','/actividad'); }catch(e){ return; }
+  }
+  actividad=[]; notifsVistas=[];
+  if(!MODO_SERVIDOR) sd('actividad',actividad);
+  renderHistorial();
+  toast('Historial vaciado ✓');
+}
+
 async function eliminarVenta(id){
   const v=ventas.find(x=>x.id===id); if(!v){toast('Venta no encontrada');return}
   const devuelve=v.camId?`\nSe devolverán ${v.cant} UND al stock (talla ${v.talla}).`:'';
@@ -2257,20 +2279,33 @@ function importarDatos(e){
   reader.readAsText(file);
 }
 
-function confirmarBorrar(tipo){
+async function confirmarBorrar(tipo){
   const msgs={
     ventas:'¿Borrar todo el historial de ventas? No se puede deshacer.',
     envios:'¿Borrar todo el historial de envíos? No se puede deshacer.',
     transacciones:'¿Borrar todos los movimientos financieros? No se puede deshacer.',
-    todo:'⚠️ ¿BORRAR ABSOLUTAMENTE TODO? Esto reinicia la app completamente. No se puede deshacer.',
+    todo:'⚠️ ¿BORRAR ABSOLUTAMENTE TODO? Esto reinicia la app completamente (inventario, ventas, caja, historial). No se puede deshacer.',
   };
   if(!confirm(msgs[tipo]||'¿Seguro?')) return;
+
+  if(MODO_SERVIDOR){
+    // Borrar en el servidor y recargar los datos reales
+    try{
+      await apiCall('POST','/datos/borrar',{tipo});
+    }catch(e){ return; /* apiCall ya mostró el error */ }
+    await cargarDatosServidor();
+    toast('Datos borrados del servidor ✓');
+    renderAjustes();
+    return;
+  }
+
+  // Modo local (sin servidor): borrar del navegador
   if(tipo==='ventas'||tipo==='todo'){ventas=[];sd('ventas',ventas)}
   if(tipo==='envios'||tipo==='todo'){envios=[];sd('envios',envios)}
   if(tipo==='transacciones'||tipo==='todo'){transacciones=[];sd('transacciones',transacciones)}
   if(tipo==='todo'){
-    pedidos=[];devoluciones=[];
-    sd('pedidos',pedidos);sd('devoluciones',devoluciones);
+    pedidos=[];devoluciones=[];actividad=[];notifsVistas=[];
+    sd('pedidos',pedidos);sd('devoluciones',devoluciones);sd('actividad',actividad);sd('notifsVistas',notifsVistas);
     camisetas=[];sd('camisetas',camisetas);
   }
   toast('Datos borrados ✓'); renderAjustes();
@@ -2352,7 +2387,10 @@ function renderHistorial(){
   }
 
   cont.innerHTML=`
-    <div style="font-size:19px;font-weight:800;margin-bottom:4px">Historial</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:19px;font-weight:800">Historial</div>
+      ${role==='owner'?`<button class="abtn abtn-gray abtn-sm" style="margin-top:0;padding:7px 13px;font-size:12px;color:var(--r);flex:0 0 auto" onclick="limpiarHistorial()"><i class="ti ti-trash"></i> Limpiar todo</button>`:''}
+    </div>
     <div style="font-size:13px;color:var(--txm);margin-bottom:16px">Registro de toda la actividad</div>
     ${Object.entries(porFecha).map(([fecha,eventos])=>`
       <div class="stitle">${fecha===hoy()?'Hoy':fecha}</div>
@@ -2369,6 +2407,7 @@ function renderHistorial(){
               </div>
               <div class="lisub">${a.quien} · ${a.hora}${a.extra?` · ${a.extra}`:''}</div>
             </div>
+            ${role==='owner'?`<button onclick="eliminarActividad(${a.id})" style="background:none;border:none;cursor:pointer;color:var(--txh);font-size:16px;padding:6px;flex:0 0 auto" title="Eliminar del historial"><i class="ti ti-x"></i></button>`:''}
           </div>`;
         }).join('')}
       </div>`).join('')}`;
