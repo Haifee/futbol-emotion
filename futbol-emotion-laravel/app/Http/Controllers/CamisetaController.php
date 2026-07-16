@@ -25,6 +25,7 @@ class CamisetaController extends Controller
             'tallas'       => 'required|array',
             'stock_minimo' => 'required|integer|min:0',
             'proveedor_id' => 'required|integer|between:1,4',
+            'precio'       => 'nullable|numeric|min:0',
         ]);
 
         $tallas = $request->input('tallas', []);
@@ -40,6 +41,7 @@ class CamisetaController extends Controller
             'talla_xxl'     => $tallas['XXL'] ?? 0,
             'stock_minimo'  => $request->stock_minimo,
             'proveedor_id'  => $request->proveedor_id,
+            'precio'        => $request->input('precio'),
             'created_at'    => now(),
             'updated_at'    => now(),
         ]);
@@ -65,6 +67,7 @@ class CamisetaController extends Controller
             'talla_xxl'    => $tallas['XXL'] ?? $camiseta->talla_xxl,
             'stock_minimo' => $request->input('stock_minimo', $camiseta->stock_minimo),
             'proveedor_id' => $request->input('proveedor_id', $camiseta->proveedor_id),
+            'precio'       => $request->input('precio', $camiseta->precio),
             'updated_at'   => now(),
         ]);
 
@@ -97,6 +100,60 @@ class CamisetaController extends Controller
         return response()->json($this->formatear(DB::table('camisetas')->find($id)));
     }
 
+    // ── CÓDIGOS DE BARRAS ────────────────────────────────────────────────────
+
+    // Buscar camiseta+talla por código escaneado.
+    // Siempre responde 200: {encontrado:true, ...} o {encontrado:false}
+    public function buscarPorCodigo($codigo)
+    {
+        $fila = DB::table('codigos_barras')
+            ->where('codigo', $codigo)
+            ->first();
+
+        if (!$fila) {
+            return response()->json(['encontrado' => false, 'codigo' => $codigo]);
+        }
+
+        $camiseta = DB::table('camisetas')->find($fila->camiseta_id);
+        if (!$camiseta) {
+            // Código huérfano (no debería pasar por el cascade, pero por si acaso)
+            DB::table('codigos_barras')->where('id', $fila->id)->delete();
+            return response()->json(['encontrado' => false, 'codigo' => $codigo]);
+        }
+
+        return response()->json([
+            'encontrado' => true,
+            'codigo'     => $codigo,
+            'talla'      => $fila->talla,
+            'camiseta'   => $this->formatear($camiseta),
+        ]);
+    }
+
+    // Asociar un código de barras a una camiseta + talla
+    public function asociarCodigo(Request $request)
+    {
+        $request->validate([
+            'codigo'      => 'required|string|max:64',
+            'camiseta_id' => 'required|integer|exists:camisetas,id',
+            'talla'       => 'required|in:S,M,L,XL,XXL',
+        ]);
+
+        $existente = DB::table('codigos_barras')->where('codigo', $request->codigo)->first();
+        if ($existente) {
+            return response()->json(['error' => 'Ese código ya está asociado a otra camiseta'], 422);
+        }
+
+        DB::table('codigos_barras')->insert([
+            'codigo'      => $request->codigo,
+            'camiseta_id' => $request->camiseta_id,
+            'talla'       => $request->talla,
+            'created_at'  => now(),
+            'updated_at'  => now(),
+        ]);
+
+        return response()->json(['ok' => true], 201);
+    }
+
     // Convierte el formato de la BD al formato que usa el frontend
     private function formatear($c)
     {
@@ -112,8 +169,9 @@ class CamisetaController extends Controller
                 'XL'  => (int)$c->talla_xl,
                 'XXL' => (int)$c->talla_xxl,
             ],
-            'min'  => (int)$c->stock_minimo,
-            'prov' => (int)$c->proveedor_id,
+            'min'    => (int)$c->stock_minimo,
+            'prov'   => (int)$c->proveedor_id,
+            'precio' => isset($c->precio) && $c->precio !== null ? (float)$c->precio : null,
         ];
     }
 }

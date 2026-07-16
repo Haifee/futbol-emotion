@@ -91,6 +91,7 @@ class VentaController extends Controller
 
             // Registrar transacción automáticamente (para venta con o sin inventario)
             DB::table('transacciones')->insert([
+                'venta_id'    => $id,
                 'tipo'        => 'ingreso',
                 'descripcion' => "Venta {$equipoNombre} {$request->talla} x{$request->cantidad}",
                 'importe'     => $request->importe,
@@ -115,6 +116,130 @@ class VentaController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => 'Error al registrar la venta'], 500);
+        }
+    }
+
+    // Editar una venta existente (corrige también stock y transacción vinculada)
+    public function update(Request $request, $id)
+    {
+        $venta = DB::table('ventas')->find($id);
+        if (!$venta) return response()->json(['error' => 'Venta no encontrada'], 404);
+
+        $request->validate([
+            'equipo'   => 'nullable|string',
+            'talla'    => 'nullable|string|max:5',
+            'cantidad' => 'nullable|integer|min:1',
+            'importe'  => 'nullable|numeric|min:0',
+            'canal'    => 'nullable|string',
+            'cliente'  => 'nullable|string',
+        ]);
+
+        $nuevaTalla    = $request->input('talla', $venta->talla);
+        $nuevaCantidad = (int) $request->input('cantidad', $venta->cantidad);
+        $nuevoImporte  = $request->input('importe', $venta->importe);
+        $nuevoCanal    = $request->input('canal', $venta->canal);
+        $nuevoCliente  = $request->input('cliente', $venta->cliente);
+        $nuevoEquipo   = $request->input('equipo', $venta->equipo);
+
+        DB::beginTransaction();
+        try {
+            $stockNuevo = null;
+
+            // Si la venta descontó stock, corregir el inventario
+            if ($venta->camiseta_id) {
+                $camiseta = DB::table('camisetas')->find($venta->camiseta_id);
+                if ($camiseta) {
+                    $tallasValidas = ['S', 'M', 'L', 'XL', 'XXL'];
+                    if (!in_array(strtoupper($nuevaTalla), $tallasValidas)) {
+                        DB::rollBack();
+                        return response()->json(['error' => 'Talla inválida'], 422);
+                    }
+                    $nuevaTalla = strtoupper($nuevaTalla);
+                    $colVieja = 'talla_' . strtolower($venta->talla);
+                    $colNueva = 'talla_' . strtolower($nuevaTalla);
+
+                    // 1) Devolver lo que la venta original había descontado
+                    DB::table('camisetas')->where('id', $venta->camiseta_id)
+                        ->increment($colVieja, $venta->cantidad);
+
+                    // 2) Verificar que alcanza para la nueva talla/cantidad
+                    $fresca = DB::table('camisetas')->find($venta->camiseta_id);
+                    if (($fresca->$colNueva ?? 0) < $nuevaCantidad) {
+                        DB::rollBack();
+                        return response()->json([
+                            'error' => "Solo hay {$fresca->$colNueva} UND en talla {$nuevaTalla}"
+                        ], 422);
+                    }
+
+                    // 3) Descontar según la venta corregida
+                    DB::table('camisetas')->where('id', $venta->camiseta_id)
+                        ->decrement($colNueva, $nuevaCantidad);
+
+                    $stockNuevo = DB::table('camisetas')->find($venta->camiseta_id)->$colNueva;
+
+                    // El nombre para display sigue derivado de la camiseta del stock
+                    $nuevoEquipo = $camiseta->equipo . ' ' . $camiseta->tipo . ' ' . $camiseta->temporada;
+                }
+            }
+
+            DB::table('ventas')->where('id', $id)->update([
+                'equipo'     => $nuevoEquipo,
+                'talla'      => $nuevaTalla,
+                'cantidad'   => $nuevaCantidad,
+                'importe'    => $nuevoImporte,
+                'canal'      => $nuevoCanal,
+                'cliente'    => $nuevoCliente,
+                'updated_at' => now(),
+            ]);
+
+            // Corregir la transacción de ingreso vinculada
+            DB::table('transacciones')->where('venta_id', $id)->update([
+                'descripcion' => "Venta {$nuevoEquipo} {$nuevaTalla} x{$nuevaCantidad}",
+                'importe'     => $nuevoImporte,
+                'canal'       => $nuevoCanal,
+                'updated_at'  => now(),
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'venta'       => DB::table('ventas')->find($id),
+                'stock_nuevo' => $stockNuevo,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'Error al actualizar la venta'], 500);
+        }
+    }
+
+    // Eliminar una venta (devuelve el stock y borra la transacción vinculada)
+    public function destroy($id)
+    {
+        $venta = DB::table('ventas')->find($id);
+        if (!$venta) return response()->json(['error' => 'Venta no encontrada'], 404);
+
+        DB::beginTransaction();
+        try {
+            // Devolver las unidades al inventario si la venta descontó stock
+            if ($venta->camiseta_id) {
+                $col = 'talla_' . strtolower($venta->talla);
+                if (in_array($col, ['talla_s', 'talla_m', 'talla_l', 'talla_xl', 'talla_xxl'])) {
+                    DB::table('camisetas')->where('id', $venta->camiseta_id)
+                        ->increment($col, $venta->cantidad);
+                }
+            }
+
+            // Borrar la transacción de ingreso vinculada (si existe)
+            DB::table('transacciones')->where('venta_id', $id)->delete();
+
+            // Borrar la venta
+            DB::table('ventas')->where('id', $id)->delete();
+
+            DB::commit();
+            return response()->json(['ok' => true]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'Error al eliminar la venta'], 500);
         }
     }
 

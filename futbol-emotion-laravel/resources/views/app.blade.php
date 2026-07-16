@@ -9,6 +9,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 :root{
   --g:#16a34a;--gl:#dcfce7;--gm:#22c55e;--gd:#15803d;--gx:#bbf7d0;
@@ -157,6 +158,8 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 
 /* MODAL */
 .mbg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px)}
+#m-scan{z-index:120}
+#m-scan-add,#m-scan-asociar{z-index:110}
 .mbg.open{display:flex}
 .modal{background:#fff;border-radius:28px 28px 0 0;padding:22px 20px 36px;width:100%;max-width:520px;max-height:92vh;overflow-y:auto}
 .modal-handle{width:40px;height:4px;background:#e2e8f0;border-radius:2px;margin:0 auto 18px}
@@ -328,6 +331,69 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
   </div>
 </div>
 
+<!-- MODAL: ESCÁNER DE CÓDIGO DE BARRAS -->
+<div class="mbg" id="m-scan">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle">Escanear código <button class="mclose" onclick="cerrarScanner()"><i class="ti ti-x"></i></button></div>
+    <div id="scan-reader" style="width:100%;border-radius:14px;overflow:hidden;background:#000;min-height:240px"></div>
+    <div id="scan-status" style="font-size:13px;color:var(--txm);text-align:center;margin-top:10px">Apunta la cámara al código de barras de la etiqueta</div>
+    <div style="display:flex;align-items:center;gap:8px;margin:14px 0 4px">
+      <div style="flex:1;height:1px;background:var(--grayb)"></div>
+      <span style="font-size:11px;color:var(--txh);font-weight:700">O ESCRÍBELO A MANO</span>
+      <div style="flex:1;height:1px;background:var(--grayb)"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+      <input class="fi" id="scan-manual" inputmode="numeric" placeholder="Ej: 020330784" style="margin-bottom:0">
+      <button class="abtn abtn-g abtn-sm" onclick="scanManual()" style="margin-top:0;padding:0 18px"><i class="ti ti-search"></i></button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CÓDIGO CONOCIDO → SUMAR STOCK -->
+<div class="mbg" id="m-scan-add">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle">Camiseta reconocida <button class="mclose" onclick="closeM('m-scan-add')"><i class="ti ti-x"></i></button></div>
+    <div style="background:var(--gl);border-radius:12px;padding:14px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px">
+      <i class="ti ti-shirt" style="font-size:28px;color:var(--g)"></i>
+      <div>
+        <div style="font-size:16px;font-weight:800" id="sa-nombre">—</div>
+        <div style="font-size:13px;color:var(--txm)">Talla <b id="sa-talla">—</b> · Stock actual: <b id="sa-stock">0</b> UND</div>
+      </div>
+    </div>
+    <label class="fl">Unidades que llegaron</label>
+    <input class="fi" id="sa-cant" type="number" min="1" value="1" style="text-align:center;font-size:18px;font-weight:700">
+    <input type="hidden" id="sa-camid"><input type="hidden" id="sa-talla-h">
+    <button class="abtn abtn-g" onclick="confirmarSumarStock()"><i class="ti ti-plus"></i> Sumar al inventario</button>
+    <button class="abtn abtn-gray abtn-sm" onclick="closeM('m-scan-add');abrirScannerInventario()" style="margin-top:8px"><i class="ti ti-scan"></i> Escanear otra</button>
+  </div>
+</div>
+
+<!-- MODAL: CÓDIGO NUEVO → ASOCIAR A CAMISETA -->
+<div class="mbg" id="m-scan-asociar">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle">Código nuevo <button class="mclose" onclick="closeM('m-scan-asociar')"><i class="ti ti-x"></i></button></div>
+    <div style="background:var(--al);border-radius:12px;padding:13px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+      <i class="ti ti-barcode" style="font-size:24px;color:var(--ad)"></i>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--ad);text-transform:uppercase;letter-spacing:.4px">Primera vez que se escanea</div>
+        <div style="font-size:15px;font-weight:800;font-family:monospace" id="as-codigo">—</div>
+      </div>
+    </div>
+    <div style="font-size:13px;color:var(--txm);margin-bottom:10px">Dime a qué camiseta y talla corresponde este código. Solo se hace una vez — la próxima vez la app la reconocerá sola.</div>
+    <label class="fl">Camiseta</label>
+    <select class="fi" id="as-cam"></select>
+    <label class="fl">Talla</label>
+    <select class="fi" id="as-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select>
+    <label class="fl">Unidades que llegaron (0 = solo asociar)</label>
+    <input class="fi" id="as-cant" type="number" min="0" value="1" style="text-align:center;font-weight:700">
+    <button class="abtn abtn-g" onclick="confirmarAsociarCodigo()"><i class="ti ti-link"></i> Asociar y guardar</button>
+    <button class="abtn abtn-gray abtn-sm" onclick="crearCamisetaDesdeScan()" style="margin-top:8px"><i class="ti ti-plus"></i> La camiseta no existe — crearla</button>
+  </div>
+</div>
+
 <!-- MODAL: NUEVA VENTA -->
 <div class="mbg" id="m-venta">
   <div class="modal">
@@ -391,13 +457,14 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 
     <!-- MODO STOCK: seleccionar del inventario -->
     <div id="v-stock-wrap" style="display:none">
+      <button class="abtn abtn-g abtn-sm" onclick="escanearParaVenta()" style="margin-top:10px;margin-bottom:6px"><i class="ti ti-scan"></i> Escanear código de la camiseta</button>
       <label class="fl">Camiseta del inventario</label>
-      <select class="fi" id="v-cam"></select>
+      <select class="fi" id="v-cam" onchange="autoPrecioVenta()"></select>
       <label class="fl">Talla</label>
       <select class="fi" id="v-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div><label class="fl">Cantidad (UND)</label><input class="fi" id="v-cant" type="number" min="1" value="1"></div>
-        <div><label class="fl">Importe ($)</label><input class="fi" id="v-imp" type="number" min="0" step="0.01" placeholder="0.00"></div>
+        <div><label class="fl">Cantidad (UND)</label><input class="fi" id="v-cant" type="number" min="1" value="1" oninput="autoPrecioVenta()"></div>
+        <div><label class="fl">Importe ($)</label><input class="fi" id="v-imp" type="number" min="0" step="0.01" placeholder="0.00" oninput="impEditadoManual=true"></div>
       </div>
     </div>
 
@@ -410,6 +477,47 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <button class="abtn abtn-g" onclick="saveVenta()" id="v-save-btn" style="opacity:.4;pointer-events:none;margin-top:14px">
       <i class="ti ti-check"></i> Registrar venta
     </button>
+  </div>
+</div>
+
+<!-- MODAL: EDITAR VENTA -->
+<div class="mbg" id="m-editventa">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle">Editar venta <button class="mclose" onclick="closeM('m-editventa')"><i class="ti ti-x"></i></button></div>
+
+    <div style="background:var(--gray);border-radius:12px;padding:12px 15px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+      <i class="ti ti-receipt" style="font-size:22px;color:var(--txm)"></i>
+      <div>
+        <div style="font-size:14px;font-weight:800" id="ev-titulo">—</div>
+        <div style="font-size:12px;color:var(--txm)" id="ev-sub">—</div>
+      </div>
+    </div>
+
+    <!-- Nombre editable solo en ventas libres (escritas a mano) -->
+    <div id="ev-nombre-wrap" style="display:none">
+      <label class="fl">Camiseta vendida</label>
+      <input class="fi" id="ev-nombre" placeholder="Ej: Argentina Local M 24/25">
+    </div>
+
+    <!-- Talla editable solo en ventas del stock -->
+    <div id="ev-talla-wrap" style="display:none">
+      <label class="fl">Talla</label>
+      <select class="fi" id="ev-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label class="fl">Cantidad (UND)</label><input class="fi" id="ev-cant" type="number" min="1" value="1"></div>
+      <div><label class="fl">Importe ($)</label><input class="fi" id="ev-imp" type="number" min="0" step="0.01"></div>
+    </div>
+
+    <div id="ev-cliente-wrap" style="display:none">
+      <label class="fl">Nombre del cliente</label>
+      <input class="fi" id="ev-cliente" placeholder="Nombre del cliente">
+    </div>
+
+    <input type="hidden" id="ev-id">
+    <button class="abtn abtn-g" onclick="guardarEdicionVenta()" id="ev-save-btn"><i class="ti ti-check"></i> Guardar cambios</button>
   </div>
 </div>
 
@@ -508,6 +616,9 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
         </select>
       </div>
     </div>
+
+    <label class="fl">Precio de venta sugerido ($) — opcional</label>
+    <input class="fi" id="nc-precio" type="number" min="0" step="0.01" placeholder="Se autocompleta al vender, siempre editable">
 
     <input type="hidden" id="nc-id">
     <button class="abtn abtn-g" onclick="saveNuevaCamiseta()"><i class="ti ti-check"></i> Guardar en inventario</button>
@@ -719,6 +830,275 @@ async function syncCamisetas(accion, data, id=null){
 async function syncVenta(data){
   if(MODO_SERVIDOR) return apiCall('POST','/ventas',data);
   else sd('ventas',ventas);
+}
+
+// ── ESCÁNER DE CÓDIGO DE BARRAS ───────────────────────────────────────────────
+let scannerActivo=null, scanCallback=null, pendingCodigo=null, pendingTalla=null, impEditadoManual=false;
+
+function abrirScanner(cb){
+  scanCallback=cb;
+  document.getElementById('scan-manual').value='';
+  document.getElementById('scan-status').textContent='Iniciando cámara…';
+  openM('m-scan');
+  const config={
+    fps:10,
+    qrbox:{width:260,height:150},
+    formatsToSupport:[
+      Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,  Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.QR_CODE
+    ]
+  };
+  scannerActivo=new Html5Qrcode('scan-reader');
+  scannerActivo.start(
+    {facingMode:'environment'}, config,
+    (texto)=>{ procesarScan(texto); },
+    ()=>{} // errores por frame (no encontró código en ese cuadro): ignorar
+  ).then(()=>{
+    document.getElementById('scan-status').textContent='Apunta la cámara al código de barras de la etiqueta';
+  }).catch(()=>{
+    document.getElementById('scan-status').textContent='⚠ No se pudo abrir la cámara (revisa el permiso). Puedes escribir el código a mano abajo.';
+  });
+}
+function pararScanner(){
+  if(scannerActivo){
+    const s=scannerActivo; scannerActivo=null;
+    try{ s.stop().then(()=>s.clear()).catch(()=>{}); }catch(e){}
+  }
+}
+function cerrarScanner(){ pararScanner(); scanCallback=null; closeM('m-scan'); }
+function scanManual(){
+  const c=document.getElementById('scan-manual').value.trim();
+  if(!c){toast('Escribe el código primero');return}
+  procesarScan(c);
+}
+function procesarScan(codigo){
+  pararScanner(); closeM('m-scan');
+  if(navigator.vibrate) navigator.vibrate(80);
+  const cb=scanCallback; scanCallback=null;
+  if(cb) cb(codigo);
+}
+async function buscarCodigo(codigo){
+  return apiCall('GET','/camisetas/barcode/'+encodeURIComponent(codigo));
+}
+// Si cierran el escáner tocando el fondo oscuro, apagar la cámara también
+document.getElementById('m-scan').addEventListener('click',e=>{
+  if(e.target===e.currentTarget){ pararScanner(); scanCallback=null; }
+});
+
+// ── Escaneo desde INVENTARIO (entrada de mercancía) ──
+function abrirScannerInventario(){
+  if(!MODO_SERVIDOR){toast('El escáner requiere conexión con el servidor');return}
+  abrirScanner(async codigo=>{
+    try{
+      const r=await buscarCodigo(codigo);
+      if(r.encontrado){
+        const cam=camisetas.find(c=>c.id===r.camiseta.id)||r.camiseta;
+        document.getElementById('sa-nombre').textContent=`${cam.equipo} ${cam.tipo} ${cam.temp}`;
+        document.getElementById('sa-talla').textContent=r.talla;
+        document.getElementById('sa-stock').textContent=cam.tallas[r.talla]||0;
+        document.getElementById('sa-cant').value=1;
+        document.getElementById('sa-camid').value=cam.id;
+        document.getElementById('sa-talla-h').value=r.talla;
+        openM('m-scan-add');
+      } else {
+        prepararAsociar(codigo);
+      }
+    }catch(e){/* apiCall ya mostró el toast */}
+  });
+}
+function prepararAsociar(codigo){
+  pendingCodigo=codigo;
+  document.getElementById('as-codigo').textContent=codigo;
+  const sel=document.getElementById('as-cam');
+  sel.innerHTML=camisetas.length
+    ? camisetas.map(c=>`<option value="${c.id}">${c.equipo} ${c.tipo} ${c.temp}</option>`).join('')
+    : '<option value="">Sin camisetas — crea una nueva</option>';
+  document.getElementById('as-cant').value=1;
+  openM('m-scan-asociar');
+}
+async function confirmarSumarStock(){
+  const id=+document.getElementById('sa-camid').value;
+  const talla=document.getElementById('sa-talla-h').value;
+  const cant=+document.getElementById('sa-cant').value||0;
+  if(cant<1){toast('La cantidad debe ser al menos 1');return}
+  const i=camisetas.findIndex(c=>c.id===id);
+  if(i<0){toast('Camiseta no encontrada');return}
+  camisetas[i].tallas[talla]=(camisetas[i].tallas[talla]||0)+cant;
+  if(!MODO_SERVIDOR) sd('camisetas',camisetas);
+  try{
+    await syncCamisetas('stock',camisetas[i].tallas,id);
+  }catch(e){
+    camisetas[i].tallas[talla]-=cant; // revertir si el servidor falló
+    return;
+  }
+  registrarActividad('stock',`Entrada por escaneo: ${camisetas[i].equipo} ${camisetas[i].tipo} Talla ${talla}`,`+${cant} UND`);
+  closeM('m-scan-add');
+  toast(`✓ +${cant} UND · ${camisetas[i].equipo} ${talla}: ${camisetas[i].tallas[talla]} UND`);
+  if(curPage==='stock') renderStock();
+}
+async function confirmarAsociarCodigo(){
+  const camId=+document.getElementById('as-cam').value;
+  const talla=document.getElementById('as-talla').value;
+  const cant=+document.getElementById('as-cant').value||0;
+  if(!camId){toast('Selecciona una camiseta, o créala nueva');return}
+  try{
+    await apiCall('POST','/camisetas/barcode',{codigo:pendingCodigo,camiseta_id:camId,talla});
+  }catch(e){ return; }
+  const i=camisetas.findIndex(c=>c.id===camId);
+  if(cant>0 && i>=0){
+    camisetas[i].tallas[talla]=(camisetas[i].tallas[talla]||0)+cant;
+    try{ await syncCamisetas('stock',camisetas[i].tallas,camId); }catch(e){}
+  }
+  registrarActividad('stock',`Código de barras asociado: ${i>=0?camisetas[i].equipo+' '+camisetas[i].tipo:''} Talla ${talla}`,cant>0?`+${cant} UND`:'Solo asociación');
+  closeM('m-scan-asociar');
+  pendingCodigo=null; pendingTalla=null;
+  toast('✓ Código guardado — la próxima vez se reconoce solo');
+  if(curPage==='stock') renderStock();
+}
+function crearCamisetaDesdeScan(){
+  pendingTalla=document.getElementById('as-talla').value;
+  closeM('m-scan-asociar');
+  abrirNuevaCamiseta();
+  toast('Crea la camiseta — el código se asociará solo al guardarla');
+}
+
+// ── Escaneo desde VENTA ──
+function escanearParaVenta(){
+  if(!MODO_SERVIDOR){toast('El escáner requiere conexión con el servidor');return}
+  abrirScanner(async codigo=>{
+    try{
+      const r=await buscarCodigo(codigo);
+      if(!r.encontrado){
+        toast('Código no registrado — escanéalo primero desde Inventario');
+        openM('m-venta'); // devolver al modal de venta
+        return;
+      }
+      openM('m-venta');
+      const cam=camisetas.find(c=>c.id===r.camiseta.id)||r.camiseta;
+      document.getElementById('v-cam').value=String(cam.id);
+      document.getElementById('v-talla').value=r.talla;
+      impEditadoManual=false;
+      autoPrecioVenta();
+      const stock=cam.tallas[r.talla]||0;
+      toast(stock>0?`✓ ${cam.equipo} ${r.talla} — quedan ${stock} UND`:`⚠ ${cam.equipo} ${r.talla} está SIN STOCK`);
+    }catch(e){ openM('m-venta'); }
+  });
+}
+function autoPrecioVenta(){
+  if(impEditadoManual) return;
+  const camId=+document.getElementById('v-cam').value;
+  const cam=camisetas.find(c=>c.id===camId);
+  if(!cam || cam.precio==null || cam.precio===undefined) return;
+  const cant=+document.getElementById('v-cant').value||1;
+  document.getElementById('v-imp').value=(cam.precio*cant).toFixed(2);
+}
+
+// ── EDITAR / ELIMINAR VENTAS ─────────────────────────────────────────────────
+function refrescarVistasVenta(){
+  if(curPage==='misventas') renderMisVentas();
+  if(curPage==='ventas') renderVentas();
+  if(curPage==='stock') renderStock();
+  if(curPage==='home') renderHome();
+  if(curPage==='fin') renderFin();
+  if(curPage==='caja') renderCaja();
+}
+
+function abrirEditarVenta(id){
+  const v=ventas.find(x=>x.id===id); if(!v){toast('Venta no encontrada');return}
+  document.getElementById('ev-id').value=id;
+  document.getElementById('ev-titulo').textContent=v.equipo;
+  document.getElementById('ev-sub').textContent=`${v.canal} · ${v.fecha}${v.cliente?' · '+v.cliente:''}`;
+  // Nombre editable solo si fue venta libre (escrita a mano)
+  document.getElementById('ev-nombre-wrap').style.display=v.camId?'none':'block';
+  document.getElementById('ev-nombre').value=v.camId?'':v.equipo;
+  // Talla editable solo si fue venta del stock
+  document.getElementById('ev-talla-wrap').style.display=v.camId?'block':'none';
+  if(v.camId) document.getElementById('ev-talla').value=v.talla;
+  document.getElementById('ev-cant').value=v.cant;
+  document.getElementById('ev-imp').value=v.imp;
+  const esFisica=v.canal==='Tienda física';
+  document.getElementById('ev-cliente-wrap').style.display=esFisica?'none':'block';
+  document.getElementById('ev-cliente').value=esFisica?'':(v.cliente||'');
+  openM('m-editventa');
+}
+
+async function guardarEdicionVenta(){
+  const id=+document.getElementById('ev-id').value;
+  const v=ventas.find(x=>x.id===id); if(!v) return;
+  const btn=document.getElementById('ev-save-btn');
+  const cant=+document.getElementById('ev-cant').value||1;
+  const imp=+document.getElementById('ev-imp').value||0;
+  const payload={cantidad:cant,importe:imp};
+  if(v.camId){
+    payload.talla=document.getElementById('ev-talla').value;
+  } else {
+    const nombre=document.getElementById('ev-nombre').value.trim();
+    if(!nombre){toast('Escribe la camiseta');return}
+    payload.equipo=nombre;
+  }
+  if(v.canal!=='Tienda física'){
+    const cli=document.getElementById('ev-cliente').value.trim();
+    if(!cli){toast('Escribe el nombre del cliente');return}
+    payload.cliente=cli;
+  }
+  btn.style.pointerEvents='none'; btn.style.opacity='.5';
+  try{
+    if(MODO_SERVIDOR){
+      await apiCall('PUT','/ventas/'+id,payload);
+      await cargarDatosServidor(); // recarga stock, ventas y caja ya corregidos
+    } else {
+      // Modo local: revertir stock viejo y aplicar el nuevo
+      if(v.camId){
+        const i=camisetas.findIndex(c=>c.id===v.camId);
+        if(i>=0){
+          camisetas[i].tallas[v.talla]=(camisetas[i].tallas[v.talla]||0)+v.cant;
+          const nt=payload.talla;
+          if((camisetas[i].tallas[nt]||0)<cant){
+            camisetas[i].tallas[v.talla]-=v.cant;
+            toast(`Solo hay ${camisetas[i].tallas[nt]||0} UND en talla ${nt}`);
+            btn.style.pointerEvents='auto';btn.style.opacity='1';
+            return;
+          }
+          camisetas[i].tallas[nt]-=cant;
+          sd('camisetas',camisetas);
+          v.talla=nt;
+        }
+      } else if(payload.equipo){ v.equipo=payload.equipo; }
+      const ti=transacciones.findIndex(t=>t.tipo==='ingreso'&&t.imp===v.imp&&t.fecha===v.fecha);
+      if(ti>=0){transacciones[ti].imp=imp;transacciones[ti].desc=`Venta ${v.equipo} ${v.talla} x${cant}`;sd('transacciones',transacciones);}
+      v.cant=cant; v.imp=imp;
+      if(payload.cliente!==undefined) v.cliente=payload.cliente;
+      sd('ventas',ventas);
+    }
+    registrarActividad('venta',`Venta corregida: ${payload.equipo||v.equipo}`,`${cant} UND · ${fmt(imp)}`);
+    closeM('m-editventa');
+    toast('Venta actualizada ✓');
+    refrescarVistasVenta();
+  }catch(e){/* apiCall ya mostró el toast de error */}
+  btn.style.pointerEvents='auto'; btn.style.opacity='1';
+}
+
+async function eliminarVenta(id){
+  const v=ventas.find(x=>x.id===id); if(!v){toast('Venta no encontrada');return}
+  const devuelve=v.camId?`\nSe devolverán ${v.cant} UND al stock (talla ${v.talla}).`:'';
+  if(!confirm(`¿Eliminar la venta "${v.equipo}" de ${fmt(v.imp)}?${devuelve}\nTambién se corrige la caja. No se puede deshacer.`)) return;
+  if(MODO_SERVIDOR){
+    try{ await apiCall('DELETE','/ventas/'+id); }catch(e){ return; }
+    await cargarDatosServidor();
+  } else {
+    if(v.camId){
+      const i=camisetas.findIndex(c=>c.id===v.camId);
+      if(i>=0){camisetas[i].tallas[v.talla]=(camisetas[i].tallas[v.talla]||0)+v.cant; sd('camisetas',camisetas);}
+    }
+    const ti=transacciones.findIndex(t=>t.tipo==='ingreso'&&t.imp===v.imp&&t.fecha===v.fecha);
+    if(ti>=0){transacciones.splice(ti,1); sd('transacciones',transacciones);}
+    ventas=ventas.filter(x=>x.id!==id); sd('ventas',ventas);
+  }
+  registrarActividad('venta',`Venta eliminada: ${v.equipo}`,`${v.cant} UND · ${fmt(v.imp)}`);
+  toast('Venta eliminada ✓ Stock y caja corregidos');
+  refrescarVistasVenta();
 }
 async function syncPedido(accion,data,id=null){
   if(MODO_SERVIDOR){
@@ -1015,8 +1395,9 @@ function renderStock(){
   const criticos=camisetas.filter(c=>stockStatus(c)==='critico');
   cont.innerHTML=`
     ${criticos.length?`<div class="abox abox-r" style="margin-bottom:12px"><i class="ti ti-alert-triangle"></i><div><div class="abox-title">Stock crítico — reponer urgente</div><div class="abox-sub">${criticos.map(c=>`${c.equipo} ${c.tipo} ${c.temp}`).join(' · ')}</div></div></div>`:''}
+    <button class="abtn abtn-g" onclick="abrirScannerInventario()" style="margin-top:0;margin-bottom:9px"><i class="ti ti-scan"></i> Escanear mercancía (entrada de stock)</button>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px">
-      <button class="abtn abtn-g abtn-sm" onclick="abrirNuevaCamiseta()" style="margin-top:0"><i class="ti ti-plus"></i> Nueva camiseta</button>
+      <button class="abtn abtn-gray abtn-sm" onclick="abrirNuevaCamiseta()" style="margin-top:0"><i class="ti ti-plus"></i> Nueva camiseta</button>
       <button class="abtn abtn-gray abtn-sm" onclick="openVentaModal()" style="margin-top:0"><i class="ti ti-shopping-cart"></i> Registrar venta</button>
     </div>
     ${camisetas.length===0?`<div class="empty"><i class="ti ti-shirt"></i><p>Sin camisetas en inventario.<br>Pulsa "Nueva camiseta" para empezar.</p></div>`:''}
@@ -1056,6 +1437,7 @@ function abrirNuevaCamiseta(){
   document.getElementById('nc-equipo').value='';
   document.getElementById('nc-temp').value='24/25';
   document.getElementById('nc-min').value='5';
+  document.getElementById('nc-precio').value='';
   document.getElementById('nc-id').value='';
   document.getElementById('nc-btn-borrar').style.display='none';
   TALLAS.forEach(t=>document.getElementById('nc-'+t).value=0);
@@ -1076,6 +1458,7 @@ function editarCamiseta(id){
   document.getElementById('nc-equipo').value=c.equipo;
   document.getElementById('nc-temp').value=c.temp;
   document.getElementById('nc-min').value=c.min;
+  document.getElementById('nc-precio').value=c.precio!=null?c.precio:'';
   document.getElementById('nc-id').value=c.id;
   document.getElementById('nc-btn-borrar').style.display='flex';
   TALLAS.forEach(t=>document.getElementById('nc-'+t).value=c.tallas[t]||0);
@@ -1093,6 +1476,7 @@ async function saveNuevaCamiseta(){
   if(!equipo){toast('Escribe el nombre del equipo');return}
   const tallas={};
   TALLAS.forEach(t=>tallas[t]=+document.getElementById('nc-'+t).value||0);
+  const precioVal=document.getElementById('nc-precio').value;
   const data={
     equipo,
     temp:document.getElementById('nc-temp').value.trim()||'24/25',
@@ -1100,9 +1484,10 @@ async function saveNuevaCamiseta(){
     tallas,
     min:+document.getElementById('nc-min').value||5,
     prov:+document.getElementById('nc-prov').value||1,
+    precio:precioVal!==''?+precioVal:null,
   };
   const editId=+document.getElementById('nc-id').value;
-  const payload={equipo:data.equipo,temporada:data.temp,tipo:data.tipo,tallas:data.tallas,stock_minimo:data.min,proveedor_id:data.prov};
+  const payload={equipo:data.equipo,temporada:data.temp,tipo:data.tipo,tallas:data.tallas,stock_minimo:data.min,proveedor_id:data.prov,precio:data.precio};
   try{
     if(editId){
       const i=camisetas.findIndex(c=>c.id===editId);
@@ -1120,7 +1505,18 @@ async function saveNuevaCamiseta(){
       camisetas.push(data);
       if(!MODO_SERVIDOR) sd('camisetas',camisetas);
       registrarActividad('stock',`Nueva camiseta: ${equipo} ${data.tipo}`,`${data.temp}`);
-      toast(`${equipo} añadida al inventario ✓`);
+      // Si veníamos de un escaneo, asociar el código automáticamente
+      if(pendingCodigo && MODO_SERVIDOR){
+        try{
+          await apiCall('POST','/camisetas/barcode',{codigo:pendingCodigo,camiseta_id:data.id,talla:pendingTalla||'M'});
+          toast(`${equipo} añadida ✓ Código asociado a talla ${pendingTalla||'M'}`);
+        }catch(e){
+          toast(`${equipo} añadida ✓ pero el código no se pudo asociar`);
+        }
+        pendingCodigo=null; pendingTalla=null;
+      } else {
+        toast(`${equipo} añadida al inventario ✓`);
+      }
     }
     closeM('m-nueva-cam');
     renderStock();
@@ -1233,7 +1629,7 @@ async function saveEnvio(){
 let modoVenta=null; // 'libre' o 'stock'
 
 function openVentaModal(){
-  tipoVenta=null; modoVenta=null;
+  tipoVenta=null; modoVenta=null; impEditadoManual=false;
   // Reset campos
   ['v-cliente','v-cam-libre','v-imp-libre','v-imp'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const cantLibre=document.getElementById('v-cant-libre'); if(cantLibre) cantLibre.value=1;
@@ -1300,7 +1696,20 @@ function setModoVenta(modo){
   });
 }
 
+// Evita ventas duplicadas por doble toque: bloquea el botón mientras guarda
+let ventaGuardando=false;
 async function saveVenta(){
+  if(ventaGuardando) return;
+  ventaGuardando=true;
+  const _btn=document.getElementById('v-save-btn');
+  if(_btn){_btn.style.pointerEvents='none';_btn.style.opacity='.5';}
+  try{ await _saveVentaInterno(); }
+  finally{
+    ventaGuardando=false;
+    if(_btn){_btn.style.pointerEvents='auto';_btn.style.opacity='1';}
+  }
+}
+async function _saveVentaInterno(){
   if(!tipoVenta){toast('Elige el tipo de venta primero');return}
   if(!modoVenta){toast('Elige cómo registrar la camiseta');return}
 
@@ -1997,6 +2406,10 @@ function renderMisVentas(){
           <div style="font-weight:800;font-size:15px;color:var(--g)">${fmt(v.imp)}</div>
           <div style="font-size:11px;color:var(--txh);margin-top:2px">${v.fecha}</div>
         </div>
+      </div>
+      <div style="display:flex;gap:7px;margin-top:9px;justify-content:flex-end">
+        <button class="abtn abtn-gray abtn-sm" style="font-size:12px;margin-top:0;padding:7px 14px;flex:0 0 auto" onclick="abrirEditarVenta(${v.id})"><i class="ti ti-edit"></i> Editar</button>
+        <button class="abtn abtn-gray abtn-sm" style="font-size:12px;margin-top:0;padding:7px 14px;flex:0 0 auto;color:var(--r)" onclick="eliminarVenta(${v.id})"><i class="ti ti-trash"></i> Eliminar</button>
       </div>
     </div>`;
   };

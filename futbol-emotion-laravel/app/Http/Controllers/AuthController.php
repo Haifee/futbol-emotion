@@ -7,8 +7,8 @@ use Illuminate\Http\Request;
 class AuthController extends Controller
 {
     const PINS = [
-        'manager' => '1515',
-        'owner'   => '2828',
+        'manager' => '1234',
+        'owner'   => '0000',
     ];
 
     public function login(Request $request)

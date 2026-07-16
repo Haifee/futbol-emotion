@@ -38,48 +38,10 @@ class DevolucionController extends Controller
         return response()->json(DB::table('devoluciones')->find($id), 201);
     }
 
-    public function aprobar(Request $request, $id)
-    {
-        if ($request->input('_rol') !== 'owner') {
-            return response()->json(['error' => 'Sin permisos'], 403);
-        }
-
-        $dev = DB::table('devoluciones')->find($id);
-        if (!$dev) return response()->json(['error' => 'No encontrada'], 404);
-
-        DB::table('devoluciones')->where('id', $id)->update([
-            'estado'     => 'aprobado',
-            'updated_at' => now(),
-        ]);
-
-        return response()->json(['ok' => true]);
-    }
-
-    public function rechazar(Request $request, $id)
-    {
-        if ($request->input('_rol') !== 'owner') {
-            return response()->json(['error' => 'Sin permisos'], 403);
-        }
-
-        $dev = DB::table('devoluciones')->find($id);
-        if (!$dev) return response()->json(['error' => 'No encontrada'], 404);
-
-        DB::table('devoluciones')->where('id', $id)->update([
-            'estado'     => 'rechazado',
-            'updated_at' => now(),
-        ]);
-
-        return response()->json(['ok' => true]);
-    }
-
     public function completar($id)
     {
         $dev = DB::table('devoluciones')->find($id);
         if (!$dev) return response()->json(['error' => 'No encontrada'], 404);
-
-        if ($dev->estado !== 'aprobado') {
-            return response()->json(['error' => 'El dueño debe aprobar este cambio primero'], 422);
-        }
 
         DB::table('devoluciones')->where('id', $id)->update([
             'estado'     => 'cambiado',

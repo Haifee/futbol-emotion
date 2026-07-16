@@ -20,6 +20,8 @@ Route::get('/me', [AuthController::class, 'me']);
 Route::middleware('auth.pin')->group(function () {
 
     // Camisetas / Inventario
+    Route::get('/camisetas/barcode/{codigo}', [CamisetaController::class, 'buscarPorCodigo']);
+    Route::post('/camisetas/barcode', [CamisetaController::class, 'asociarCodigo']);
     Route::get('/camisetas',          [CamisetaController::class, 'index']);
     Route::post('/camisetas',         [CamisetaController::class, 'store']);
     Route::put('/camisetas/{id}',     [CamisetaController::class, 'update']);
@@ -30,6 +32,8 @@ Route::middleware('auth.pin')->group(function () {
     Route::get('/ventas',             [VentaController::class, 'index']);
     Route::post('/ventas',            [VentaController::class, 'store']);
     Route::get('/ventas/resumen',     [VentaController::class, 'resumen']);
+    Route::put('/ventas/{id}',        [VentaController::class, 'update']);
+    Route::delete('/ventas/{id}',     [VentaController::class, 'destroy']);
 
     // Pedidos a proveedores
     Route::get('/pedidos',            [PedidoController::class, 'index']);
