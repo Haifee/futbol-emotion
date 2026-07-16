@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Migración de datos — Fútbol Emotion</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #111; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+  h1 span { color: #16783f; }
+  .sub { font-size: 13px; color: #6b7280; margin-bottom: 28px; }
+  .card { background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .card h2 { font-size: 15px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .num { width: 26px; height: 26px; background: #16783f; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .desc { font-size: 13px; color: #6b7280; margin-bottom: 14px; line-height: 1.5; }
+  .btn { padding: 13px 20px; border-radius: 12px; border: none; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn:active { opacity: .88; transform: scale(.99); }
+  .btn-g { background: #16783f; color: #fff; }
+  .btn-b { background: #e3eefa; color: #1565c0; }
+  .btn-gray { background: #f4f5f7; color: #374151; }
+  .log { background: #f4f5f7; border-radius: 10px; padding: 14px; font-size: 13px; font-family: monospace; line-height: 1.6; margin-top: 12px; max-height: 220px; overflow-y: auto; display: none; }
+  .log.show { display: block; }
+  .ok { color: #16783f; font-weight: 700; }
+  .err { color: #c0392b; font-weight: 700; }
+  .warn { color: #b86a0a; }
+  .resumen { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .res-item { background: #e6f4ed; border-radius: 10px; padding: 10px 12px; }
+  .res-label { font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; }
+  .res-val { font-size: 22px; font-weight: 800; color: #16783f; }
+  .url-input { width: 100%; padding: 11px 13px; border: 1.5px solid #e0e2e7; border-radius: 10px; font-size: 14px; outline: none; }
+  .url-input:focus { border-color: #2ea76a; }
+  .step-done { opacity: .5; pointer-events: none; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-left: 8px; }
+  .badge-ok { background: #e6f4ed; color: #16783f; }
+  .badge-pend { background: #fef3e2; color: #b86a0a; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Fútbol <span>Emotion</span></h1>
+  <div class="sub">Herramienta de migración · localStorage → Servidor MySQL</div>
+
+  <!-- PASO 1: URL del servidor -->
+  <div class="card" id="card-1">
+    <h2><div class="num">1</div> URL de tu servidor <span class="badge badge-pend" id="badge-1">Pendiente</span></h2>
+    <div class="desc">Introduce la URL donde está instalado el backend Laravel. Ejemplo: <b>http://tuip.com</b> o <b>http://192.168.1.10</b></div>
+    <input class="url-input" id="servidor-url" placeholder="http://tudominio.com o http://IP" value="">
+    <br><br>
+    <button class="btn btn-b" onclick="verificarServidor()">Verificar conexión con el servidor</button>
+    <div class="log" id="log-1"></div>
+  </div>
+
+  <!-- PASO 2: Leer datos del localStorage -->
+  <div class="card" id="card-2">
+    <h2><div class="num">2</div> Leer datos actuales <span class="badge badge-pend" id="badge-2">Pendiente</span></h2>
+    <div class="desc">Abre este archivo en el <b>mismo navegador y dispositivo</b> donde has estado usando la app de Fútbol Emotion. Así podremos leer todos los datos guardados.</div>
+    <button class="btn btn-gray" onclick="leerDatos()">Leer datos del dispositivo</button>
+    <div class="log" id="log-2"></div>
+    <div id="resumen-datos" class="resumen" style="display:none"></div>
+  </div>
+
+  <!-- PASO 3: Migrar al servidor -->
+  <div class="card" id="card-3">
+    <h2><div class="num">3</div> Enviar al servidor <span class="badge badge-pend" id="badge-3">Pendiente</span></h2>
+    <div class="desc">Una vez verificada la conexión y leídos los datos, haz clic para enviarlos al servidor. <b>Este proceso no borra los datos locales.</b></div>
+    <button class="btn btn-g" id="btn-migrar" onclick="migrar()" disabled style="opacity:.4">Migrar datos al servidor</button>
+    <div class="log" id="log-3"></div>
+  </div>
+
+  <!-- PASO 4: Resultado -->
+  <div class="card" id="card-4" style="display:none">
+    <h2><div class="num">4</div> ¡Migración completada! <span class="badge badge-ok">✓ Listo</span></h2>
+    <div class="desc">Todos los datos están ahora en el servidor MySQL. Puedes abrir la nueva versión de la app desde cualquier dispositivo y verás los mismos datos.</div>
+    <div id="resumen-final" class="resumen"></div>
+  </div>
+</div>
+
+<script>
+let SERVIDOR_URL = '';
+let datosLocales = {};
+let servidorOk = false;
+let datosOk = false;
+
+function log(id, msg, tipo='') {
+  const el = document.getElementById('log-' + id);
+  el.classList.add('show');
+  el.innerHTML += `<div class="${tipo}">${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function badge(id, texto, tipo) {
+  const el = document.getElementById('badge-' + id);
+  el.textContent = texto;
+  el.className = 'badge badge-' + tipo;
+}
+
+async function verificarServidor() {
+  SERVIDOR_URL = document.getElementById('servidor-url').value.trim().replace(/\/$/, '');
+  if (!SERVIDOR_URL) { log(1, '⚠ Introduce la URL del servidor', 'warn'); return; }
+
+  document.getElementById('log-1').innerHTML = '';
+  log(1, `Conectando con ${SERVIDOR_URL}...`);
+
+  try {
+    const res = await fetch(`${SERVIDOR_URL}/api/me`, { credentials: 'include' });
+    if (res.status === 401 || res.ok) {
+      log(1, '✓ Servidor encontrado y respondiendo', 'ok');
+      log(1, `URL: ${SERVIDOR_URL}/api`);
+      badge(1, '✓ Conectado', 'ok');
+      servidorOk = true;
+      revisarListo();
+    } else {
+      log(1, `✗ Error ${res.status} — Verifica la URL`, 'err');
+    }
+  } catch (e) {
+    log(1, '✗ No se pudo conectar. Verifica que el servidor esté activo y la URL sea correcta.', 'err');
+    log(1, `Detalle: ${e.message}`, 'warn');
+  }
+}
+
+function leerDatos() {
+  document.getElementById('log-2').innerHTML = '';
+  const PREFIX = 'fe4_';
+  const claves = {
+    camisetas:     PREFIX + 'camisetas',
+    pedidos:       PREFIX + 'pedidos',
+    envios:        PREFIX + 'envios',
+    devoluciones:  PREFIX + 'devoluciones',
+    ventas:        PREFIX + 'ventas',
+    transacciones: PREFIX + 'transacciones',
+  };
+
+  let totalRegistros = 0;
+  const resumen = {};
+
+  for (const [nombre, clave] of Object.entries(claves)) {
+    try {
+      const raw = localStorage.getItem(clave);
+      const datos = raw ? JSON.parse(raw) : [];
+      datosLocales[nombre] = datos;
+      resumen[nombre] = datos.length;
+      totalRegistros += datos.length;
+      log(2, `✓ ${nombre}: ${datos.length} registros`, 'ok');
+    } catch (e) {
+      log(2, `⚠ ${nombre}: sin datos o error al leer`, 'warn');
+      datosLocales[nombre] = [];
+      resumen[nombre] = 0;
+    }
+  }
+
+  if (totalRegistros === 0) {
+    log(2, '⚠ No se encontraron datos. Asegúrate de abrir este archivo en el mismo navegador donde usas la app.', 'warn');
+    return;
+  }
+
+  log(2, `Total: ${totalRegistros} registros encontrados`, 'ok');
+  badge(2, `✓ ${totalRegistros} registros`, 'ok');
+  datosOk = true;
+
+  // Mostrar resumen visual
+  const resEl = document.getElementById('resumen-datos');
+  resEl.style.display = 'grid';
+  resEl.innerHTML = Object.entries(resumen).map(([k, v]) => `
+    <div class="res-item">
+      <div class="res-label">${k}</div>
+      <div class="res-val">${v}</div>
+    </div>`).join('');
+
+  revisarListo();
+}
+
+function revisarListo() {
+  const btn = document.getElementById('btn-migrar');
+  if (servidorOk && datosOk) {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
+}
+
+async function migrar() {
+  document.getElementById('log-3').innerHTML = '';
+  log(3, 'Iniciando migración...');
+
+  // Primero hacer login como owner para tener permisos
+  log(3, 'Autenticando en el servidor...');
+  try {
+    const loginRes = await fetch(`${SERVIDOR_URL}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ rol: 'owner', pin: '0000' }),
+    });
+    const loginData = await loginRes.json();
+    if (!loginData.ok) {
+      log(3, '✗ Error de autenticación. Verifica que el servidor esté configurado.', 'err');
+      return;
+    }
+    log(3, '✓ Autenticado correctamente', 'ok');
+  } catch(e) {
+    log(3, `✗ Error de conexión: ${e.message}`, 'err');
+    return;
+  }
+
+  // Enviar datos
+  log(3, 'Enviando datos al servidor...');
+  try {
+    const res = await fetch(`${SERVIDOR_URL}/api/migrar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(datosLocales),
+    });
+
+    const data = await res.json();
+
+    if (data.ok) {
+      log(3, '✓ Migración completada exitosamente', 'ok');
+      badge(3, '✓ Completado', 'ok');
+
+      // Mostrar paso 4
+      const card4 = document.getElementById('card-4');
+      card4.style.display = 'block';
+
+      const resEl = document.getElementById('resumen-final');
+      resEl.innerHTML = Object.entries(data.resumen || {}).map(([k, v]) => `
+        <div class="res-item">
+          <div class="res-label">${k}</div>
+          <div class="res-val">${v}</div>
+        </div>`).join('');
+
+      card4.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      log(3, `✗ Error: ${data.error || 'Error desconocido'}`, 'err');
+      if (data.detalle) log(3, `Detalle: ${data.detalle}`, 'warn');
+    }
+  } catch(e) {
+    log(3, `✗ Error de conexión: ${e.message}`, 'err');
+  }
+}
+</script>
+</body>
+</html>
