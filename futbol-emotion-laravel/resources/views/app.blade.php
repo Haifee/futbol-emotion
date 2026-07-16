@@ -430,10 +430,10 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <input class="fi" id="v-cliente" placeholder="Nombre del cliente">
     </div>
 
-    <!-- MODO: escribir libre o seleccionar del stock -->
+    <!-- MODO: escribir libre, seleccionar del stock, o escanear -->
     <div id="v-modo-wrap" style="display:none;margin-top:14px">
       <label class="fl">¿Cómo registrar la camiseta?</label>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
         <button id="modo-libre" onclick="setModoVenta('libre')"
           style="padding:11px;border-radius:10px;border:2px solid var(--grayb);background:#fff;cursor:pointer;font-size:13px;font-weight:700;color:var(--txm);display:flex;flex-direction:column;align-items:center;gap:5px">
           <i class="ti ti-pencil" style="font-size:22px"></i>Escribir
@@ -441,6 +441,10 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
         <button id="modo-stock" onclick="setModoVenta('stock')"
           style="padding:11px;border-radius:10px;border:2px solid var(--grayb);background:#fff;cursor:pointer;font-size:13px;font-weight:700;color:var(--txm);display:flex;flex-direction:column;align-items:center;gap:5px">
           <i class="ti ti-shirt" style="font-size:22px"></i>Del stock
+        </button>
+        <button id="modo-scan" onclick="modoEscanear()"
+          style="padding:11px;border-radius:10px;border:2px solid var(--gm);background:var(--gl);cursor:pointer;font-size:13px;font-weight:700;color:var(--gd);display:flex;flex-direction:column;align-items:center;gap:5px">
+          <i class="ti ti-scan" style="font-size:22px"></i>Escanear
         </button>
       </div>
     </div>
@@ -965,6 +969,11 @@ function crearCamisetaDesdeScan(){
 }
 
 // ── Escaneo desde VENTA ──
+// Atajo: elige "Escanear" en el modal de venta → activa modo stock + abre cámara
+function modoEscanear(){
+  setModoVenta('stock');
+  escanearParaVenta();
+}
 function escanearParaVenta(){
   if(!MODO_SERVIDOR){toast('El escáner requiere conexión con el servidor');return}
   abrirScanner(async codigo=>{
