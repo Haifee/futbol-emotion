@@ -10,6 +10,9 @@
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{
   --g:#16a34a;--gl:#dcfce7;--gm:#22c55e;--gd:#15803d;--gx:#bbf7d0;
@@ -331,6 +334,25 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
   </div>
 </div>
 
+<!-- MODAL: EXPORTAR REPORTE -->
+<div class="mbg" id="m-export">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle">Exportar reporte <button class="mclose" onclick="closeM('m-export')"><i class="ti ti-x"></i></button></div>
+    <div style="font-size:14px;color:var(--txm);margin-bottom:14px" id="ex-sub">—</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button onclick="exportarReporte('pdf')" style="padding:18px 10px;border-radius:12px;border:2px solid var(--grayb);background:#fff;cursor:pointer;font-size:14px;font-weight:800;color:var(--txd);display:flex;flex-direction:column;align-items:center;gap:8px">
+        <i class="ti ti-file-type-pdf" style="font-size:32px;color:#e5484d"></i>PDF
+        <span style="font-size:11px;font-weight:600;color:var(--txm)">Para imprimir o enviar</span>
+      </button>
+      <button onclick="exportarReporte('excel')" style="padding:18px 10px;border-radius:12px;border:2px solid var(--grayb);background:#fff;cursor:pointer;font-size:14px;font-weight:800;color:var(--txd);display:flex;flex-direction:column;align-items:center;gap:8px">
+        <i class="ti ti-file-type-xls" style="font-size:32px;color:#16a34a"></i>Excel
+        <span style="font-size:11px;font-weight:600;color:var(--txm)">Para el contador</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: ESCÁNER DE CÓDIGO DE BARRAS -->
 <div class="mbg" id="m-scan">
   <div class="modal">
@@ -386,7 +408,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <label class="fl">Camiseta</label>
     <select class="fi" id="as-cam"></select>
     <label class="fl">Talla</label>
-    <select class="fi" id="as-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select>
+    <select class="fi" id="as-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option value="10">10 (niño)</option><option value="12">12 (niño)</option><option value="14">14 (niño)</option><option value="16">16 (niño)</option></select>
     <label class="fl">Unidades que llegaron (0 = solo asociar)</label>
     <input class="fi" id="as-cant" type="number" min="0" value="1" style="text-align:center;font-weight:700">
     <button class="abtn abtn-g" onclick="confirmarAsociarCodigo()"><i class="ti ti-link"></i> Asociar y guardar</button>
@@ -430,10 +452,10 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <input class="fi" id="v-cliente" placeholder="Nombre del cliente">
     </div>
 
-    <!-- MODO: escribir libre o seleccionar del stock -->
+    <!-- MODO: escribir libre, seleccionar del stock, o escanear -->
     <div id="v-modo-wrap" style="display:none;margin-top:14px">
       <label class="fl">¿Cómo registrar la camiseta?</label>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
         <button id="modo-libre" onclick="setModoVenta('libre')"
           style="padding:11px;border-radius:10px;border:2px solid var(--grayb);background:#fff;cursor:pointer;font-size:13px;font-weight:700;color:var(--txm);display:flex;flex-direction:column;align-items:center;gap:5px">
           <i class="ti ti-pencil" style="font-size:22px"></i>Escribir
@@ -441,6 +463,10 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
         <button id="modo-stock" onclick="setModoVenta('stock')"
           style="padding:11px;border-radius:10px;border:2px solid var(--grayb);background:#fff;cursor:pointer;font-size:13px;font-weight:700;color:var(--txm);display:flex;flex-direction:column;align-items:center;gap:5px">
           <i class="ti ti-shirt" style="font-size:22px"></i>Del stock
+        </button>
+        <button id="modo-scan" onclick="modoEscanear()"
+          style="padding:11px;border-radius:10px;border:2px solid var(--gm);background:var(--gl);cursor:pointer;font-size:13px;font-weight:700;color:var(--gd);display:flex;flex-direction:column;align-items:center;gap:5px">
+          <i class="ti ti-scan" style="font-size:22px"></i>Escanear
         </button>
       </div>
     </div>
@@ -461,7 +487,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <label class="fl">Camiseta del inventario</label>
       <select class="fi" id="v-cam" onchange="autoPrecioVenta()"></select>
       <label class="fl">Talla</label>
-      <select class="fi" id="v-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select>
+      <select class="fi" id="v-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option value="10">10 (niño)</option><option value="12">12 (niño)</option><option value="14">14 (niño)</option><option value="16">16 (niño)</option></select>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label class="fl">Cantidad (UND)</label><input class="fi" id="v-cant" type="number" min="1" value="1" oninput="autoPrecioVenta()"></div>
         <div><label class="fl">Importe ($)</label><input class="fi" id="v-imp" type="number" min="0" step="0.01" placeholder="0.00" oninput="impEditadoManual=true"></div>
@@ -503,7 +529,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <!-- Talla editable solo en ventas del stock -->
     <div id="ev-talla-wrap" style="display:none">
       <label class="fl">Talla</label>
-      <select class="fi" id="ev-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select>
+      <select class="fi" id="ev-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option value="10">10 (niño)</option><option value="12">12 (niño)</option><option value="14">14 (niño)</option><option value="16">16 (niño)</option></select>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -566,6 +592,10 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <div><label class="fl" style="margin-top:0;text-align:center">L</label><input class="fi" id="aj-L" type="number" min="0" style="text-align:center;padding:10px 6px"></div>
       <div><label class="fl" style="margin-top:0;text-align:center">XL</label><input class="fi" id="aj-XL" type="number" min="0" style="text-align:center;padding:10px 6px"></div>
       <div><label class="fl" style="margin-top:0;text-align:center">XXL</label><input class="fi" id="aj-XXL" type="number" min="0" style="text-align:center;padding:10px 6px"></div>
+      <div><label class="fl" style="margin-top:0;text-align:center">10<span style="font-size:9px;display:block;color:var(--txh)">niño</span></label><input class="fi" id="aj-10" type="number" min="0" style="text-align:center;padding:10px 6px"></div>
+      <div><label class="fl" style="margin-top:0;text-align:center">12<span style="font-size:9px;display:block;color:var(--txh)">niño</span></label><input class="fi" id="aj-12" type="number" min="0" style="text-align:center;padding:10px 6px"></div>
+      <div><label class="fl" style="margin-top:0;text-align:center">14<span style="font-size:9px;display:block;color:var(--txh)">niño</span></label><input class="fi" id="aj-14" type="number" min="0" style="text-align:center;padding:10px 6px"></div>
+      <div><label class="fl" style="margin-top:0;text-align:center">16<span style="font-size:9px;display:block;color:var(--txh)">niño</span></label><input class="fi" id="aj-16" type="number" min="0" style="text-align:center;padding:10px 6px"></div>
     </div>
     <input type="hidden" id="aj-id">
     <button class="abtn abtn-g" onclick="saveAjuste()"><i class="ti ti-check"></i> Actualizar stock</button>
@@ -601,6 +631,10 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <div><label style="display:block;font-size:11px;font-weight:700;color:var(--txm);text-align:center;margin-bottom:5px">L</label><input class="fi" id="nc-L" type="number" min="0" value="0" style="text-align:center;padding:10px 4px;font-size:16px;font-weight:700"></div>
       <div><label style="display:block;font-size:11px;font-weight:700;color:var(--txm);text-align:center;margin-bottom:5px">XL</label><input class="fi" id="nc-XL" type="number" min="0" value="0" style="text-align:center;padding:10px 4px;font-size:16px;font-weight:700"></div>
       <div><label style="display:block;font-size:11px;font-weight:700;color:var(--txm);text-align:center;margin-bottom:5px">XXL</label><input class="fi" id="nc-XXL" type="number" min="0" value="0" style="text-align:center;padding:10px 4px;font-size:16px;font-weight:700"></div>
+      <div><label style="display:block;font-size:11px;font-weight:700;color:var(--txm);text-align:center;margin-bottom:5px">10 <span style="font-size:9px;color:var(--txh)">niño</span></label><input class="fi" id="nc-10" type="number" min="0" value="0" style="text-align:center;padding:10px 4px;font-size:16px;font-weight:700"></div>
+      <div><label style="display:block;font-size:11px;font-weight:700;color:var(--txm);text-align:center;margin-bottom:5px">12 <span style="font-size:9px;color:var(--txh)">niño</span></label><input class="fi" id="nc-12" type="number" min="0" value="0" style="text-align:center;padding:10px 4px;font-size:16px;font-weight:700"></div>
+      <div><label style="display:block;font-size:11px;font-weight:700;color:var(--txm);text-align:center;margin-bottom:5px">14 <span style="font-size:9px;color:var(--txh)">niño</span></label><input class="fi" id="nc-14" type="number" min="0" value="0" style="text-align:center;padding:10px 4px;font-size:16px;font-weight:700"></div>
+      <div><label style="display:block;font-size:11px;font-weight:700;color:var(--txm);text-align:center;margin-bottom:5px">16 <span style="font-size:9px;color:var(--txh)">niño</span></label><input class="fi" id="nc-16" type="number" min="0" value="0" style="text-align:center;padding:10px 4px;font-size:16px;font-weight:700"></div>
     </div>
     <div style="font-size:12px;color:var(--txh);margin-bottom:4px">Total: <span id="nc-total" style="font-weight:700;color:var(--g)">0</span> UND</div>
 
@@ -679,7 +713,7 @@ async function apiCall(method, endpoint, data=null){
 
 // ── DATOS ────────────────────────────────────────────────────────────────────
 const PINS={manager:'1515',owner:'2828'};
-const TALLAS=['S','M','L','XL','XXL'];
+const TALLAS=['S','M','L','XL','XXL','10','12','14','16']; // adulto + niño
 let role=null, curPage='';
 
 let camisetas=ld('camisetas',[
@@ -834,9 +868,11 @@ async function syncVenta(data){
 
 // ── ESCÁNER DE CÓDIGO DE BARRAS ───────────────────────────────────────────────
 let scannerActivo=null, scanCallback=null, pendingCodigo=null, pendingTalla=null, impEditadoManual=false;
+let scanContinuo=false, ultimoCodigo=null, ultimoScanTs=0, contadorSesion=0;
 
-function abrirScanner(cb){
+function abrirScanner(cb, continuo=false){
   scanCallback=cb;
+  scanContinuo=continuo; ultimoCodigo=null; ultimoScanTs=0; contadorSesion=0;
   document.getElementById('scan-manual').value='';
   document.getElementById('scan-status').textContent='Iniciando cámara…';
   openM('m-scan');
@@ -867,13 +903,22 @@ function pararScanner(){
     try{ s.stop().then(()=>s.clear()).catch(()=>{}); }catch(e){}
   }
 }
-function cerrarScanner(){ pararScanner(); scanCallback=null; closeM('m-scan'); }
+function cerrarScanner(){ pararScanner(); scanCallback=null; scanContinuo=false; closeM('m-scan'); }
 function scanManual(){
   const c=document.getElementById('scan-manual').value.trim();
   if(!c){toast('Escribe el código primero');return}
   procesarScan(c);
 }
 function procesarScan(codigo){
+  if(scanContinuo){
+    // Anti-rebote: la cámara lee ~10 veces/seg — ignorar el mismo código por 1.8s
+    const ahora=Date.now();
+    if(codigo===ultimoCodigo && ahora-ultimoScanTs<1800) return;
+    ultimoCodigo=codigo; ultimoScanTs=ahora;
+    if(navigator.vibrate) navigator.vibrate(80);
+    if(scanCallback) scanCallback(codigo); // NO cerrar: sigue escaneando
+    return;
+  }
   pararScanner(); closeM('m-scan');
   if(navigator.vibrate) navigator.vibrate(80);
   const cb=scanCallback; scanCallback=null;
@@ -884,29 +929,47 @@ async function buscarCodigo(codigo){
 }
 // Si cierran el escáner tocando el fondo oscuro, apagar la cámara también
 document.getElementById('m-scan').addEventListener('click',e=>{
-  if(e.target===e.currentTarget){ pararScanner(); scanCallback=null; }
+  if(e.target===e.currentTarget){ pararScanner(); scanCallback=null; scanContinuo=false; }
 });
 
 // ── Escaneo desde INVENTARIO (entrada de mercancía) ──
 function abrirScannerInventario(){
   if(!MODO_SERVIDOR){toast('El escáner requiere conexión con el servidor');return}
+  // MODO CONTINUO: cada escaneo suma 1 UND y la cámara sigue abierta
   abrirScanner(async codigo=>{
     try{
       const r=await buscarCodigo(codigo);
       if(r.encontrado){
-        const cam=camisetas.find(c=>c.id===r.camiseta.id)||r.camiseta;
-        document.getElementById('sa-nombre').textContent=`${cam.equipo} ${cam.tipo} ${cam.temp}`;
-        document.getElementById('sa-talla').textContent=r.talla;
-        document.getElementById('sa-stock').textContent=cam.tallas[r.talla]||0;
-        document.getElementById('sa-cant').value=1;
-        document.getElementById('sa-camid').value=cam.id;
-        document.getElementById('sa-talla-h').value=r.talla;
-        openM('m-scan-add');
+        await sumarUnaUnidad(r.camiseta.id, r.talla);
       } else {
+        // Código nuevo: pausar el continuo y abrir el asociador
+        pararScanner(); scanCallback=null; scanContinuo=false; closeM('m-scan');
         prepararAsociar(codigo);
       }
     }catch(e){/* apiCall ya mostró el toast */}
-  });
+  }, true);
+  setTimeout(()=>{
+    const st=document.getElementById('scan-status');
+    if(st && scannerActivo) st.textContent='Modo continuo: cada lectura suma 1 UND. Escanea una por una.';
+  }, 1200);
+}
+
+async function sumarUnaUnidad(camId, talla){
+  const i=camisetas.findIndex(c=>c.id===camId);
+  if(i<0){toast('Camiseta no encontrada');return}
+  camisetas[i].tallas[talla]=(camisetas[i].tallas[talla]||0)+1;
+  try{
+    await syncCamisetas('stock',camisetas[i].tallas,camId);
+  }catch(e){
+    camisetas[i].tallas[talla]-=1; // revertir si el servidor falló
+    return;
+  }
+  contadorSesion++;
+  registrarActividad('stock',`Entrada por escaneo: ${camisetas[i].equipo} ${camisetas[i].tipo} Talla ${talla}`,`+1 UND`);
+  toast(`✓ ${camisetas[i].equipo} ${talla} — ahora ${camisetas[i].tallas[talla]} UND`);
+  const st=document.getElementById('scan-status');
+  if(st) st.textContent=`✓ ${contadorSesion} escaneada${contadorSesion>1?'s':''} esta sesión. Sigue escaneando o cierra al terminar.`;
+  if(curPage==='stock') renderStock();
 }
 function prepararAsociar(codigo){
   pendingCodigo=codigo;
@@ -965,6 +1028,11 @@ function crearCamisetaDesdeScan(){
 }
 
 // ── Escaneo desde VENTA ──
+// Atajo: elige "Escanear" en el modal de venta → activa modo stock + abre cámara
+function modoEscanear(){
+  setModoVenta('stock');
+  escanearParaVenta();
+}
 function escanearParaVenta(){
   if(!MODO_SERVIDOR){toast('El escáner requiere conexión con el servidor');return}
   abrirScanner(async codigo=>{
@@ -979,6 +1047,7 @@ function escanearParaVenta(){
       const cam=camisetas.find(c=>c.id===r.camiseta.id)||r.camiseta;
       document.getElementById('v-cam').value=String(cam.id);
       document.getElementById('v-talla').value=r.talla;
+      document.getElementById('v-cant').value=1; // escaneo = 1 unidad (editable si llevan más)
       impEditadoManual=false;
       autoPrecioVenta();
       const stock=cam.tallas[r.talla]||0;
@@ -1078,6 +1147,28 @@ async function guardarEdicionVenta(){
     refrescarVistasVenta();
   }catch(e){/* apiCall ya mostró el toast de error */}
   btn.style.pointerEvents='auto'; btn.style.opacity='1';
+}
+
+// ── LIMPIAR HISTORIAL (solo dueño) ───────────────────────────────────────────
+async function eliminarActividad(id){
+  if(!confirm('¿Eliminar esta entrada del historial?')) return;
+  if(MODO_SERVIDOR){
+    try{ await apiCall('DELETE','/actividad/'+id); }catch(e){ return; }
+  }
+  actividad=actividad.filter(a=>a.id!==id);
+  if(!MODO_SERVIDOR) sd('actividad',actividad);
+  renderHistorial();
+  toast('Entrada eliminada ✓');
+}
+async function limpiarHistorial(){
+  if(!confirm('¿Vaciar TODO el historial de actividad? No se puede deshacer.')) return;
+  if(MODO_SERVIDOR){
+    try{ await apiCall('DELETE','/actividad'); }catch(e){ return; }
+  }
+  actividad=[]; notifsVistas=[];
+  if(!MODO_SERVIDOR) sd('actividad',actividad);
+  renderHistorial();
+  toast('Historial vaciado ✓');
 }
 
 async function eliminarVenta(id){
@@ -2057,7 +2148,7 @@ function renderCaja(){
   const sem=calcPeriodo(inicioSemStr);
   const mes=calcPeriodo(inicioMesStr);
 
-  function bloqueResumen(titulo,icono,color,data,periodo){
+  function bloqueResumen(titulo,icono,color,data,periodo,clave){
     const margen=data.ing>0?Math.round((data.neto/data.ing)*100):0;
     return `
       <div class="card" style="border-left:4px solid ${color};margin-bottom:14px">
@@ -2066,7 +2157,7 @@ function renderCaja(){
             <div style="width:38px;height:38px;border-radius:10px;background:${color}22;display:flex;align-items:center;justify-content:center;font-size:20px;color:${color}"><i class="ti ${icono}"></i></div>
             <div><div style="font-size:16px;font-weight:800">${titulo}</div><div style="font-size:12px;color:var(--txm)">${periodo}</div></div>
           </div>
-          <button onclick="exportarCierre('${titulo}',${JSON.stringify(data).replace(/'/g,"\\'")})" style="background:var(--gray);border:none;border-radius:9px;padding:7px 11px;cursor:pointer;font-size:12px;font-weight:700;color:var(--txm);display:${role==='owner'?'flex':'none'};align-items:center;gap:5px"><i class="ti ti-download" style="font-size:15px"></i> Exportar</button>
+          <button onclick="abrirExport('${clave}')" style="background:var(--gray);border:none;border-radius:9px;padding:7px 11px;cursor:pointer;font-size:12px;font-weight:700;color:var(--txm);display:${role==='owner'?'flex':'none'};align-items:center;gap:5px"><i class="ti ti-download" style="font-size:15px"></i> Exportar</button>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
           <div style="background:var(--gl);border-radius:10px;padding:11px 13px">
@@ -2120,35 +2211,138 @@ function renderCaja(){
   cont.innerHTML=`
     <div style="font-size:19px;font-weight:800;margin-bottom:4px">Cierre de caja</div>
     <div style="font-size:13px;color:var(--txm);margin-bottom:18px">Hoy: ${hoyStr}</div>
-    ${bloqueResumen('Cierre del día','ti-sun','var(--g)',dia,hoyStr)}
-    ${bloqueResumen('Cierre de la semana','ti-calendar-week','var(--b)',sem,`${inicioSemStr} → ${hoyStr}`)}
-    ${bloqueResumen('Cierre del mes','ti-calendar-month','var(--p)',mes,inicioMesStr.slice(0,7))}
+    ${bloqueResumen('Cierre del día','ti-sun','var(--g)',dia,hoyStr,'dia')}
+    ${bloqueResumen('Cierre de la semana','ti-calendar-week','var(--b)',sem,`${inicioSemStr} → ${hoyStr}`,'sem')}
+    ${bloqueResumen('Cierre del mes','ti-calendar-month','var(--p)',mes,inicioMesStr.slice(0,7),'mes')}
   `;
 }
 
-function exportarCierre(titulo,data){
-  const lineas=[
-    `CIERRE: ${titulo}`,
-    `Fecha: ${hoy()}`,
-    ``,
-    `INGRESOS:   ${data.ing.toFixed(2)}`,
-    `GASTOS:     ${data.gas.toFixed(2)}`,
-    `BENEFICIO:  ${data.neto.toFixed(2)}`,
-    `MARGEN:     ${data.ing>0?Math.round((data.neto/data.ing)*100):0}%`,
-    ``,
-    `Ventas físicas: ${data.vFis.length} (${data.vFis.reduce((s,v)=>s+v.imp,0).toFixed(2)})`,
-    `Ventas online:  ${data.vOnl.length} (${data.vOnl.reduce((s,v)=>s+v.imp,0).toFixed(2)})`,
-    `Envíos:         ${data.envs.length}`,
-    ``,
-    `--- MOVIMIENTOS ---`,
-    ...data.txs.map(t=>`${t.fecha} | ${t.tipo==='ingreso'?'+':'-'}${t.imp.toFixed(2)} | ${t.desc} | ${t.canal}`),
+// ── EXPORTAR REPORTES (PDF / Excel) ──────────────────────────────────────────
+let exportPeriodo=null;
+
+// Calcula rango y datos del período (independiente de renderCaja)
+function datosPeriodo(clave){
+  const ahora=new Date(), hoyStr=hoy();
+  const diasSemana=ahora.getDay()===0?6:ahora.getDay()-1;
+  const inicioSem=new Date(ahora); inicioSem.setDate(ahora.getDate()-diasSemana);
+  const rangos={
+    dia:{desde:hoyStr,titulo:'Cierre del día',etiqueta:hoyStr},
+    sem:{desde:inicioSem.toISOString().slice(0,10),titulo:'Cierre de la semana',etiqueta:inicioSem.toISOString().slice(0,10)+' al '+hoyStr},
+    mes:{desde:ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0')+'-01',titulo:'Cierre del mes',etiqueta:hoyStr.slice(0,7)},
+  };
+  const r=rangos[clave];
+  const txs=transacciones.filter(t=>t.fecha>=r.desde&&t.fecha<=hoyStr);
+  const vts=ventas.filter(v=>v.fecha>=r.desde&&v.fecha<=hoyStr);
+  const ing=txs.filter(t=>t.tipo==='ingreso').reduce((s,t)=>s+t.imp,0);
+  const gas=txs.filter(t=>t.tipo==='gasto').reduce((s,t)=>s+t.imp,0);
+  return {...r,txs,vts,ing,gas,neto:ing-gas,margen:ing>0?Math.round((ing-gas)/ing*100):0};
+}
+
+function abrirExport(clave){
+  exportPeriodo=clave;
+  const d=datosPeriodo(clave);
+  document.getElementById('ex-sub').textContent=d.titulo+' · '+d.etiqueta+' · '+d.vts.length+' ventas, '+d.txs.length+' movimientos';
+  openM('m-export');
+}
+
+function exportarReporte(formato){
+  const d=datosPeriodo(exportPeriodo);
+  const nombre='futbol-emotion_'+exportPeriodo+'_'+hoy();
+  try{
+    if(formato==='pdf') generarPDF(d,nombre);
+    else generarExcel(d,nombre);
+    closeM('m-export');
+    toast('Reporte descargado ✓');
+  }catch(e){
+    toast('Error al generar el reporte — revisa tu conexión');
+  }
+}
+
+function generarPDF(d,nombre){
+  const { jsPDF }=window.jspdf;
+  const doc=new jsPDF();
+  const verde=[22,163,74];
+
+  doc.setFillColor(verde[0],verde[1],verde[2]); doc.rect(0,0,210,26,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(16); doc.setFont(undefined,'bold');
+  doc.text('FÚTBOL EMOTION',14,11);
+  doc.setFontSize(11); doc.setFont(undefined,'normal');
+  doc.text(d.titulo+' — '+d.etiqueta,14,19);
+  doc.setTextColor(120,120,120); doc.setFontSize(8);
+  doc.text('Generado: '+new Date().toLocaleString('es'),14,32);
+
+  doc.autoTable({
+    startY:36,
+    head:[['Concepto','Valor']],
+    body:[
+      ['Ingresos','$'+d.ing.toFixed(2)],
+      ['Gastos','$'+d.gas.toFixed(2)],
+      ['Beneficio neto','$'+d.neto.toFixed(2)],
+      ['Margen',d.margen+'%'],
+      ['Ventas del período',''+d.vts.length],
+    ],
+    theme:'grid', headStyles:{fillColor:verde}, styles:{fontSize:9},
+    columnStyles:{1:{halign:'right',fontStyle:'bold'}},
+  });
+
+  if(d.vts.length){
+    doc.autoTable({
+      startY:doc.lastAutoTable.finalY+8,
+      head:[['Fecha','Camiseta','Talla','Cant.','Canal','Cliente','Importe']],
+      body:d.vts.map(v=>[v.fecha,v.equipo,v.talla||'—',v.cant,v.canal,v.cliente||'—','$'+v.imp.toFixed(2)]),
+      foot:[['','','','','','TOTAL','$'+d.vts.reduce((s,v)=>s+v.imp,0).toFixed(2)]],
+      theme:'striped', headStyles:{fillColor:verde}, footStyles:{fillColor:[240,240,240],textColor:[0,0,0],fontStyle:'bold'},
+      styles:{fontSize:8}, columnStyles:{6:{halign:'right'}},
+    });
+  }
+
+  if(d.txs.length){
+    doc.autoTable({
+      startY:doc.lastAutoTable.finalY+8,
+      head:[['Fecha','Tipo','Descripción','Canal','Importe']],
+      body:d.txs.map(t=>[t.fecha,t.tipo==='ingreso'?'Ingreso':'Gasto',t.desc,t.canal,(t.tipo==='ingreso'?'+':'-')+'$'+t.imp.toFixed(2)]),
+      theme:'striped', headStyles:{fillColor:verde},
+      styles:{fontSize:8}, columnStyles:{4:{halign:'right'}},
+    });
+  }
+
+  doc.save(nombre+'.pdf');
+}
+
+function generarExcel(d,nombre){
+  const wb=XLSX.utils.book_new();
+
+  const resumen=[
+    ['FÚTBOL EMOTION — '+d.titulo],
+    ['Período',d.etiqueta],
+    ['Generado',new Date().toLocaleString('es')],
+    [],
+    ['Concepto','Valor'],
+    ['Ingresos',d.ing],
+    ['Gastos',d.gas],
+    ['Beneficio neto',d.neto],
+    ['Margen (%)',d.margen],
+    ['Ventas del período',d.vts.length],
   ];
-  const blob=new Blob([lineas.join('\n')],{type:'text/plain;charset=utf-8'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`futbol-emotion-${titulo.toLowerCase().replace(/ /g,'-')}-${hoy()}.txt`;
-  a.click();
-  toast('Cierre exportado ✓');
+  const ws1=XLSX.utils.aoa_to_sheet(resumen);
+  ws1['!cols']=[{wch:22},{wch:16}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Resumen');
+
+  const ventasFilas=[['Fecha','Camiseta','Talla','Cantidad','Canal','Cliente','Importe']]
+    .concat(d.vts.map(v=>[v.fecha,v.equipo,v.talla||'—',v.cant,v.canal,v.cliente||'—',v.imp]));
+  ventasFilas.push([]);
+  ventasFilas.push(['','','','','','TOTAL',d.vts.reduce((s,v)=>s+v.imp,0)]);
+  const ws2=XLSX.utils.aoa_to_sheet(ventasFilas);
+  ws2['!cols']=[{wch:11},{wch:28},{wch:6},{wch:9},{wch:14},{wch:18},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Ventas');
+
+  const movFilas=[['Fecha','Tipo','Descripción','Canal','Importe']]
+    .concat(d.txs.map(t=>[t.fecha,t.tipo==='ingreso'?'Ingreso':'Gasto',t.desc,t.canal,t.tipo==='ingreso'?t.imp:-t.imp]));
+  const ws3=XLSX.utils.aoa_to_sheet(movFilas);
+  ws3['!cols']=[{wch:11},{wch:9},{wch:38},{wch:14},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Movimientos');
+
+  XLSX.writeFile(wb,nombre+'.xlsx');
 }
 
 // ── AJUSTES ───────────────────────────────────────────────────────────────────
@@ -2257,20 +2451,41 @@ function importarDatos(e){
   reader.readAsText(file);
 }
 
-function confirmarBorrar(tipo){
+async function confirmarBorrar(tipo){
   const msgs={
     ventas:'¿Borrar todo el historial de ventas? No se puede deshacer.',
     envios:'¿Borrar todo el historial de envíos? No se puede deshacer.',
     transacciones:'¿Borrar todos los movimientos financieros? No se puede deshacer.',
-    todo:'⚠️ ¿BORRAR ABSOLUTAMENTE TODO? Esto reinicia la app completamente. No se puede deshacer.',
+    todo:'⚠️ ¿BORRAR ABSOLUTAMENTE TODO? Esto reinicia la app completamente (inventario, ventas, caja, historial). No se puede deshacer.',
   };
   if(!confirm(msgs[tipo]||'¿Seguro?')) return;
+
+  // Reinicio total: doble seguro — escribir BORRAR + respaldo automático antes
+  if(tipo==='todo'){
+    const escrito=prompt('Para confirmar el reinicio total, escribe la palabra:\n\nBORRAR');
+    if(escrito===null) return; // canceló
+    if(escrito.trim().toUpperCase()!=='BORRAR'){toast('Confirmación incorrecta — no se borró nada');return}
+    exportarTodo(); // descarga una copia de seguridad automática antes de borrar
+  }
+
+  if(MODO_SERVIDOR){
+    // Borrar en el servidor y recargar los datos reales
+    try{
+      await apiCall('POST','/datos/borrar',{tipo});
+    }catch(e){ return; /* apiCall ya mostró el error */ }
+    await cargarDatosServidor();
+    toast('Datos borrados del servidor ✓');
+    renderAjustes();
+    return;
+  }
+
+  // Modo local (sin servidor): borrar del navegador
   if(tipo==='ventas'||tipo==='todo'){ventas=[];sd('ventas',ventas)}
   if(tipo==='envios'||tipo==='todo'){envios=[];sd('envios',envios)}
   if(tipo==='transacciones'||tipo==='todo'){transacciones=[];sd('transacciones',transacciones)}
   if(tipo==='todo'){
-    pedidos=[];devoluciones=[];
-    sd('pedidos',pedidos);sd('devoluciones',devoluciones);
+    pedidos=[];devoluciones=[];actividad=[];notifsVistas=[];
+    sd('pedidos',pedidos);sd('devoluciones',devoluciones);sd('actividad',actividad);sd('notifsVistas',notifsVistas);
     camisetas=[];sd('camisetas',camisetas);
   }
   toast('Datos borrados ✓'); renderAjustes();
@@ -2352,7 +2567,10 @@ function renderHistorial(){
   }
 
   cont.innerHTML=`
-    <div style="font-size:19px;font-weight:800;margin-bottom:4px">Historial</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="font-size:19px;font-weight:800">Historial</div>
+      ${role==='owner'?`<button class="abtn abtn-gray abtn-sm" style="margin-top:0;padding:7px 13px;font-size:12px;color:var(--r);flex:0 0 auto" onclick="limpiarHistorial()"><i class="ti ti-trash"></i> Limpiar todo</button>`:''}
+    </div>
     <div style="font-size:13px;color:var(--txm);margin-bottom:16px">Registro de toda la actividad</div>
     ${Object.entries(porFecha).map(([fecha,eventos])=>`
       <div class="stitle">${fecha===hoy()?'Hoy':fecha}</div>
@@ -2369,6 +2587,7 @@ function renderHistorial(){
               </div>
               <div class="lisub">${a.quien} · ${a.hora}${a.extra?` · ${a.extra}`:''}</div>
             </div>
+            ${role==='owner'?`<button onclick="eliminarActividad(${a.id})" style="background:none;border:none;cursor:pointer;color:var(--txh);font-size:16px;padding:6px;flex:0 0 auto" title="Eliminar del historial"><i class="ti ti-x"></i></button>`:''}
           </div>`;
         }).join('')}
       </div>`).join('')}`;
