@@ -30,6 +30,7 @@ class CamisetaController extends Controller
         ]);
 
         $tallas = $request->input('tallas', []);
+        $tallas = array_map(fn($v) => max(0, (int)$v), $tallas); // nunca negativos
 
         $id = DB::table('camisetas')->insertGetId([
             'equipo'        => $request->equipo,
@@ -62,6 +63,7 @@ class CamisetaController extends Controller
         if (!$camiseta) return response()->json(['error' => 'No encontrada'], 404);
 
         $tallas = $request->input('tallas', []);
+        $tallas = array_map(fn($v) => max(0, (int)$v), $tallas); // nunca negativos
 
         DB::table('camisetas')->where('id', $id)->update([
             'categoria'    => $request->input('categoria', $camiseta->categoria ?? 'camiseta'),
@@ -100,6 +102,7 @@ class CamisetaController extends Controller
         if (!$camiseta) return response()->json(['error' => 'No encontrada'], 404);
 
         $tallas = $request->input('tallas', []);
+        $tallas = array_map(fn($v) => max(0, (int)$v), $tallas); // nunca negativos
 
         DB::table('camisetas')->where('id', $id)->update([
             'talla_s'    => $tallas['S']   ?? $camiseta->talla_s,
