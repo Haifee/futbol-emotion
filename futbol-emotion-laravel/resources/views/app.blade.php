@@ -719,15 +719,23 @@ async function apiCall(method, endpoint, data=null){
   const xsrf = getCookie('XSRF-TOKEN');
   if(xsrf) opts.headers['X-XSRF-TOKEN']=xsrf;
   if(data) opts.body=JSON.stringify(data);
+  let res;
   try{
-    const res=await fetch(SERVIDOR+'/api'+endpoint, opts);
-    const json=await res.json();
-    if(!res.ok) throw new Error(json.error||'Error del servidor');
-    return json;
+    res=await fetch(SERVIDOR+'/api'+endpoint, opts);
   }catch(e){
-    toast('Error de conexión: '+e.message);
+    toast('Sin conexión con el servidor — revisa tu internet');
     throw e;
   }
+  let json={};
+  try{ json=await res.json(); }catch(e){}
+  if(!res.ok){
+    // Laravel responde {error} en nuestros controladores o {message, errors} en validaciones
+    let msg=json.error||json.message||('Error del servidor ('+res.status+')');
+    if(json.errors){ const first=Object.values(json.errors)[0]; if(first&&first[0]) msg=first[0]; }
+    toast(msg);
+    const err=new Error(msg); err.mostrado=true; throw err;
+  }
+  return json;
 }
 
 // ── DATOS ────────────────────────────────────────────────────────────────────
@@ -1626,6 +1634,9 @@ async function saveNuevaCamiseta(){
   }
   const tallas={};
   TALLAS_TODAS.forEach(t=>tallas[t]=+document.getElementById('nc-'+t).value||0);
+  if(Object.values(tallas).some(v=>v<0)){toast('⚠️ Las cantidades no pueden ser negativas');return}
+  if(+document.getElementById('nc-min').value<0){toast('⚠️ El stock mínimo no puede ser negativo');return}
+  if(document.getElementById('nc-precio').value!==''&&+document.getElementById('nc-precio').value<0){toast('⚠️ El precio no puede ser negativo');return}
   if(esOtro) TALLAS.forEach(t=>tallas[t]=0); // producto sin tallas: solo U
   else tallas['U']=0; // camiseta: sin talla única
   const precioVal=document.getElementById('nc-precio').value;
@@ -1700,6 +1711,8 @@ function openAjuste(id){
 async function saveAjuste(){
   const id=+document.getElementById('aj-id').value;
   const i=camisetas.findIndex(c=>c.id===id);
+  const ajVals=TALLAS_TODAS.map(t=>+document.getElementById('aj-'+t).value||0);
+  if(ajVals.some(v=>v<0)){toast('⚠️ Las cantidades no pueden ser negativas');return}
   if(i>=0){TALLAS_TODAS.forEach(t=>{camisetas[i].tallas[t]=+document.getElementById('aj-'+t).value||0})}
   if(!MODO_SERVIDOR) sd('camisetas',camisetas); await syncCamisetas('stock',camisetas[i].tallas,id); const camUpd=camisetas.find(c=>c.id===id); if(camUpd) registrarActividad('stock',`Stock ajustado: ${camUpd.equipo} ${camUpd.tipo}`,`${camUpd.temp}`);
   closeM('m-ajuste');toast('Stock actualizado ✓');renderStock();
