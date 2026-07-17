@@ -21,7 +21,8 @@ class CamisetaController extends Controller
         $request->validate([
             'equipo'       => 'required|string|max:100',
             'temporada'    => 'required|string|max:10',
-            'tipo'         => 'required|in:Local,Visitante,Tercera,Portero',
+            'tipo'         => 'required|in:Local,Visitante,Tercera,Portero,Otro',
+            'categoria'    => 'nullable|string|max:50',
             'tallas'       => 'required|array',
             'stock_minimo' => 'required|integer|min:0',
             'proveedor_id' => 'required|integer|between:1,4',
@@ -34,6 +35,7 @@ class CamisetaController extends Controller
             'equipo'        => $request->equipo,
             'temporada'     => $request->temporada,
             'tipo'          => $request->tipo,
+            'categoria'     => $request->input('categoria', 'camiseta') ?: 'camiseta',
             'talla_s'       => $tallas['S']   ?? 0,
             'talla_m'       => $tallas['M']   ?? 0,
             'talla_l'       => $tallas['L']   ?? 0,
@@ -43,6 +45,7 @@ class CamisetaController extends Controller
             'talla_12'      => $tallas['12']  ?? 0,
             'talla_14'      => $tallas['14']  ?? 0,
             'talla_16'      => $tallas['16']  ?? 0,
+            'talla_u'       => $tallas['U']   ?? 0,
             'stock_minimo'  => $request->stock_minimo,
             'proveedor_id'  => $request->proveedor_id,
             'precio'        => $request->input('precio'),
@@ -61,6 +64,7 @@ class CamisetaController extends Controller
         $tallas = $request->input('tallas', []);
 
         DB::table('camisetas')->where('id', $id)->update([
+            'categoria'    => $request->input('categoria', $camiseta->categoria ?? 'camiseta'),
             'equipo'       => $request->input('equipo', $camiseta->equipo),
             'temporada'    => $request->input('temporada', $camiseta->temporada),
             'tipo'         => $request->input('tipo', $camiseta->tipo),
@@ -73,6 +77,7 @@ class CamisetaController extends Controller
             'talla_12'     => $tallas['12']  ?? $camiseta->talla_12,
             'talla_14'     => $tallas['14']  ?? $camiseta->talla_14,
             'talla_16'     => $tallas['16']  ?? $camiseta->talla_16,
+            'talla_u'      => $tallas['U']   ?? $camiseta->talla_u,
             'stock_minimo' => $request->input('stock_minimo', $camiseta->stock_minimo),
             'proveedor_id' => $request->input('proveedor_id', $camiseta->proveedor_id),
             'precio'       => $request->input('precio', $camiseta->precio),
@@ -106,6 +111,7 @@ class CamisetaController extends Controller
             'talla_12'   => $tallas['12']  ?? $camiseta->talla_12,
             'talla_14'   => $tallas['14']  ?? $camiseta->talla_14,
             'talla_16'   => $tallas['16']  ?? $camiseta->talla_16,
+            'talla_u'    => $tallas['U']   ?? $camiseta->talla_u,
             'updated_at' => now(),
         ]);
 
@@ -147,7 +153,7 @@ class CamisetaController extends Controller
         $request->validate([
             'codigo'      => 'required|string|max:64',
             'camiseta_id' => 'required|integer|exists:camisetas,id',
-            'talla'       => 'required|in:S,M,L,XL,XXL',
+            'talla'       => 'required|in:S,M,L,XL,XXL,10,12,14,16,U',
         ]);
 
         $existente = DB::table('codigos_barras')->where('codigo', $request->codigo)->first();
@@ -174,6 +180,7 @@ class CamisetaController extends Controller
             'equipo'  => $c->equipo,
             'temp'    => $c->temporada,
             'tipo'    => $c->tipo,
+            'categoria' => $c->categoria ?? 'camiseta',
             'tallas'  => [
                 'S'   => (int)$c->talla_s,
                 'M'   => (int)$c->talla_m,
@@ -184,6 +191,7 @@ class CamisetaController extends Controller
                 '12'  => (int)$c->talla_12,
                 '14'  => (int)$c->talla_14,
                 '16'  => (int)$c->talla_16,
+                'U'   => (int)($c->talla_u ?? 0),
             ],
             'min'    => (int)$c->stock_minimo,
             'prov'   => (int)$c->proveedor_id,

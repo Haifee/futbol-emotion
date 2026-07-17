@@ -28,6 +28,7 @@ class PedidoController extends Controller
                         '12'  => (int)$l->talla_12,
                         '14'  => (int)$l->talla_14,
                         '16'  => (int)$l->talla_16,
+                        'U'   => (int)($l->talla_u ?? 0),
                     ],
                 ]);
             return $p;
@@ -68,6 +69,7 @@ class PedidoController extends Controller
                     'talla_12'   => $tallas['12']  ?? 0,
                     'talla_14'   => $tallas['14']  ?? 0,
                     'talla_16'   => $tallas['16']  ?? 0,
+                    'talla_u'    => $tallas['U']   ?? 0,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -130,6 +132,7 @@ class PedidoController extends Controller
                         'talla_12'   => $camiseta->talla_12  + $linea->talla_12,
                         'talla_14'   => $camiseta->talla_14  + $linea->talla_14,
                         'talla_16'   => $camiseta->talla_16  + $linea->talla_16,
+                        'talla_u'    => $camiseta->talla_u   + $linea->talla_u,
                         'updated_at' => now(),
                     ]);
                 }

@@ -408,7 +408,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <label class="fl">Camiseta</label>
     <select class="fi" id="as-cam"></select>
     <label class="fl">Talla</label>
-    <select class="fi" id="as-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option value="10">10 (niño)</option><option value="12">12 (niño)</option><option value="14">14 (niño)</option><option value="16">16 (niño)</option></select>
+    <select class="fi" id="as-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option value="10">10 (niño)</option><option value="12">12 (niño)</option><option value="14">14 (niño)</option><option value="16">16 (niño)</option><option value="U">Única (producto sin talla)</option></select>
     <label class="fl">Unidades que llegaron (0 = solo asociar)</label>
     <input class="fi" id="as-cant" type="number" min="0" value="1" style="text-align:center;font-weight:700">
     <button class="abtn abtn-g" onclick="confirmarAsociarCodigo()"><i class="ti ti-link"></i> Asociar y guardar</button>
@@ -485,9 +485,11 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <div id="v-stock-wrap" style="display:none">
       <button class="abtn abtn-g abtn-sm" onclick="escanearParaVenta()" style="margin-top:10px;margin-bottom:6px"><i class="ti ti-scan"></i> Escanear código de la camiseta</button>
       <label class="fl">Camiseta del inventario</label>
-      <select class="fi" id="v-cam" onchange="autoPrecioVenta()"></select>
+      <select class="fi" id="v-cam" onchange="toggleTallaVenta();autoPrecioVenta()"></select>
+      <div id="v-talla-wrap">
       <label class="fl">Talla</label>
-      <select class="fi" id="v-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option value="10">10 (niño)</option><option value="12">12 (niño)</option><option value="14">14 (niño)</option><option value="16">16 (niño)</option></select>
+      <select class="fi" id="v-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option value="10">10 (niño)</option><option value="12">12 (niño)</option><option value="14">14 (niño)</option><option value="16">16 (niño)</option><option value="U" hidden>Única</option></select>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label class="fl">Cantidad (UND)</label><input class="fi" id="v-cant" type="number" min="1" value="1" oninput="autoPrecioVenta()"></div>
         <div><label class="fl">Importe ($)</label><input class="fi" id="v-imp" type="number" min="0" step="0.01" placeholder="0.00" oninput="impEditadoManual=true"></div>
@@ -529,7 +531,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <!-- Talla editable solo en ventas del stock -->
     <div id="ev-talla-wrap" style="display:none">
       <label class="fl">Talla</label>
-      <select class="fi" id="ev-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option value="10">10 (niño)</option><option value="12">12 (niño)</option><option value="14">14 (niño)</option><option value="16">16 (niño)</option></select>
+      <select class="fi" id="ev-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option value="10">10 (niño)</option><option value="12">12 (niño)</option><option value="14">14 (niño)</option><option value="16">16 (niño)</option><option value="U" hidden>Única</option></select>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -596,6 +598,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <div><label class="fl" style="margin-top:0;text-align:center">12<span style="font-size:9px;display:block;color:var(--txh)">niño</span></label><input class="fi" id="aj-12" type="number" min="0" style="text-align:center;padding:10px 6px"></div>
       <div><label class="fl" style="margin-top:0;text-align:center">14<span style="font-size:9px;display:block;color:var(--txh)">niño</span></label><input class="fi" id="aj-14" type="number" min="0" style="text-align:center;padding:10px 6px"></div>
       <div><label class="fl" style="margin-top:0;text-align:center">16<span style="font-size:9px;display:block;color:var(--txh)">niño</span></label><input class="fi" id="aj-16" type="number" min="0" style="text-align:center;padding:10px 6px"></div>
+      <div><label class="fl" style="margin-top:0;text-align:center">Única<span style="font-size:9px;display:block;color:var(--txh)">otro</span></label><input class="fi" id="aj-U" type="number" min="0" style="text-align:center;padding:10px 6px"></div>
     </div>
     <input type="hidden" id="aj-id">
     <button class="abtn abtn-g" onclick="saveAjuste()"><i class="ti ti-check"></i> Actualizar stock</button>
@@ -608,10 +611,20 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <div class="modal-handle"></div>
     <div class="mtitle"><span id="ncam-title">Nueva camiseta</span><button class="mclose" onclick="closeM('m-nueva-cam')"><i class="ti ti-x"></i></button></div>
 
-    <label class="fl">Equipo / Club</label>
+    <label class="fl" style="margin-top:0">¿Qué tipo de producto es?</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
+      <button type="button" id="nc-chip-cam" onclick="setCatProducto('camiseta')" style="padding:11px;border-radius:11px;border:2px solid var(--g);background:var(--gl);cursor:pointer;font-size:13px;font-weight:800;color:var(--gd)">👕 Camiseta</button>
+      <button type="button" id="nc-chip-otro" onclick="setCatProducto('otro')" style="padding:11px;border-radius:11px;border:2px solid var(--grayb);background:#fff;cursor:pointer;font-size:13px;font-weight:800;color:var(--txm)">📦 Otro producto</button>
+    </div>
+    <div id="nc-cat-wrap" style="display:none">
+      <label class="fl">¿Qué producto es?</label>
+      <input class="fi" id="nc-categoria" placeholder="Ej: Balón, Medias, Guantes, Gorra…">
+    </div>
+
+    <label class="fl" id="nc-lbl-nombre">Equipo / Club</label>
     <input class="fi" id="nc-equipo" placeholder="Ej: Real Madrid, Barça, España…">
 
-    <div class="frow">
+    <div class="frow" id="nc-camposcam">
       <div>
         <label class="fl">Temporada</label>
         <input class="fi" id="nc-temp" placeholder="Ej: 24/25" value="24/25">
@@ -624,6 +637,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       </div>
     </div>
 
+    <div id="nc-tallas-cam">
     <label class="fl">UND por talla (inventario actual)</label>
     <div style="background:var(--gray);border-radius:12px;padding:12px;display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:4px">
       <div><label style="display:block;font-size:11px;font-weight:700;color:var(--txm);text-align:center;margin-bottom:5px">S</label><input class="fi" id="nc-S" type="number" min="0" value="0" style="text-align:center;padding:10px 4px;font-size:16px;font-weight:700"></div>
@@ -635,6 +649,11 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <div><label style="display:block;font-size:11px;font-weight:700;color:var(--txm);text-align:center;margin-bottom:5px">12 <span style="font-size:9px;color:var(--txh)">niño</span></label><input class="fi" id="nc-12" type="number" min="0" value="0" style="text-align:center;padding:10px 4px;font-size:16px;font-weight:700"></div>
       <div><label style="display:block;font-size:11px;font-weight:700;color:var(--txm);text-align:center;margin-bottom:5px">14 <span style="font-size:9px;color:var(--txh)">niño</span></label><input class="fi" id="nc-14" type="number" min="0" value="0" style="text-align:center;padding:10px 4px;font-size:16px;font-weight:700"></div>
       <div><label style="display:block;font-size:11px;font-weight:700;color:var(--txm);text-align:center;margin-bottom:5px">16 <span style="font-size:9px;color:var(--txh)">niño</span></label><input class="fi" id="nc-16" type="number" min="0" value="0" style="text-align:center;padding:10px 4px;font-size:16px;font-weight:700"></div>
+    </div>
+    </div>
+    <div id="nc-tallas-otro" style="display:none">
+      <label class="fl">Unidades en inventario</label>
+      <input class="fi" id="nc-U" type="number" min="0" value="0" style="text-align:center;font-size:18px;font-weight:700">
     </div>
     <div style="font-size:12px;color:var(--txh);margin-bottom:4px">Total: <span id="nc-total" style="font-weight:700;color:var(--g)">0</span> UND</div>
 
@@ -714,6 +733,24 @@ async function apiCall(method, endpoint, data=null){
 // ── DATOS ────────────────────────────────────────────────────────────────────
 const PINS={manager:'1515',owner:'2828'};
 const TALLAS=['S','M','L','XL','XXL','10','12','14','16']; // adulto + niño
+const TALLAS_TODAS=[...TALLAS,'U']; // U = talla Única (productos que no son camisetas)
+let catProducto='camiseta';
+function esCamiseta(c){ return !c.categoria || c.categoria==='camiseta'; }
+function tallasDe(c){ return esCamiseta(c) ? TALLAS : ['U']; }
+function nombreProducto(c){ return esCamiseta(c) ? `${c.equipo} ${c.tipo} ${c.temp}` : `${c.equipo} (${c.categoria})`; }
+function setCatProducto(cat){
+  catProducto=cat;
+  const esCam=cat==='camiseta';
+  document.getElementById('nc-chip-cam').style.cssText='padding:11px;border-radius:11px;cursor:pointer;font-size:13px;font-weight:800;'+(esCam?'border:2px solid var(--g);background:var(--gl);color:var(--gd)':'border:2px solid var(--grayb);background:#fff;color:var(--txm)');
+  document.getElementById('nc-chip-otro').style.cssText='padding:11px;border-radius:11px;cursor:pointer;font-size:13px;font-weight:800;'+(!esCam?'border:2px solid var(--g);background:var(--gl);color:var(--gd)':'border:2px solid var(--grayb);background:#fff;color:var(--txm)');
+  document.getElementById('nc-cat-wrap').style.display=esCam?'none':'block';
+  document.getElementById('nc-camposcam').style.display=esCam?'grid':'none';
+  document.getElementById('nc-tallas-cam').style.display=esCam?'block':'none';
+  document.getElementById('nc-tallas-otro').style.display=esCam?'none':'block';
+  document.getElementById('nc-lbl-nombre').textContent=esCam?'Equipo / Club':'Nombre del producto';
+  document.getElementById('nc-equipo').placeholder=esCam?'Ej: Real Madrid, Barça, España…':'Ej: Balón Champions, Medias blancas…';
+  actualizarTotalNC();
+}
 let role=null, curPage='';
 
 let camisetas=ld('camisetas',[
@@ -976,7 +1013,7 @@ function prepararAsociar(codigo){
   document.getElementById('as-codigo').textContent=codigo;
   const sel=document.getElementById('as-cam');
   sel.innerHTML=camisetas.length
-    ? camisetas.map(c=>`<option value="${c.id}">${c.equipo} ${c.tipo} ${c.temp}</option>`).join('')
+    ? camisetas.map(c=>`<option value="${c.id}">${nombreProducto(c)}</option>`).join('')
     : '<option value="">Sin camisetas — crea una nueva</option>';
   document.getElementById('as-cant').value=1;
   openM('m-scan-asociar');
@@ -1046,6 +1083,7 @@ function escanearParaVenta(){
       openM('m-venta');
       const cam=camisetas.find(c=>c.id===r.camiseta.id)||r.camiseta;
       document.getElementById('v-cam').value=String(cam.id);
+      toggleTallaVenta();
       document.getElementById('v-talla').value=r.talla;
       document.getElementById('v-cant').value=1; // escaneo = 1 unidad (editable si llevan más)
       impEditadoManual=false;
@@ -1054,6 +1092,14 @@ function escanearParaVenta(){
       toast(stock>0?`✓ ${cam.equipo} ${r.talla} — quedan ${stock} UND`:`⚠ ${cam.equipo} ${r.talla} está SIN STOCK`);
     }catch(e){ openM('m-venta'); }
   });
+}
+function toggleTallaVenta(){
+  const camId=+document.getElementById('v-cam').value;
+  const cam=camisetas.find(c=>c.id===camId);
+  const otro=cam && !esCamiseta(cam);
+  document.getElementById('v-talla-wrap').style.display=otro?'none':'block';
+  if(otro) document.getElementById('v-talla').value='U';
+  else if(document.getElementById('v-talla').value==='U') document.getElementById('v-talla').value='M';
 }
 function autoPrecioVenta(){
   if(impEditadoManual) return;
@@ -1083,7 +1129,7 @@ function abrirEditarVenta(id){
   document.getElementById('ev-nombre-wrap').style.display=v.camId?'none':'block';
   document.getElementById('ev-nombre').value=v.camId?'':v.equipo;
   // Talla editable solo si fue venta del stock
-  document.getElementById('ev-talla-wrap').style.display=v.camId?'block':'none';
+  document.getElementById('ev-talla-wrap').style.display=(v.camId&&v.talla!=='U')?'block':'none';
   if(v.camId) document.getElementById('ev-talla').value=v.talla;
   document.getElementById('ev-cant').value=v.cant;
   document.getElementById('ev-imp').value=v.imp;
@@ -1431,8 +1477,8 @@ function appendLineaDOM(i,l){
     <input class="fi ped-temp" style="font-size:16px" value="${l.temp||'24/25'}" placeholder="24/25">
     <label class="fl">Tallas y cantidades</label>
     <div style="background:#fff;border-radius:10px;padding:4px 10px">
-      ${TALLAS.map(t=>`<div class="trow">
-        <div class="tlab">Talla ${t}<br><span class="tlab-und">UND</span></div>
+      ${TALLAS_TODAS.map(t=>`<div class="trow">
+        <div class="tlab">${t==='U'?'Única':'Talla '+t}<br><span class="tlab-und">UND</span></div>
         <div class="tcant">
           <button class="cbtn" onclick="chgCant(${i},'${t}',-1)">−</button>
           <div class="cval" id="cv-${i}-${t}">${(l.tallas&&l.tallas[t])||0}</div>
@@ -1465,7 +1511,7 @@ async function enviarPedido(){
     const equipo=(b.querySelector('.ped-equipo')?.value||'').trim();
     const temp=(b.querySelector('.ped-temp')?.value||'24/25').trim();
     const tallas={};
-    TALLAS.forEach(t=>{tallas[t]=parseInt(document.getElementById(`cv-${i}-${t}`)?.textContent)||0});
+    TALLAS_TODAS.forEach(t=>{tallas[t]=parseInt(document.getElementById(`cv-${i}-${t}`)?.textContent)||0});
     if(equipo) lineas.push({equipo,temp,tallas});
   });
   if(!lineas.length){toast('Escribe al menos una camiseta');return}
@@ -1503,7 +1549,7 @@ function renderStock(){
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
           <div>
             <div style="font-size:17px;font-weight:800">${c.equipo}</div>
-            <div style="font-size:12px;color:var(--txm)">${c.tipo} · ${c.temp} · Proveedor ${c.prov}</div>
+            <div style="font-size:12px;color:var(--txm)">${esCamiseta(c)?`${c.tipo} · ${c.temp}`:`📦 ${c.categoria}`} · Proveedor ${c.prov}</div>
           </div>
           <div style="text-align:right">
             <div style="font-size:21px;font-weight:800;color:${clr}">${total} <span style="font-size:12px;font-weight:700;color:${clr};opacity:.7">UND</span></div>
@@ -1511,7 +1557,7 @@ function renderStock(){
           </div>
         </div>
         <div class="tgrid">
-          ${TALLAS.map(t=>{const v=c.tallas[t]||0;return`<div class="tbox"><div class="tbox-lab">${t}</div><div class="tbox-val" style="color:${v===0?'var(--r)':v<c.min?'var(--a)':'var(--tx)'}">${v}</div><div class="tbox-und">UND</div></div>`}).join('')}
+          ${tallasDe(c).map(t=>{const v=c.tallas[t]||0;return`<div class="tbox"><div class="tbox-lab">${t==='U'?'Única':t}</div><div class="tbox-val" style="color:${v===0?'var(--r)':v<c.min?'var(--a)':'var(--tx)'}">${v}</div><div class="tbox-und">UND</div></div>`}).join('')}
         </div>
         <div class="pbar" style="margin-top:8px"><div class="pfill" style="width:${pct}%;background:${clr}"></div></div>
         <div style="font-size:11px;color:var(--txh);margin-top:4px">Mínimo por talla: ${c.min} UND</div>
@@ -1524,68 +1570,84 @@ function renderStock(){
     }).join('')}`;
 }
 function abrirNuevaCamiseta(){
-  document.getElementById('ncam-title').textContent='Nueva camiseta';
+  document.getElementById('ncam-title').textContent='Nuevo producto';
+  document.getElementById('nc-categoria').value='';
+  document.getElementById('nc-U').value=0;
+  setCatProducto('camiseta');
   document.getElementById('nc-equipo').value='';
   document.getElementById('nc-temp').value='24/25';
   document.getElementById('nc-min').value='5';
   document.getElementById('nc-precio').value='';
   document.getElementById('nc-id').value='';
   document.getElementById('nc-btn-borrar').style.display='none';
-  TALLAS.forEach(t=>document.getElementById('nc-'+t).value=0);
+  TALLAS_TODAS.forEach(t=>document.getElementById('nc-'+t).value=0);
   document.getElementById('nc-total').textContent='0';
   openM('m-nueva-cam');
   // Listener para calcular total en tiempo real
-  TALLAS.forEach(t=>{
+  TALLAS_TODAS.forEach(t=>{
     document.getElementById('nc-'+t).oninput=actualizarTotalNC;
   });
 }
 function actualizarTotalNC(){
-  const total=TALLAS.reduce((s,t)=>s+(+document.getElementById('nc-'+t).value||0),0);
+  const total=catProducto==='otro'
+    ? (+document.getElementById('nc-U').value||0)
+    : TALLAS.reduce((s,t)=>s+(+document.getElementById('nc-'+t).value||0),0);
   document.getElementById('nc-total').textContent=total;
 }
 function editarCamiseta(id){
   const c=camisetas.find(x=>x.id===id);if(!c)return;
-  document.getElementById('ncam-title').textContent='Editar camiseta';
+  document.getElementById('ncam-title').textContent=esCamiseta(c)?'Editar camiseta':'Editar producto';
+  setCatProducto(esCamiseta(c)?'camiseta':'otro');
+  document.getElementById('nc-categoria').value=esCamiseta(c)?'':c.categoria;
   document.getElementById('nc-equipo').value=c.equipo;
   document.getElementById('nc-temp').value=c.temp;
   document.getElementById('nc-min').value=c.min;
   document.getElementById('nc-precio').value=c.precio!=null?c.precio:'';
   document.getElementById('nc-id').value=c.id;
   document.getElementById('nc-btn-borrar').style.display='flex';
-  TALLAS.forEach(t=>document.getElementById('nc-'+t).value=c.tallas[t]||0);
+  TALLAS_TODAS.forEach(t=>document.getElementById('nc-'+t).value=c.tallas[t]||0);
   // Tipo y proveedor
   const selTipo=document.getElementById('nc-tipo');
   for(let o of selTipo.options) if(o.text===c.tipo){o.selected=true;break}
   const selProv=document.getElementById('nc-prov');
   for(let o of selProv.options) if(+o.value===c.prov){o.selected=true;break}
   actualizarTotalNC();
-  TALLAS.forEach(t=>{document.getElementById('nc-'+t).oninput=actualizarTotalNC});
+  TALLAS_TODAS.forEach(t=>{document.getElementById('nc-'+t).oninput=actualizarTotalNC});
   openM('m-nueva-cam');
 }
 async function saveNuevaCamiseta(){
   const equipo=document.getElementById('nc-equipo').value.trim();
-  if(!equipo){toast('Escribe el nombre del equipo');return}
+  const esOtro=catProducto==='otro';
+  if(!equipo){toast(esOtro?'Escribe el nombre del producto':'Escribe el nombre del equipo');return}
+  let categoria='camiseta';
+  if(esOtro){
+    categoria=document.getElementById('nc-categoria').value.trim();
+    if(!categoria){toast('Escribe qué producto es (Ej: Balón, Medias…)');return}
+  }
   const tallas={};
-  TALLAS.forEach(t=>tallas[t]=+document.getElementById('nc-'+t).value||0);
+  TALLAS_TODAS.forEach(t=>tallas[t]=+document.getElementById('nc-'+t).value||0);
+  if(esOtro) TALLAS.forEach(t=>tallas[t]=0); // producto sin tallas: solo U
+  else tallas['U']=0; // camiseta: sin talla única
   const precioVal=document.getElementById('nc-precio').value;
   const data={
     equipo,
-    temp:document.getElementById('nc-temp').value.trim()||'24/25',
-    tipo:document.getElementById('nc-tipo').value,
+    categoria,
+    temp:esOtro?'—':(document.getElementById('nc-temp').value.trim()||'24/25'),
+    tipo:esOtro?'Otro':document.getElementById('nc-tipo').value,
     tallas,
     min:+document.getElementById('nc-min').value||5,
     prov:+document.getElementById('nc-prov').value||1,
     precio:precioVal!==''?+precioVal:null,
   };
   const editId=+document.getElementById('nc-id').value;
-  const payload={equipo:data.equipo,temporada:data.temp,tipo:data.tipo,tallas:data.tallas,stock_minimo:data.min,proveedor_id:data.prov,precio:data.precio};
+  const payload={equipo:data.equipo,categoria:data.categoria,temporada:data.temp,tipo:data.tipo,tallas:data.tallas,stock_minimo:data.min,proveedor_id:data.prov,precio:data.precio};
   try{
     if(editId){
       const i=camisetas.findIndex(c=>c.id===editId);
       if(i>=0) camisetas[i]={...camisetas[i],...data};
       if(!MODO_SERVIDOR) sd('camisetas',camisetas);
       await syncCamisetas('update',payload,editId);
-      toast('Camiseta actualizada ✓');
+      toast(esOtro?'Producto actualizado ✓':'Camiseta actualizada ✓');
     } else {
       if(MODO_SERVIDOR){
         const creada=await syncCamisetas('add',payload);
@@ -1595,7 +1657,7 @@ async function saveNuevaCamiseta(){
       }
       camisetas.push(data);
       if(!MODO_SERVIDOR) sd('camisetas',camisetas);
-      registrarActividad('stock',`Nueva camiseta: ${equipo} ${data.tipo}`,`${data.temp}`);
+      registrarActividad('stock',esOtro?`Nuevo producto: ${equipo} (${categoria})`:`Nueva camiseta: ${equipo} ${data.tipo}`,esOtro?'':`${data.temp}`);
       // Si veníamos de un escaneo, asociar el código automáticamente
       if(pendingCodigo && MODO_SERVIDOR){
         try{
@@ -1631,14 +1693,14 @@ function openAjuste(id){
   const c=camisetas.find(x=>x.id===id);
   document.getElementById('aj-title').textContent='Ajustar stock';
   document.getElementById('aj-name').textContent=`${c.equipo} ${c.tipo} ${c.temp}`;
-  TALLAS.forEach(t=>document.getElementById('aj-'+t).value=c.tallas[t]||0);
+  TALLAS_TODAS.forEach(t=>document.getElementById('aj-'+t).value=c.tallas[t]||0);
   document.getElementById('aj-id').value=c.id;
   openM('m-ajuste');
 }
 async function saveAjuste(){
   const id=+document.getElementById('aj-id').value;
   const i=camisetas.findIndex(c=>c.id===id);
-  if(i>=0){TALLAS.forEach(t=>{camisetas[i].tallas[t]=+document.getElementById('aj-'+t).value||0})}
+  if(i>=0){TALLAS_TODAS.forEach(t=>{camisetas[i].tallas[t]=+document.getElementById('aj-'+t).value||0})}
   if(!MODO_SERVIDOR) sd('camisetas',camisetas); await syncCamisetas('stock',camisetas[i].tallas,id); const camUpd=camisetas.find(c=>c.id===id); if(camUpd) registrarActividad('stock',`Stock ajustado: ${camUpd.equipo} ${camUpd.tipo}`,`${camUpd.temp}`);
   closeM('m-ajuste');toast('Stock actualizado ✓');renderStock();
 }
@@ -1998,7 +2060,7 @@ function pedCard(p,acc){
       <div style="background:var(--gray);border-radius:10px;padding:10px 12px;margin-bottom:7px">
         <div style="font-weight:700;font-size:14px;margin-bottom:6px">${l.equipo} ${l.temp}</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px">
-          ${TALLAS.filter(t=>l.tallas&&l.tallas[t]>0).map(t=>`<span style="background:var(--gl);border:1.5px solid var(--gm);border-radius:9px;padding:4px 11px;font-size:13px;font-weight:700;color:var(--gd)">Talla ${t} · ${l.tallas[t]} <span style="font-size:10px;opacity:.7">UND</span></span>`).join('')}
+          ${TALLAS_TODAS.filter(t=>l.tallas&&l.tallas[t]>0).map(t=>`<span style="background:var(--gl);border:1.5px solid var(--gm);border-radius:9px;padding:4px 11px;font-size:13px;font-weight:700;color:var(--gd)">${t==='U'?'Única':'Talla '+t} · ${l.tallas[t]} <span style="font-size:10px;opacity:.7">UND</span></span>`).join('')}
         </div>
       </div>`).join('')}
     ${p.notas?`<div style="font-size:13px;color:var(--txm);font-style:italic;margin-bottom:8px">"${p.notas}"</div>`:''}
@@ -2027,7 +2089,7 @@ async function marcarRecibido(id){
   const ped=pedidos.find(p=>p.id===id);if(!ped)return;
   ped.lineas.forEach(l=>{
     const ci=camisetas.findIndex(c=>c.equipo+' '+c.tipo===l.equipo&&c.temp===l.temp);
-    if(ci>=0) TALLAS.forEach(t=>{if(l.tallas[t]) camisetas[ci].tallas[t]=(camisetas[ci].tallas[t]||0)+l.tallas[t]});
+    if(ci>=0) TALLAS_TODAS.forEach(t=>{if(l.tallas[t]) camisetas[ci].tallas[t]=(camisetas[ci].tallas[t]||0)+l.tallas[t]});
   });
   pedidos[pedidos.findIndex(p=>p.id===id)].estado='recibido';
   if(!MODO_SERVIDOR){sd('pedidos',pedidos);sd('camisetas',camisetas);} await syncPedido('recibido',null,id);
@@ -2051,7 +2113,7 @@ function renderVerStock(){
           <div style="font-size:22px;font-weight:800;color:${clr}">${total} <span style="font-size:12px;opacity:.7">UND</span></div>
         </div>
         <div class="tgrid">
-          ${TALLAS.map(t=>`<div class="tbox"><div class="tbox-lab">${t}</div><div class="tbox-val" style="color:${(c.tallas[t]||0)<c.min?'var(--r)':'var(--tx)'}">${c.tallas[t]||0}</div><div class="tbox-und">UND</div></div>`).join('')}
+          ${tallasDe(c).map(t=>`<div class="tbox"><div class="tbox-lab">${t==='U'?'Única':t}</div><div class="tbox-val" style="color:${(c.tallas[t]||0)<c.min?'var(--r)':'var(--tx)'}">${c.tallas[t]||0}</div><div class="tbox-und">UND</div></div>`).join('')}
         </div>
       </div>`;
     }).join('')}`;

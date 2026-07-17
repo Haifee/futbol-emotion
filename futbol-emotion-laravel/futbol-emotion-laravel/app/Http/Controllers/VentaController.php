@@ -149,7 +149,7 @@ class VentaController extends Controller
             if ($venta->camiseta_id) {
                 $camiseta = DB::table('camisetas')->find($venta->camiseta_id);
                 if ($camiseta) {
-                    $tallasValidas = ['S', 'M', 'L', 'XL', 'XXL', '10', '12', '14', '16'];
+                    $tallasValidas = ['S', 'M', 'L', 'XL', 'XXL', '10', '12', '14', '16', 'U'];
                     if (!in_array(strtoupper($nuevaTalla), $tallasValidas)) {
                         DB::rollBack();
                         return response()->json(['error' => 'Talla inválida'], 422);
@@ -223,7 +223,7 @@ class VentaController extends Controller
             // Devolver las unidades al inventario si la venta descontó stock
             if ($venta->camiseta_id) {
                 $col = 'talla_' . strtolower($venta->talla);
-                if (in_array($col, ['talla_s', 'talla_m', 'talla_l', 'talla_xl', 'talla_xxl', 'talla_10', 'talla_12', 'talla_14', 'talla_16'])) {
+                if (in_array($col, ['talla_s', 'talla_m', 'talla_l', 'talla_xl', 'talla_xxl', 'talla_10', 'talla_12', 'talla_14', 'talla_16', 'talla_u'])) {
                     DB::table('camisetas')->where('id', $venta->camiseta_id)
                         ->increment($col, $venta->cantidad);
                 }
