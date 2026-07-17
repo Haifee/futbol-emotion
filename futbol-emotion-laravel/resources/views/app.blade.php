@@ -1335,8 +1335,8 @@ function renderHome(){
 
   if(role==='manager'){
     let alertas='';
-    if(criticos.length) alertas+=`<div class="abox abox-r"><i class="ti ti-alert-triangle"></i><div><div class="abox-title">Sin stock suficiente</div><div class="abox-sub">${criticos.map(c=>`${c.equipo} ${c.tipo} ${c.temp}`).join(' · ')}</div></div></div>`;
-    if(bajos.length) alertas+=`<div class="abox abox-a"><i class="ti ti-alert-circle"></i><div><div class="abox-title">Stock bajo — revisar pronto</div><div class="abox-sub">${bajos.map(c=>`${c.equipo} ${c.tipo} ${c.temp}`).join(' · ')}</div></div></div>`;
+    if(criticos.length) alertas+=`<div class="abox abox-r"><i class="ti ti-alert-triangle"></i><div><div class="abox-title">Sin stock suficiente</div><div class="abox-sub">${criticos.map(c=>nombreProducto(c)).join(' · ')}</div></div></div>`;
+    if(bajos.length) alertas+=`<div class="abox abox-a"><i class="ti ti-alert-circle"></i><div><div class="abox-title">Stock bajo — revisar pronto</div><div class="abox-sub">${bajos.map(c=>nombreProducto(c)).join(' · ')}</div></div></div>`;
     if(pendPed) alertas+=`<div class="abox abox-p"><i class="ti ti-clock"></i><div><div class="abox-title">${pendPed} pedido(s) esperando al dueño</div><div class="abox-sub">En cuanto apruebe podrás recibirlo</div></div></div>`;
     if(pendDev) alertas+=`<div class="abox abox-a"><i class="ti ti-refresh"></i><div><div class="abox-title">${pendDev} cambio(s) de cliente pendiente(s)</div><div class="abox-sub">Ir a Cambios para gestionarlos</div></div></div>`;
     if(!alertas) alertas=`<div class="abox abox-g"><i class="ti ti-circle-check"></i><div><div class="abox-title">Todo en orden</div><div class="abox-sub">Sin alertas activas ahora mismo</div></div></div>`;
@@ -1388,7 +1388,7 @@ function renderHome(){
     const neto=ing-gas;
     let alertas='';
     if(pendPed) alertas+=`<div class="abox abox-p" style="cursor:pointer" onclick="goTo('aprobar')"><i class="ti ti-clipboard-check"></i><div><div class="abox-title">${pendPed} pedido(s) esperando tu aprobación</div><div class="abox-sub">Toca aquí para revisar y aprobar</div></div><i class="ti ti-chevron-right" style="color:var(--p);margin-left:auto;font-size:20px"></i></div>`;
-    if(criticos.length) alertas+=`<div class="abox abox-r"><i class="ti ti-alert-triangle"></i><div><div class="abox-title">Sin stock suficiente</div><div class="abox-sub">${criticos.map(c=>`${c.equipo} ${c.tipo} ${c.temp}`).join(' · ')}</div></div></div>`;
+    if(criticos.length) alertas+=`<div class="abox abox-r"><i class="ti ti-alert-triangle"></i><div><div class="abox-title">Sin stock suficiente</div><div class="abox-sub">${criticos.map(c=>nombreProducto(c)).join(' · ')}</div></div></div>`;
     if(!alertas) alertas=`<div class="abox abox-g"><i class="ti ti-circle-check"></i><div><div class="abox-title">Sin pedidos pendientes</div><div class="abox-sub">Todo está bajo control</div></div></div>`;
 
     const top=Object.entries(ventas.reduce((acc,v)=>{acc[v.equipo]=(acc[v.equipo]||0)+v.imp;return acc},{})).sort((a,b)=>b[1]-a[1]).slice(0,3);
@@ -1539,7 +1539,7 @@ function renderStock(){
   const cont=document.getElementById('stk-c');
   const criticos=camisetas.filter(c=>stockStatus(c)==='critico');
   cont.innerHTML=`
-    ${criticos.length?`<div class="abox abox-r" style="margin-bottom:12px"><i class="ti ti-alert-triangle"></i><div><div class="abox-title">Stock crítico — reponer urgente</div><div class="abox-sub">${criticos.map(c=>`${c.equipo} ${c.tipo} ${c.temp}`).join(' · ')}</div></div></div>`:''}
+    ${criticos.length?`<div class="abox abox-r" style="margin-bottom:12px"><i class="ti ti-alert-triangle"></i><div><div class="abox-title">Stock crítico — reponer urgente</div><div class="abox-sub">${criticos.map(c=>nombreProducto(c)).join(' · ')}</div></div></div>`:''}
     <button class="abtn abtn-g" onclick="abrirScannerInventario()" style="margin-top:0;margin-bottom:9px"><i class="ti ti-scan"></i> Escanear mercancía (entrada de stock)</button>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px">
       <button class="abtn abtn-gray abtn-sm" onclick="abrirNuevaCamiseta()" style="margin-top:0"><i class="ti ti-plus"></i> Nueva camiseta</button>
@@ -1692,7 +1692,7 @@ async function borrarCamiseta(){
   const id=+document.getElementById('nc-id').value;
   const c=camisetas.find(x=>x.id===id);
   if(!c) return;
-  if(!confirm(`¿Eliminar "${c.equipo} ${c.tipo} ${c.temp}" del inventario? No se puede deshacer.`)) return;
+  if(!confirm(`¿Eliminar "${nombreProducto(c)}" del inventario? No se puede deshacer.`)) return;
   camisetas=camisetas.filter(x=>x.id!==id);
   if(!MODO_SERVIDOR) sd('camisetas',camisetas);
   await syncCamisetas('delete',null,id);
@@ -1703,7 +1703,7 @@ async function borrarCamiseta(){
 function openAjuste(id){
   const c=camisetas.find(x=>x.id===id);
   document.getElementById('aj-title').textContent='Ajustar stock';
-  document.getElementById('aj-name').textContent=`${c.equipo} ${c.tipo} ${c.temp}`;
+  document.getElementById('aj-name').textContent=nombreProducto(c);
   TALLAS_TODAS.forEach(t=>document.getElementById('aj-'+t).value=c.tallas[t]||0);
   document.getElementById('aj-id').value=c.id;
   openM('m-ajuste');
@@ -1814,8 +1814,9 @@ function openVentaModal(){
   // Cargar stock si hay camisetas
   const sel=document.getElementById('v-cam');
   sel.innerHTML=camisetas.length
-    ? camisetas.map(c=>`<option value="${c.id}">${c.equipo} ${c.tipo} ${c.temp}</option>`).join('')
+    ? camisetas.map(c=>`<option value="${c.id}">${nombreProducto(c)}</option>`).join('')
     : '<option value="">Sin camisetas en inventario</option>';
+  toggleTallaVenta();
   openM('m-venta');
 }
 
@@ -1851,6 +1852,7 @@ function setModoVenta(modo){
   modoVenta=modo;
   document.getElementById('v-libre-wrap').style.display=modo==='libre'?'block':'none';
   document.getElementById('v-stock-wrap').style.display=modo==='stock'?'block':'none';
+  if(modo==='stock') toggleTallaVenta();
   document.getElementById('v-save-btn').style.opacity='1';
   document.getElementById('v-save-btn').style.pointerEvents='auto';
   ['modo-libre','modo-stock'].forEach(id=>{
@@ -2115,7 +2117,7 @@ function renderVerStock(){
   const cont=document.getElementById('vs-c');
   const criticos=camisetas.filter(c=>stockStatus(c)!=='ok');
   cont.innerHTML=`
-    ${criticos.length?`<div class="abox abox-a" style="margin-bottom:12px"><i class="ti ti-alert-circle"></i><div><div class="abox-title">Necesitan reposición</div><div class="abox-sub">${criticos.map(c=>`${c.equipo} ${c.tipo} ${c.temp}`).join(' · ')}</div></div></div>`:''}
+    ${criticos.length?`<div class="abox abox-a" style="margin-bottom:12px"><i class="ti ti-alert-circle"></i><div><div class="abox-title">Necesitan reposición</div><div class="abox-sub">${criticos.map(c=>nombreProducto(c)).join(' · ')}</div></div></div>`:''}
     ${camisetas.map(c=>{
       const s=stockStatus(c);
       const clr=s==='ok'?'var(--g)':s==='bajo'?'var(--a)':'var(--r)';
