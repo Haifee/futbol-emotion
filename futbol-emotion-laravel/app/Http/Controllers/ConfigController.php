@@ -17,6 +17,9 @@ class ConfigController extends Controller
         'tasa_bcv'          => '0',
         'tasa_fecha'        => '',
         'tasa_origen'       => 'manual',
+        'banco_receptor'    => '',
+        'titular_pago'      => '',
+        'telefono_pago'     => '',
     ];
 
     public function index(Request $request)
@@ -31,6 +34,9 @@ class ConfigController extends Controller
                 'tasa_bcv'          => $config['tasa_bcv'],
                 'tasa_fecha'        => $config['tasa_fecha'],
                 'tasa_origen'       => $config['tasa_origen'],
+                'banco_receptor'    => $config['banco_receptor'],
+                'titular_pago'      => $config['titular_pago'],
+                'telefono_pago'     => $config['telefono_pago'],
             ]);
         }
 
