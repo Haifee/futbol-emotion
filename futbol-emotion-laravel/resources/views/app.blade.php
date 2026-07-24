@@ -488,8 +488,9 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <select class="fi" id="v-cam" onchange="toggleTallaVenta();autoPrecioVenta()"></select>
       <div id="v-talla-wrap">
       <label class="fl">Talla</label>
-      <select class="fi" id="v-talla"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option value="10">10 (niño)</option><option value="12">12 (niño)</option><option value="14">14 (niño)</option><option value="16">16 (niño)</option><option value="U" hidden>Única</option></select>
+      <select class="fi" id="v-talla" onchange="actualizarDispVenta()"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option value="10">10 (niño)</option><option value="12">12 (niño)</option><option value="14">14 (niño)</option><option value="16">16 (niño)</option><option value="U" hidden>Única</option></select>
       </div>
+      <div id="v-disp" style="display:none;margin:2px 0 6px;padding:9px 12px;border-radius:10px;font-size:13px;font-weight:700"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label class="fl">Cantidad (UND)</label><input class="fi" id="v-cant" type="number" min="1" value="1" oninput="autoPrecioVenta()"></div>
         <div><label class="fl">Importe ($)</label><input class="fi" id="v-imp" type="number" min="0" step="0.01" placeholder="0.00" oninput="impEditadoManual=true"></div>
@@ -570,15 +571,19 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 <!-- MODAL: TRANSACCIÓN (dueño) -->
 <div class="mbg" id="m-tx">
   <div class="modal">
-    <div class="mtitle">Registrar movimiento <button class="mclose" onclick="closeM('m-tx')"><i class="ti ti-x"></i></button></div>
-    <label class="fl">Tipo</label>
-    <select class="fi" id="tx-tipo"><option value="ingreso">Ingreso</option><option value="gasto">Gasto</option></select>
-    <label class="fl">Descripción</label><input class="fi" id="tx-desc" placeholder="Ej: Venta camiseta España L">
+    <div class="modal-handle"></div>
+    <div class="mtitle"><span id="tx-title">Registrar gasto</span> <button class="mclose" onclick="closeM('m-tx')"><i class="ti ti-x"></i></button></div>
+    <div id="tx-tipo-wrap">
+      <label class="fl" style="margin-top:0">Tipo</label>
+      <select class="fi" id="tx-tipo" onchange="toggleTxTipo()"><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select>
+    </div>
+    <label class="fl">Descripción</label><input class="fi" id="tx-desc" placeholder="Ej: Bolsas para la tienda, pago de luz…">
     <div class="frow">
       <div><label class="fl">Importe ($)</label><input class="fi" id="tx-imp" type="number" min="0" step="0.01" placeholder="0.00"></div>
-      <div><label class="fl">Canal</label><select class="fi" id="tx-canal"><option>Tienda física</option><option>Instagram</option><option>WhatsApp</option><option>Web</option><option>Proveedor</option></select></div>
+      <div id="tx-cat-wrap"><label class="fl">Categoría</label><select class="fi" id="tx-cat"><option>Mercancía</option><option>Servicios</option><option>Transporte</option><option>Local</option><option>Otros</option></select></div>
+      <div id="tx-canal-wrap" style="display:none"><label class="fl">Canal</label><select class="fi" id="tx-canal"><option>Tienda física</option><option>Instagram</option><option>WhatsApp</option><option>Web</option><option>Otro</option></select></div>
     </div>
-    <button class="abtn abtn-g" onclick="saveTx()"><i class="ti ti-check"></i> Guardar</button>
+    <button class="abtn abtn-g" onclick="saveTx()" id="tx-save-btn"><i class="ti ti-check"></i> Guardar</button>
   </div>
 </div>
 
@@ -840,7 +845,7 @@ async function cargarDatosServidor(){
     envios = e.map(x=>({id:x.id,cliente:x.cliente,prods:x.productos,origen:x.origen,trans:x.transportista,dir:x.direccion,imp:parseFloat(x.importe),estado:x.estado,notas:x.notas,fecha:x.fecha}));
     devoluciones = d.map(x=>({id:x.id,cliente:x.cliente,motivo:x.motivo,dev:x.camiseta_devuelta,sol:x.camiseta_solicitada,imp:parseFloat(x.importe),estado:x.estado,fecha:x.fecha}));
     ventas = v.map(x=>({id:x.id,camId:x.camiseta_id,equipo:x.equipo,talla:x.talla,cant:x.cantidad,canal:x.canal,cliente:x.cliente,numeroVenta:x.numero_venta,imp:parseFloat(x.importe),fecha:x.fecha}));
-    transacciones = t.map(x=>({id:x.id,tipo:x.tipo,desc:x.descripcion,imp:parseFloat(x.importe),canal:x.canal,fecha:x.fecha}));
+    transacciones = t.map(x=>({id:x.id,tipo:x.tipo,desc:x.descripcion,imp:parseFloat(x.importe),canal:x.canal,fecha:x.fecha,venta_id:x.venta_id||null}));
     actividad = act.actividad;
     notifsVistas = act.vistas;
     actualizarBadgeNotif();
@@ -1109,7 +1114,28 @@ function toggleTallaVenta(){
   if(otro) document.getElementById('v-talla').value='U';
   else if(document.getElementById('v-talla').value==='U') document.getElementById('v-talla').value='M';
 }
+function actualizarDispVenta(){
+  const box=document.getElementById('v-disp');
+  if(!box)return;
+  const cam=camisetas.find(c=>c.id===+document.getElementById('v-cam').value);
+  if(!cam){box.style.display='none';return}
+  const talla=esCamiseta(cam)?document.getElementById('v-talla').value:'U';
+  const disp=cam.tallas[talla]||0;
+  const cant=+document.getElementById('v-cant').value||1;
+  box.style.display='block';
+  if(disp===0){
+    box.style.background='var(--rl)';box.style.color='var(--rd)';
+    box.innerHTML='<i class="ti ti-alert-triangle"></i> Sin stock en '+(talla==='U'?'inventario':'talla '+talla);
+  }else if(cant>disp){
+    box.style.background='var(--al)';box.style.color='var(--ad)';
+    box.innerHTML=`<i class="ti ti-alert-circle"></i> Solo hay ${disp} UND disponible${disp>1?'s':''} — pediste ${cant}`;
+  }else{
+    box.style.background='var(--gl)';box.style.color='var(--gd)';
+    box.innerHTML=`<i class="ti ti-package"></i> Disponibles: ${disp} UND`;
+  }
+}
 function autoPrecioVenta(){
+  actualizarDispVenta();
   if(impEditadoManual) return;
   const camId=+document.getElementById('v-cam').value;
   const cam=camisetas.find(c=>c.id===camId);
@@ -2188,13 +2214,56 @@ function renderFin(){
     </div>
     <button class="abtn abtn-g" onclick="openM('m-tx')"><i class="ti ti-plus"></i> Registrar movimiento</button>`;
 }
+function abrirTx(){
+  document.getElementById('tx-desc').value='';
+  document.getElementById('tx-imp').value='';
+  document.getElementById('tx-tipo').value='gasto';
+  // El encargado solo registra gastos; el dueño puede elegir tipo
+  document.getElementById('tx-tipo-wrap').style.display=role==='owner'?'block':'none';
+  toggleTxTipo();
+  openM('m-tx');
+}
+function toggleTxTipo(){
+  const tipo=document.getElementById('tx-tipo').value;
+  document.getElementById('tx-title').textContent=tipo==='gasto'?'Registrar gasto':'Registrar ingreso';
+  document.getElementById('tx-cat-wrap').style.display=tipo==='gasto'?'block':'none';
+  document.getElementById('tx-canal-wrap').style.display=tipo==='gasto'?'none':'block';
+}
+let txGuardando=false;
 async function saveTx(){
+  if(txGuardando) return;
   const desc=document.getElementById('tx-desc').value.trim();
+  const imp=+document.getElementById('tx-imp').value;
+  const tipo=document.getElementById('tx-tipo').value;
   if(!desc){toast('Escribe una descripción');return}
-  const d={id:ids.tx++,tipo:document.getElementById('tx-tipo').value,desc,imp:+document.getElementById('tx-imp').value||0,canal:document.getElementById('tx-canal').value,fecha:hoy()};
-  transacciones.push(d); if(!MODO_SERVIDOR) sd('transacciones',transacciones); await syncTx(d);
-  closeM('m-tx');toast('Movimiento guardado ✓');renderFin();
-  ['tx-desc','tx-imp'].forEach(id=>document.getElementById(id).value='');
+  if(!(imp>0)){toast('⚠️ El importe debe ser mayor que 0');return}
+  const canal=tipo==='gasto'?document.getElementById('tx-cat').value:document.getElementById('tx-canal').value;
+  txGuardando=true;
+  try{
+    if(MODO_SERVIDOR){
+      const r=await apiCall('POST','/transacciones',{tipo,descripcion:desc,importe:imp,canal});
+      transacciones.push({id:r.id,tipo,desc,imp,canal,fecha:r.fecha,venta_id:null});
+    }else{
+      transacciones.push({id:ids.tx++,tipo,desc,imp,canal,fecha:hoy(),venta_id:null});
+      sd('transacciones',transacciones);
+    }
+    registrarActividad('caja',`${tipo==='gasto'?'Gasto':'Ingreso'}: ${desc} [${canal}]`,`${tipo==='gasto'?'-':'+'}$${imp.toFixed(2)}`);
+    closeM('m-tx');toast(tipo==='gasto'?'Gasto registrado ✓':'Ingreso registrado ✓');
+    if(curPage==='caja') renderCaja();
+  }catch(e){/* apiCall ya mostró el error */}
+  txGuardando=false;
+}
+async function eliminarTx(id){
+  const t=transacciones.find(x=>x.id===id);if(!t)return;
+  if(!confirm(`¿Eliminar "${t.desc}" (${t.tipo==='ingreso'?'+':'-'}${fmt(t.imp)})?`))return;
+  try{
+    if(MODO_SERVIDOR) await apiCall('DELETE','/transacciones/'+id);
+    const i=transacciones.findIndex(x=>x.id===id);
+    if(i>=0){transacciones.splice(i,1); if(!MODO_SERVIDOR) sd('transacciones',transacciones);}
+    registrarActividad('caja',`Movimiento eliminado: ${t.desc}`,`${t.tipo==='ingreso'?'+':'-'}$${t.imp.toFixed(2)}`);
+    toast('Movimiento eliminado ✓');
+    if(curPage==='caja') renderCaja();
+  }catch(e){/* apiCall ya mostró el error */}
 }
 
 // ── CIERRE DE CAJA ────────────────────────────────────────────────────────────
@@ -2291,6 +2360,19 @@ function renderCaja(){
     ${bloqueResumen('Cierre del día','ti-sun','var(--g)',dia,hoyStr,'dia')}
     ${bloqueResumen('Cierre de la semana','ti-calendar-week','var(--b)',sem,`${inicioSemStr} → ${hoyStr}`,'sem')}
     ${bloqueResumen('Cierre del mes','ti-calendar-month','var(--p)',mes,inicioMesStr.slice(0,7),'mes')}
+    <button class="abtn abtn-g" onclick="abrirTx()" style="margin-bottom:14px"><i class="ti ti-receipt"></i> ${role==='owner'?'Registrar gasto / ingreso':'Registrar gasto'}</button>
+    <div class="stitle">Movimientos recientes</div>
+    <div class="card">
+      ${[...transacciones].sort((a,b)=>(b.fecha+String(b.id).padStart(9,'0')).localeCompare(a.fecha+String(a.id).padStart(9,'0'))).slice(0,12).map(t=>`
+        <div class="li">
+          <div class="liico ${t.tipo==='ingreso'?'ig':'ir'}"><i class="ti ${t.tipo==='ingreso'?'ti-arrow-up':'ti-arrow-down'}"></i></div>
+          <div class="libody"><div class="liname">${t.desc}</div><div class="lisub">${t.canal} · ${t.fecha}</div></div>
+          <div class="liright" style="display:flex;align-items:center;gap:8px">
+            <span style="font-weight:800;color:${t.tipo==='ingreso'?'var(--g)':'var(--r)'}">${t.tipo==='ingreso'?'+':'-'}${fmt(t.imp)}</span>
+            ${role==='owner'&&!t.venta_id?`<button onclick="eliminarTx(${t.id})" style="background:none;border:none;cursor:pointer;color:var(--txh);font-size:16px;padding:4px"><i class="ti ti-x"></i></button>`:''}
+          </div>
+        </div>`).join('')||'<div style="font-size:13px;color:var(--txm);text-align:center;padding:10px">Sin movimientos aún</div>'}
+    </div>
   `;
 }
 
