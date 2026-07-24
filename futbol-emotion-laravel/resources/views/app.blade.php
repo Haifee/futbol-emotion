@@ -2214,10 +2214,10 @@ function renderFin(){
     </div>
     <button class="abtn abtn-g" onclick="openM('m-tx')"><i class="ti ti-plus"></i> Registrar movimiento</button>`;
 }
-function abrirTx(){
+function abrirTx(tipo='gasto'){
   document.getElementById('tx-desc').value='';
   document.getElementById('tx-imp').value='';
-  document.getElementById('tx-tipo').value='gasto';
+  document.getElementById('tx-tipo').value=(role==='owner'&&tipo==='ingreso')?'ingreso':'gasto';
   // El encargado solo registra gastos; el dueño puede elegir tipo
   document.getElementById('tx-tipo-wrap').style.display=role==='owner'?'block':'none';
   toggleTxTipo();
@@ -2356,11 +2356,22 @@ function renderCaja(){
 
   cont.innerHTML=`
     <div style="font-size:19px;font-weight:800;margin-bottom:4px">Cierre de caja</div>
-    <div style="font-size:13px;color:var(--txm);margin-bottom:18px">Hoy: ${hoyStr}</div>
+    <div style="font-size:13px;color:var(--txm);margin-bottom:14px">Hoy: ${hoyStr}</div>
+    <div style="display:grid;grid-template-columns:${role==='owner'?'1fr 1fr':'1fr'};gap:10px;margin-bottom:18px">
+      <button onclick="abrirTx('gasto')" style="padding:18px 12px;border-radius:14px;border:2px solid var(--rd);background:var(--rl);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;box-shadow:var(--shadow)">
+        <i class="ti ti-receipt-2" style="font-size:30px;color:var(--rd)"></i>
+        <span style="font-size:15px;font-weight:800;color:var(--rd)">Registrar gasto</span>
+        <span style="font-size:11px;font-weight:600;color:var(--rd);opacity:.75">Compras, servicios, envíos…</span>
+      </button>
+      ${role==='owner'?`<button onclick="abrirTx('ingreso')" style="padding:18px 12px;border-radius:14px;border:2px solid var(--gd);background:var(--gl);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;box-shadow:var(--shadow)">
+        <i class="ti ti-cash-banknote" style="font-size:30px;color:var(--gd)"></i>
+        <span style="font-size:15px;font-weight:800;color:var(--gd)">Registrar ingreso</span>
+        <span style="font-size:11px;font-weight:600;color:var(--gd);opacity:.75">Dinero que entra aparte de ventas</span>
+      </button>`:''}
+    </div>
     ${bloqueResumen('Cierre del día','ti-sun','var(--g)',dia,hoyStr,'dia')}
     ${bloqueResumen('Cierre de la semana','ti-calendar-week','var(--b)',sem,`${inicioSemStr} → ${hoyStr}`,'sem')}
     ${bloqueResumen('Cierre del mes','ti-calendar-month','var(--p)',mes,inicioMesStr.slice(0,7),'mes')}
-    <button class="abtn abtn-g" onclick="abrirTx()" style="margin-bottom:14px"><i class="ti ti-receipt"></i> ${role==='owner'?'Registrar gasto / ingreso':'Registrar gasto'}</button>
     <div class="stitle">Movimientos recientes</div>
     <div class="card">
       ${[...transacciones].sort((a,b)=>(b.fecha+String(b.id).padStart(9,'0')).localeCompare(a.fecha+String(a.id).padStart(9,'0'))).slice(0,12).map(t=>`
