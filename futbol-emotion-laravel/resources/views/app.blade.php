@@ -495,8 +495,25 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <div id="v-disp" style="display:none;margin:2px 0 6px;padding:9px 12px;border-radius:10px;font-size:13px;font-weight:700"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label class="fl">Cantidad (UND)</label><input class="fi" id="v-cant" type="number" min="1" value="1" oninput="autoPrecioVenta()"></div>
-        <div><label class="fl">Importe ($)</label><input class="fi" id="v-imp" type="number" min="0" step="0.01" placeholder="0.00" oninput="impEditadoManual=true"></div>
+        <div><label class="fl">Importe ($)</label><input class="fi" id="v-imp" type="number" min="0" step="0.01" placeholder="0.00" oninput="impEditadoManual=true;recalcularBs()"></div>
       </div>
+    </div>
+
+    <!-- MÉTODO DE PAGO -->
+    <div id="v-pago-wrap">
+      <label class="fl">¿Cómo pagó?</label>
+      <div id="v-pago-metodos" style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:6px"></div>
+      <div id="v-pago-bs" style="display:none;background:var(--gl);border:1.5px solid var(--gm);border-radius:11px;padding:11px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:12px;font-weight:700;color:var(--gd)">A pagar en bolívares</span>
+          <span style="font-size:11px;color:var(--gd);opacity:.8" id="v-tasa-info">—</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+          <span style="font-size:20px;font-weight:800;color:var(--gd)">Bs</span>
+          <input class="fi" id="v-monto-bs" type="number" min="0" step="0.01" style="font-size:18px;font-weight:800;padding:8px 10px;background:#fff">
+        </div>
+      </div>
+      <div id="v-pago-campos"></div>
     </div>
 
     <!-- Canal (solo envío) -->
@@ -857,7 +874,7 @@ async function cargarDatosServidor(){
     pedidos = p.map(x=>({id:x.id,provId:x.proveedor_id,lineas:x.lineas,notas:x.notas,estado:x.estado,fecha:x.fecha}));
     envios = e.map(x=>({id:x.id,cliente:x.cliente,prods:x.productos,origen:x.origen,trans:x.transportista,dir:x.direccion,imp:parseFloat(x.importe),estado:x.estado,notas:x.notas,fecha:x.fecha}));
     devoluciones = d.map(x=>({id:x.id,cliente:x.cliente,motivo:x.motivo,dev:x.camiseta_devuelta,sol:x.camiseta_solicitada,imp:parseFloat(x.importe),estado:x.estado,fecha:x.fecha}));
-    ventas = v.map(x=>({id:x.id,camId:x.camiseta_id,equipo:x.equipo,talla:x.talla,cant:x.cantidad,canal:x.canal,cliente:x.cliente,numeroVenta:x.numero_venta,imp:parseFloat(x.importe),fecha:x.fecha}));
+    ventas = v.map(x=>({id:x.id,camId:x.camiseta_id,equipo:x.equipo,talla:x.talla,cant:x.cantidad,canal:x.canal,cliente:x.cliente,numeroVenta:x.numero_venta,imp:parseFloat(x.importe),fecha:x.fecha,pagos:x.pagos||[]}));
     transacciones = t.map(x=>({id:x.id,tipo:x.tipo,desc:x.descripcion,imp:parseFloat(x.importe),canal:x.canal,fecha:x.fecha,venta_id:x.venta_id||null}));
     actividad = act.actividad;
     notifsVistas = act.vistas;
@@ -1123,6 +1140,125 @@ function escanearParaVenta(){
     }catch(e){ openM('m-venta'); }
   });
 }
+// ── MÉTODOS DE PAGO (Venezuela) ───────────────────────────────────────────────
+const BANCOS_VE=['0102 Banco de Venezuela','0104 Venezolano de Crédito','0105 Mercantil','0108 BBVA Provincial','0114 Bancaribe','0115 Exterior','0128 Banco Caroní','0134 Banesco','0137 Sofitasa','0138 Banco Plaza','0146 Bangente','0151 BFC Fondo Común','0156 100% Banco','0157 DelSur','0163 Banco del Tesoro','0166 Banco Agrícola','0168 Bancrecer','0169 Mi Banco','0171 Banco Activo','0172 Bancamiga','0174 Banplus','0175 Bicentenario','0177 Banfanb','0191 BNC','Otro'];
+
+const METODOS_PAGO={
+  efectivo_usd:  {label:'Efectivo $',   icono:'ti-cash',            bs:false},
+  efectivo_bs:   {label:'Efectivo Bs',  icono:'ti-cash-banknote',   bs:true},
+  pago_movil:    {label:'Pago móvil',   icono:'ti-device-mobile',   bs:true},
+  punto_venta:   {label:'Punto de venta',icono:'ti-credit-card',    bs:true},
+  transferencia: {label:'Transferencia',icono:'ti-building-bank',   bs:true},
+  zelle:         {label:'Zelle',        icono:'ti-brand-cashapp',   bs:false},
+  binance:       {label:'Binance',      icono:'ti-currency-bitcoin',bs:false},
+  zinli:         {label:'Zinli',        icono:'ti-wallet',          bs:false},
+  cashea:        {label:'Cashea',       icono:'ti-shopping-bag',    bs:false},
+};
+
+let metodoPago=null;
+
+function tasaActual(){ return parseFloat(CONFIG.tasa_bcv)||0; }
+function fmtBs(n){ return 'Bs ' + (n||0).toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function selectBanco(id,label){
+  return `<label class="fl">${label}</label><select class="fi" id="${id}"><option value="">— Selecciona —</option>${BANCOS_VE.map(b=>`<option>${b}</option>`).join('')}</select>`;
+}
+
+function renderMetodosPago(){
+  const cont=document.getElementById('v-pago-metodos');
+  if(!cont) return;
+  cont.innerHTML=Object.entries(METODOS_PAGO).map(([k,m])=>{
+    const act=metodoPago===k;
+    return `<button type="button" onclick="setMetodoPago('${k}')" style="padding:9px 4px;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;font-weight:700;border:2px solid ${act?'var(--gm)':'var(--grayb)'};background:${act?'var(--gl)':'#fff'};color:${act?'var(--gd)':'var(--txm)'}">
+      <i class="ti ${m.icono}" style="font-size:18px"></i>${m.label}</button>`;
+  }).join('');
+}
+
+function setMetodoPago(k){
+  metodoPago=k;
+  renderMetodosPago();
+  const m=METODOS_PAGO[k];
+  const tasa=tasaActual();
+
+  // Bloque de bolívares
+  const boxBs=document.getElementById('v-pago-bs');
+  boxBs.style.display=m.bs?'block':'none';
+  if(m.bs){
+    document.getElementById('v-tasa-info').textContent=tasa>0
+      ? `Tasa: ${tasa.toLocaleString('es-VE',{minimumFractionDigits:2})} Bs/$${CONFIG.tasa_fecha?' · '+CONFIG.tasa_fecha:''}`
+      : '⚠️ Sin tasa configurada (Ajustes)';
+    recalcularBs();
+  }
+
+  // Campos propios de cada método
+  const campos=document.getElementById('v-pago-campos');
+  const refCorta='inputmode="numeric" maxlength="6"';
+  const plantillas={
+    efectivo_usd: '',
+    efectivo_bs:  '',
+    pago_movil:   `${selectBanco('pg-banco-receptor','¿A qué banco cayó el dinero?')}
+                   ${selectBanco('pg-banco-emisor','Banco del cliente')}
+                   <div class="frow">
+                     <div><label class="fl">Teléfono</label><input class="fi" id="pg-telefono" inputmode="tel" placeholder="0414 000 0000"></div>
+                     <div><label class="fl">Referencia</label><input class="fi" id="pg-referencia" inputmode="numeric" placeholder="Últimos dígitos"></div>
+                   </div>`,
+    punto_venta:  `${selectBanco('pg-banco-receptor','Punto de venta (banco receptor)')}
+                   ${selectBanco('pg-banco-emisor','Banco emisor (tarjeta del cliente)')}
+                   <div class="frow">
+                     <div><label class="fl">Últimos 6 · emisor</label><input class="fi" id="pg-ref-emisor" ${refCorta} placeholder="000000"></div>
+                     <div><label class="fl">Últimos 6 · receptor</label><input class="fi" id="pg-ref-receptor" ${refCorta} placeholder="000000"></div>
+                   </div>`,
+    transferencia:`${selectBanco('pg-banco-receptor','¿A qué banco cayó el dinero?')}
+                   ${selectBanco('pg-banco-emisor','Banco del cliente')}
+                   <label class="fl">Referencia</label><input class="fi" id="pg-referencia" inputmode="numeric" placeholder="Número de referencia">`,
+    zelle:        `<label class="fl">Correo de quien envía</label><input class="fi" id="pg-correo" type="email" inputmode="email" placeholder="cliente@correo.com">
+                   <label class="fl">Nombre de quien envía</label><input class="fi" id="pg-titular" placeholder="Nombre y apellido">
+                   <label class="fl">Número de confirmación</label><input class="fi" id="pg-confirmacion" placeholder="Ej: 1234abcd">`,
+    binance:      `<label class="fl">Correo Binance</label><input class="fi" id="pg-correo" type="email" inputmode="email" placeholder="cliente@correo.com">
+                   <label class="fl">ID de la orden</label><input class="fi" id="pg-id-orden" inputmode="numeric" placeholder="Ej: 22458913057">`,
+    zinli:        `<label class="fl">Correo Zinli</label><input class="fi" id="pg-correo" type="email" inputmode="email" placeholder="cliente@correo.com">
+                   <label class="fl">Referencia</label><input class="fi" id="pg-referencia" placeholder="Número de operación">`,
+    cashea:       `<div style="background:var(--al);border-radius:10px;padding:10px;font-size:12px;color:var(--ad);font-weight:600;margin-bottom:8px"><i class="ti ti-info-circle"></i> Cashea requiere que el negocio esté registrado con ellos.</div>
+                   <label class="fl">Nombre del cliente</label><input class="fi" id="pg-titular" placeholder="Nombre y apellido">
+                   <label class="fl">N° de orden Cashea</label><input class="fi" id="pg-referencia" placeholder="Ej: CSH-123456">`,
+  };
+  campos.innerHTML=plantillas[k]||'';
+}
+
+function recalcularBs(){
+  const inp=document.getElementById('v-monto-bs');
+  if(!inp||!metodoPago||!METODOS_PAGO[metodoPago].bs) return;
+  const tasa=tasaActual();
+  const usd=+document.getElementById('v-imp').value||0;
+  if(tasa>0) inp.value=(usd*tasa).toFixed(2);
+}
+
+function datosPago(){
+  if(!metodoPago) return null;
+  const val=id=>{const e=document.getElementById(id); return e?e.value.trim():''};
+  const m=METODOS_PAGO[metodoPago];
+  const d={metodo:metodoPago};
+  if(m.bs){
+    d.tasa=tasaActual();
+    d.monto=+document.getElementById('v-monto-bs').value||0;
+  }else{
+    d.monto=+document.getElementById('v-imp').value||0;
+  }
+  ['referencia','correo','titular','telefono','confirmacion'].forEach(k=>{const v=val('pg-'+k); if(v) d[k]=v});
+  const mapa={'pg-banco-emisor':'banco_emisor','pg-banco-receptor':'banco_receptor','pg-ref-emisor':'ref_emisor','pg-ref-receptor':'ref_receptor','pg-id-orden':'id_orden'};
+  Object.entries(mapa).forEach(([id,k])=>{const v=val(id); if(v) d[k]=v});
+  return d;
+}
+
+function resumenPago(p){
+  if(!p) return '';
+  const m=METODOS_PAGO[p.metodo];
+  if(!m) return '';
+  const monto=p.moneda==='VES'?fmtBs(parseFloat(p.monto)):('$'+parseFloat(p.monto).toFixed(2));
+  const extra=p.referencia||p.confirmacion||p.id_orden||p.ref_receptor||'';
+  return `${m.label} · ${monto}${extra?' · Ref '+extra:''}`;
+}
+
 function toggleTallaVenta(){
   const camId=+document.getElementById('v-cam').value;
   const cam=camisetas.find(c=>c.id===camId);
@@ -1153,6 +1289,7 @@ function actualizarDispVenta(){
 }
 function autoPrecioVenta(){
   actualizarDispVenta();
+  setTimeout(recalcularBs,0);
   if(impEditadoManual) return;
   const camId=+document.getElementById('v-cam').value;
   const cam=camisetas.find(c=>c.id===camId);
@@ -1866,6 +2003,10 @@ function openVentaModal(){
     ? camisetas.map(c=>`<option value="${c.id}">${nombreProducto(c)}</option>`).join('')
     : '<option value="">Sin camisetas en inventario</option>';
   toggleTallaVenta();
+  metodoPago=null;
+  document.getElementById('v-pago-campos').innerHTML='';
+  document.getElementById('v-pago-bs').style.display='none';
+  renderMetodosPago();
   openM('m-venta');
 }
 
@@ -1955,10 +2096,10 @@ async function _saveVentaInterno(){
       : `${canal} — ${cliente} · ${nombreCamiseta} x${cant}`;
 
     // Guardar venta libre (sin tocar stock)
-    const v={id:ids.ven++,camId:null,equipo:nombreCamiseta,talla:'—',cant,canal,cliente,imp,fecha:hoy()};
+    const v={id:ids.ven++,camId:null,equipo:nombreCamiseta,talla:'—',cant,canal,cliente,imp,fecha:hoy(),pagos:datosPago()?[{...datosPago(),moneda:METODOS_PAGO[metodoPago].bs?'VES':'USD'}]:[]};
     ventas.push(v); if(!MODO_SERVIDOR) sd('ventas',ventas);
     try{
-      if(MODO_SERVIDOR) await syncVenta({camiseta_id:null,equipo:nombreCamiseta,talla:'—',cantidad:cant,canal,cliente,importe:imp});
+      if(MODO_SERVIDOR) await syncVenta({camiseta_id:null,equipo:nombreCamiseta,talla:'—',cantidad:cant,canal,cliente,importe:imp,pago:datosPago()});
     }catch(e){ toast('No se pudo guardar en el servidor: '+e.message); }
     const tx={id:ids.tx++,tipo:'ingreso',desc,imp,canal,fecha:hoy()};
     transacciones.push(tx); if(!MODO_SERVIDOR) sd('transacciones',transacciones);
@@ -1983,9 +2124,9 @@ async function _saveVentaInterno(){
     const i=camisetas.findIndex(c=>c.id===camId);
     camisetas[i].tallas[talla]-=cant;
     if(!MODO_SERVIDOR) sd('camisetas',camisetas);
-    const v={id:ids.ven++,camId,equipo:`${cam.equipo} ${cam.tipo} ${cam.temp}`,talla,cant,canal,cliente,imp,fecha:hoy()};
+    const v={id:ids.ven++,camId,equipo:`${cam.equipo} ${cam.tipo} ${cam.temp}`,talla,cant,canal,cliente,imp,fecha:hoy(),pagos:datosPago()?[{...datosPago(),moneda:METODOS_PAGO[metodoPago].bs?'VES':'USD'}]:[]};
     ventas.push(v); if(!MODO_SERVIDOR) sd('ventas',ventas);
-    await syncVenta({camiseta_id:camId,talla,cantidad:cant,canal,cliente,importe:imp});
+    await syncVenta({camiseta_id:camId,talla,cantidad:cant,canal,cliente,importe:imp,pago:datosPago()});
     const tx={id:ids.tx++,tipo:'ingreso',desc,imp,canal,fecha:hoy()};
     transacciones.push(tx); if(!MODO_SERVIDOR) sd('transacciones',transacciones);
     registrarActividad('venta',`${tipoVenta==='tienda'?cliente+' —':cliente+' ·'} ${cam.equipo} ${cam.tipo} Talla ${talla}`,`${cant} UND · ${fmt(imp)}`);
@@ -2481,11 +2622,34 @@ function generarPDF(d,nombre){
   if(d.vts.length){
     doc.autoTable({
       startY:doc.lastAutoTable.finalY+8,
-      head:[['Fecha','Camiseta','Talla','Cant.','Canal','Cliente','Importe']],
-      body:d.vts.map(v=>[v.fecha,v.equipo,v.talla||'—',v.cant,v.canal,v.cliente||'—','$'+v.imp.toFixed(2)]),
-      foot:[['','','','','','TOTAL','$'+d.vts.reduce((s,v)=>s+v.imp,0).toFixed(2)]],
+      head:[['Fecha','Producto','Talla','Cant.','Cliente','Pago','Ref.','Importe']],
+      body:d.vts.map(v=>{
+        const p=(v.pagos&&v.pagos[0])||null;
+        const met=p?(METODOS_PAGO[p.metodo]?.label||p.metodo):'—';
+        const ref=p?(p.referencia||p.confirmacion||p.id_orden||p.ref_receptor||''):'';
+        const bs=(p&&p.moneda==='VES')?`\n${fmtBs(parseFloat(p.monto))}`:'';
+        return [v.fecha,v.equipo,v.talla||'—',v.cant,v.cliente||'—',met+bs,ref,'$'+v.imp.toFixed(2)];
+      }),
+      foot:[['','','','','','','TOTAL','$'+d.vts.reduce((s,v)=>s+v.imp,0).toFixed(2)]],
       theme:'striped', headStyles:{fillColor:verde}, footStyles:{fillColor:[240,240,240],textColor:[0,0,0],fontStyle:'bold'},
-      styles:{fontSize:8}, columnStyles:{6:{halign:'right'}},
+      styles:{fontSize:7.5}, columnStyles:{7:{halign:'right'}},
+    });
+
+    // Resumen por método de pago
+    const porMetodo={};
+    d.vts.forEach(v=>{
+      const p=(v.pagos&&v.pagos[0])||null;
+      const k=p?(METODOS_PAGO[p.metodo]?.label||p.metodo):'Sin registrar';
+      if(!porMetodo[k]) porMetodo[k]={n:0,usd:0,bs:0};
+      porMetodo[k].n++; porMetodo[k].usd+=v.imp;
+      if(p&&p.moneda==='VES') porMetodo[k].bs+=parseFloat(p.monto)||0;
+    });
+    doc.autoTable({
+      startY:doc.lastAutoTable.finalY+8,
+      head:[['Método de pago','Ventas','Total $','Total Bs']],
+      body:Object.entries(porMetodo).map(([k,v])=>[k,v.n,'$'+v.usd.toFixed(2),v.bs?fmtBs(v.bs):'—']),
+      theme:'grid', headStyles:{fillColor:verde}, styles:{fontSize:8},
+      columnStyles:{2:{halign:'right'},3:{halign:'right'}},
     });
   }
 
@@ -2521,12 +2685,19 @@ function generarExcel(d,nombre){
   ws1['!cols']=[{wch:22},{wch:16}];
   XLSX.utils.book_append_sheet(wb,ws1,'Resumen');
 
-  const ventasFilas=[['Fecha','Camiseta','Talla','Cantidad','Canal','Cliente','Importe']]
-    .concat(d.vts.map(v=>[v.fecha,v.equipo,v.talla||'—',v.cant,v.canal,v.cliente||'—',v.imp]));
+  const ventasFilas=[['Fecha','Producto','Talla','Cantidad','Canal','Cliente','Método de pago','Moneda','Monto pagado','Tasa','Referencia','Banco receptor','Importe ($)']]
+    .concat(d.vts.map(v=>{
+      const p=(v.pagos&&v.pagos[0])||null;
+      return [v.fecha,v.equipo,v.talla||'—',v.cant,v.canal,v.cliente||'—',
+        p?(METODOS_PAGO[p.metodo]?.label||p.metodo):'',
+        p?p.moneda:'', p?parseFloat(p.monto):'', (p&&p.tasa)?parseFloat(p.tasa):'',
+        p?(p.referencia||p.confirmacion||p.id_orden||p.ref_receptor||''):'',
+        p?(p.banco_receptor||''):'', v.imp];
+    }));
   ventasFilas.push([]);
-  ventasFilas.push(['','','','','','TOTAL',d.vts.reduce((s,v)=>s+v.imp,0)]);
+  ventasFilas.push(['','','','','','','','','','','','TOTAL',d.vts.reduce((s,v)=>s+v.imp,0)]);
   const ws2=XLSX.utils.aoa_to_sheet(ventasFilas);
-  ws2['!cols']=[{wch:11},{wch:28},{wch:6},{wch:9},{wch:14},{wch:18},{wch:10}];
+  ws2['!cols']=[{wch:11},{wch:26},{wch:6},{wch:9},{wch:13},{wch:16},{wch:15},{wch:8},{wch:14},{wch:10},{wch:16},{wch:20},{wch:11}];
   XLSX.utils.book_append_sheet(wb,ws2,'Ventas');
 
   const movFilas=[['Fecha','Tipo','Descripción','Canal','Importe']]
@@ -2544,6 +2715,24 @@ function renderAjustes(){
   cont.innerHTML=`
     <div style="font-size:19px;font-weight:800;margin-bottom:4px">Ajustes</div>
     <div style="font-size:13px;color:var(--txm);margin-bottom:20px">Gestión de datos de la app</div>
+
+    <div class="stitle">Tasa del día (Bs por $)</div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <div style="font-size:26px;font-weight:800;color:var(--gd)">${(parseFloat(CONFIG.tasa_bcv)||0).toLocaleString('es-VE',{minimumFractionDigits:2})}</div>
+          <div style="font-size:12px;color:var(--txm)">${CONFIG.tasa_fecha?`${CONFIG.tasa_origen||'manual'} · ${CONFIG.tasa_fecha}`:'Sin configurar todavía'}</div>
+        </div>
+        <div style="width:46px;height:46px;border-radius:12px;background:var(--gl);display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--gd)"><i class="ti ti-currency-dollar"></i></div>
+      </div>
+      <button class="abtn abtn-g" onclick="traerTasaBcv()" style="margin-top:0;margin-bottom:8px"><i class="ti ti-refresh"></i> Traer tasa oficial del BCV</button>
+      <label class="fl">O escríbela a mano</label>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <input class="fi" id="cfg-tasa" type="number" min="0" step="0.0001" value="${parseFloat(CONFIG.tasa_bcv)||''}" placeholder="Ej: 305.4200" style="flex:1">
+        <button class="abtn abtn-gray" onclick="guardarTasaManual()" style="margin-top:0;width:auto;padding:13px 18px"><i class="ti ti-check"></i></button>
+      </div>
+      <div style="font-size:12px;color:var(--txm);margin-top:10px">Los precios siguen en dólares. Al cobrar en bolívares, la app calcula el equivalente con esta tasa.</div>
+    </div>
 
     <div class="stitle">Nombres de proveedores</div>
     <div class="card">
@@ -2648,6 +2837,30 @@ function exportarTodo(){
   a.download=`futbol-emotion-backup-${hoy()}.json`;
   a.click();
   toast('Copia de seguridad guardada ✓');
+}
+
+async function traerTasaBcv(){
+  if(!MODO_SERVIDOR){toast('Necesitas conexión con el servidor');return}
+  toast('Consultando el BCV…');
+  try{
+    const r=await apiCall('POST','/config/tasa-bcv',{});
+    CONFIG.tasa_bcv=r.tasa; CONFIG.tasa_fecha=r.fecha; CONFIG.tasa_origen=r.origen;
+    toast(`Tasa actualizada: ${parseFloat(r.tasa).toLocaleString('es-VE',{minimumFractionDigits:2})} Bs/$`);
+    registrarActividad('ajuste',`Tasa BCV actualizada: ${r.tasa} Bs/$`,'');
+    renderAjustes();
+  }catch(e){/* apiCall ya mostró el motivo */}
+}
+
+async function guardarTasaManual(){
+  const val=+document.getElementById('cfg-tasa').value;
+  if(!(val>0)){toast('⚠️ Escribe una tasa válida');return}
+  try{
+    if(MODO_SERVIDOR) await apiCall('POST','/config',{tasa_bcv:String(val),tasa_fecha:hoy(),tasa_origen:'manual'});
+    CONFIG.tasa_bcv=String(val); CONFIG.tasa_fecha=hoy(); CONFIG.tasa_origen='manual';
+    toast('Tasa guardada ✓');
+    registrarActividad('ajuste',`Tasa cambiada a mano: ${val} Bs/$`,'');
+    renderAjustes();
+  }catch(e){/* apiCall ya avisó */}
 }
 
 async function guardarProveedores(){
@@ -2868,6 +3081,7 @@ function renderMisVentas(){
         <div class="libody">
           <div class="liname">${esFisica?(v.cliente||'Venta tienda'):v.cliente||v.canal}</div>
           <div class="lisub">${v.equipo} · Talla ${v.talla} · ${v.cant} UND</div>
+          ${(v.pagos&&v.pagos.length)?`<div style="font-size:11.5px;font-weight:700;color:var(--gd);margin-top:2px"><i class="ti ti-wallet" style="font-size:12px"></i> ${resumenPago(v.pagos[0])}</div>`:''}
         </div>
         <div class="liright">
           <div style="font-weight:800;font-size:15px;color:var(--g)">${fmt(v.imp)}</div>
