@@ -8,6 +8,7 @@ use App\Http\Controllers\PedidoController;
 use App\Http\Controllers\EnvioController;
 use App\Http\Controllers\DevolucionController;
 use App\Http\Controllers\TransaccionController;
+use App\Http\Controllers\ConfigController;
 use App\Http\Controllers\MigracionController;
 use App\Http\Controllers\ActividadController;
 
@@ -60,6 +61,9 @@ Route::middleware('auth.pin')->group(function () {
     Route::post('/transacciones',     [TransaccionController::class, 'store']);
     Route::get('/transacciones/cierre', [TransaccionController::class, 'cierre']);
     Route::delete('/transacciones/{id}', [TransaccionController::class, 'destroy']);
+
+    Route::get('/config',  [ConfigController::class, 'index']);
+    Route::post('/config', [ConfigController::class, 'update']);
 
     // Actividad / Notificaciones (historial compartido entre encargado y dueño)
     Route::get('/actividad',          [ActividadController::class, 'index']);
