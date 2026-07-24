@@ -479,7 +479,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <input class="fi" id="v-cam-libre" placeholder="Ej: Argentina Local M 24/25, Brasil Visitante L…">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><label class="fl">Cantidad (UND)</label><input class="fi" id="v-cant-libre" type="number" min="1" value="1"></div>
-        <div><label class="fl">Importe ($)</label><input class="fi" id="v-imp-libre" type="number" min="0" step="0.01" placeholder="0.00"></div>
+        <div><label class="fl">Importe ($)</label><input class="fi" id="v-imp-libre" type="number" min="0" step="0.01" placeholder="0.00" oninput="recalcularBs()"></div>
       </div>
     </div>
 
@@ -1160,8 +1160,13 @@ let metodoPago=null;
 function tasaActual(){ return parseFloat(CONFIG.tasa_bcv)||0; }
 function fmtBs(n){ return 'Bs ' + (n||0).toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
-function selectBanco(id,label){
-  return `<label class="fl">${label}</label><select class="fi" id="${id}"><option value="">— Selecciona —</option>${BANCOS_VE.map(b=>`<option>${b}</option>`).join('')}</select>`;
+function selectBanco(id,label,sel=''){
+  return `<label class="fl">${label}</label><select class="fi" id="${id}"><option value="">— Selecciona —</option>${BANCOS_VE.map(b=>`<option${b===sel?' selected':''}>${b}</option>`).join('')}</select>`;
+}
+function bancoReceptorFijo(label){
+  const fijo=(CONFIG.banco_receptor||'').trim();
+  // Si ya configuraste tu banco en Ajustes, queda puesto; si no, lista normal
+  return selectBanco('pg-banco-receptor',label,fijo);
 }
 
 function renderMetodosPago(){
@@ -1196,20 +1201,17 @@ function setMetodoPago(k){
   const plantillas={
     efectivo_usd: '',
     efectivo_bs:  '',
-    pago_movil:   `${selectBanco('pg-banco-receptor','¿A qué banco cayó el dinero?')}
-                   ${selectBanco('pg-banco-emisor','Banco del cliente')}
-                   <div class="frow">
-                     <div><label class="fl">Teléfono</label><input class="fi" id="pg-telefono" inputmode="tel" placeholder="0414 000 0000"></div>
-                     <div><label class="fl">Referencia</label><input class="fi" id="pg-referencia" inputmode="numeric" placeholder="Últimos dígitos"></div>
-                   </div>`,
+    pago_movil:   `${bancoReceptorFijo('¿A qué banco cayó el dinero?')}
+                   ${selectBanco('pg-banco-emisor','¿De qué banco te pagaron?')}
+                   <label class="fl">Referencia</label><input class="fi" id="pg-referencia" inputmode="numeric" placeholder="Número de referencia">`,
     punto_venta:  `${selectBanco('pg-banco-receptor','Punto de venta (banco receptor)')}
                    ${selectBanco('pg-banco-emisor','Banco emisor (tarjeta del cliente)')}
                    <div class="frow">
                      <div><label class="fl">Últimos 6 · emisor</label><input class="fi" id="pg-ref-emisor" ${refCorta} placeholder="000000"></div>
                      <div><label class="fl">Últimos 6 · receptor</label><input class="fi" id="pg-ref-receptor" ${refCorta} placeholder="000000"></div>
                    </div>`,
-    transferencia:`${selectBanco('pg-banco-receptor','¿A qué banco cayó el dinero?')}
-                   ${selectBanco('pg-banco-emisor','Banco del cliente')}
+    transferencia:`${bancoReceptorFijo('¿A qué banco cayó el dinero?')}
+                   ${selectBanco('pg-banco-emisor','¿De qué banco te pagaron?')}
                    <label class="fl">Referencia</label><input class="fi" id="pg-referencia" inputmode="numeric" placeholder="Número de referencia">`,
     zelle:        `<label class="fl">Correo de quien envía</label><input class="fi" id="pg-correo" type="email" inputmode="email" placeholder="cliente@correo.com">
                    <label class="fl">Nombre de quien envía</label><input class="fi" id="pg-titular" placeholder="Nombre y apellido">
@@ -1225,11 +1227,30 @@ function setMetodoPago(k){
   campos.innerHTML=plantillas[k]||'';
 }
 
+function ventasHoyPorMoneda(){
+  const h=hoy();
+  let bs=0, divisas=0, sinReg=0;
+  ventas.filter(v=>v.fecha===h).forEach(v=>{
+    const p=(v.pagos&&v.pagos[0])||null;
+    if(!p){ sinReg+=v.imp; return; }
+    if(p.moneda==='VES') bs+=parseFloat(p.monto)||0;
+    else divisas+=v.imp;
+  });
+  return {bs,divisas,sinReg};
+}
+function importeVentaActual(){
+  // El importe puede estar en el campo de stock (v-imp) o en el de venta libre (v-imp-libre)
+  const libre=document.getElementById('v-imp-libre');
+  const stock=document.getElementById('v-imp');
+  const libreVisible=modoVenta==='libre';
+  const val=libreVisible ? (+((libre||{}).value)||0) : (+((stock||{}).value)||0);
+  return val;
+}
 function recalcularBs(){
   const inp=document.getElementById('v-monto-bs');
   if(!inp||!metodoPago||!METODOS_PAGO[metodoPago].bs) return;
   const tasa=tasaActual();
-  const usd=+document.getElementById('v-imp').value||0;
+  const usd=importeVentaActual();
   if(tasa>0) inp.value=(usd*tasa).toFixed(2);
 }
 
@@ -1242,9 +1263,9 @@ function datosPago(){
     d.tasa=tasaActual();
     d.monto=+document.getElementById('v-monto-bs').value||0;
   }else{
-    d.monto=+document.getElementById('v-imp').value||0;
+    d.monto=importeVentaActual();
   }
-  ['referencia','correo','titular','telefono','confirmacion'].forEach(k=>{const v=val('pg-'+k); if(v) d[k]=v});
+  ['referencia','correo','titular','confirmacion'].forEach(k=>{const v=val('pg-'+k); if(v) d[k]=v});
   const mapa={'pg-banco-emisor':'banco_emisor','pg-banco-receptor':'banco_receptor','pg-ref-emisor':'ref_emisor','pg-ref-receptor':'ref_receptor','pg-id-orden':'id_orden'};
   Object.entries(mapa).forEach(([id,k])=>{const v=val(id); if(v) d[k]=v});
   return d;
@@ -1585,6 +1606,11 @@ function renderHome(){
         <div class="mc mc-r"><i class="ti ti-trending-down mc-ico"></i><div class="mcl">Gastos</div><div class="mcv">${fmt(gas)}</div></div>
         <div class="mc mc-p"><i class="ti ti-chart-bar mc-ico"></i><div class="mcl">Beneficio</div><div class="mcv">${fmt(neto)}</div></div>
         <div class="mc mc-b"><i class="ti ti-truck mc-ico"></i><div class="mcl">Envíos activos</div><div class="mcv">${envActivos}</div></div>
+      </div>
+      <div class="stitle">Ventas de hoy</div>
+      <div class="mgrid">
+        <div class="mc mc-g"><i class="ti ti-cash mc-ico"></i><div class="mcl">En divisas ($)</div><div class="mcv">${fmt(ventasHoyPorMoneda().divisas)}</div><div class="mcs">efectivo $, Zelle, Binance…</div></div>
+        <div class="mc mc-cyan"><i class="ti ti-businessplan mc-ico"></i><div class="mcl">En bolívares</div><div class="mcv" style="font-size:19px">${fmtBs(ventasHoyPorMoneda().bs)}</div><div class="mcs">pago móvil, PDV, efectivo Bs</div></div>
       </div>
       <div class="stitle">Alertas</div>
       ${alertas}
@@ -2734,6 +2760,14 @@ function renderAjustes(){
       <div style="font-size:12px;color:var(--txm);margin-top:10px">Los precios siguen en dólares. Al cobrar en bolívares, la app calcula el equivalente con esta tasa.</div>
     </div>
 
+    <div class="stitle">Datos para cobrar (pago móvil)</div>
+    <div class="card">
+      <div style="font-size:13px;color:var(--txm);margin-bottom:12px">Estos datos quedan puestos automáticamente al registrar un pago móvil o transferencia. El encargado solo agrega la referencia y el banco del cliente.</div>
+      <label class="fl" style="margin-top:0">Tu banco (a dónde cae el dinero)</label>
+      <select class="fi" id="cfg-banco-rec"><option value="">— Selecciona —</option>${BANCOS_VE.map(b=>`<option${b===(CONFIG.banco_receptor||'')?' selected':''}>${b}</option>`).join('')}</select>
+      <button class="abtn abtn-g" onclick="guardarDatosCobro()"><i class="ti ti-check"></i> Guardar datos de cobro</button>
+    </div>
+
     <div class="stitle">Nombres de proveedores</div>
     <div class="card">
       <div style="font-size:14px;color:var(--txm);margin-bottom:12px">Solo tú ves los nombres. El encargado sigue viendo "Proveedor 1, 2, 3…".</div>
@@ -2837,6 +2871,16 @@ function exportarTodo(){
   a.download=`futbol-emotion-backup-${hoy()}.json`;
   a.click();
   toast('Copia de seguridad guardada ✓');
+}
+
+async function guardarDatosCobro(){
+  const banco=document.getElementById('cfg-banco-rec').value;
+  try{
+    if(MODO_SERVIDOR) await apiCall('POST','/config',{banco_receptor:banco});
+    CONFIG.banco_receptor=banco;
+    toast('Datos de cobro guardados ✓');
+    registrarActividad('ajuste','Banco de cobro actualizado',banco);
+  }catch(e){/* apiCall ya avisó */}
 }
 
 async function traerTasaBcv(){
