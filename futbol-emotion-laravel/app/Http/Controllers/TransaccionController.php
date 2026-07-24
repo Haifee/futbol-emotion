@@ -36,6 +36,23 @@ class TransaccionController extends Controller
         return response()->json(DB::table('transacciones')->find($id), 201);
     }
 
+    public function destroy(Request $request, $id)
+    {
+        if ($request->input('_rol') !== 'owner') {
+            return response()->json(['error' => 'Solo el dueño puede eliminar movimientos'], 403);
+        }
+
+        $tx = DB::table('transacciones')->find($id);
+        if (!$tx) return response()->json(['error' => 'Movimiento no encontrado'], 404);
+
+        if (!empty($tx->venta_id)) {
+            return response()->json(['error' => 'Este movimiento pertenece a una venta — edítala o elimínala desde Ventas'], 409);
+        }
+
+        DB::table('transacciones')->where('id', $id)->delete();
+        return response()->json(['ok' => true]);
+    }
+
     public function cierre()
     {
         $hoy       = now()->toDateString();
