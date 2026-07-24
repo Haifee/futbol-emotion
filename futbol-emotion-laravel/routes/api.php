@@ -64,6 +64,7 @@ Route::middleware('auth.pin')->group(function () {
 
     Route::get('/config',  [ConfigController::class, 'index']);
     Route::post('/config', [ConfigController::class, 'update']);
+    Route::post('/config/tasa-bcv', [ConfigController::class, 'tasaBcv']);
 
     // Actividad / Notificaciones (historial compartido entre encargado y dueño)
     Route::get('/actividad',          [ActividadController::class, 'index']);
