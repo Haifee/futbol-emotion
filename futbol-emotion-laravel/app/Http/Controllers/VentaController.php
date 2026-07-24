@@ -14,6 +14,17 @@ class VentaController extends Controller
             ->orderBy('id', 'desc')
             ->get();
 
+        // Adjuntar cómo se pagó cada venta
+        try {
+            $pagos = DB::table('pagos')->whereNotNull('venta_id')->get()->groupBy('venta_id');
+            $ventas = $ventas->map(function ($v) use ($pagos) {
+                $v->pagos = isset($pagos[$v->id]) ? $pagos[$v->id]->values() : [];
+                return $v;
+            });
+        } catch (\Throwable $e) {
+            // Si la tabla aún no existe (migración pendiente), la app sigue funcionando
+        }
+
         return response()->json($ventas);
     }
 
@@ -26,6 +37,8 @@ class VentaController extends Controller
             'cantidad'    => 'required|integer|min:1',
             'canal'       => 'required|string',
             'importe'     => 'required|numeric|min:0',
+            'pago'        => 'nullable|array',
+            'pago.metodo' => 'nullable|string|max:30',
         ]);
 
         $camiseta = null;
@@ -100,6 +113,9 @@ class VentaController extends Controller
                 'created_at'  => now(),
                 'updated_at'  => now(),
             ]);
+
+            // Cómo pagó el cliente (opcional)
+            $this->guardarPago($request->input('pago'), $id, (float) $request->importe);
 
             DB::commit();
 
@@ -213,6 +229,64 @@ class VentaController extends Controller
     }
 
     // Eliminar una venta (devuelve el stock y borra la transacción vinculada)
+    /**
+     * Registra cómo se pagó la venta (efectivo, pago móvil, Zelle, Binance…).
+     */
+    private function guardarPago($pago, int $ventaId, float $importeUsd): void
+    {
+        $metodosValidos = [
+            'efectivo_usd', 'efectivo_bs', 'pago_movil', 'punto_venta',
+            'transferencia', 'zelle', 'binance', 'zinli', 'cashea',
+        ];
+
+        if (!is_array($pago) || empty($pago['metodo']) || !in_array($pago['metodo'], $metodosValidos, true)) {
+            return;
+        }
+
+        $enBolivares = in_array($pago['metodo'], ['efectivo_bs', 'pago_movil', 'punto_venta', 'transferencia'], true);
+        $moneda = $enBolivares ? 'VES' : 'USD';
+        $tasa   = isset($pago['tasa']) ? (float) $pago['tasa'] : null;
+        $monto  = isset($pago['monto']) ? (float) $pago['monto'] : null;
+
+        if ($enBolivares) {
+            if (!$monto && $tasa > 0) $monto = round($importeUsd * $tasa, 2);
+            $montoUsd = ($tasa > 0 && $monto) ? round($monto / $tasa, 2) : $importeUsd;
+        } else {
+            $monto    = $monto ?: $importeUsd;
+            $montoUsd = $monto;
+            $tasa     = null;
+        }
+
+        $corta = function ($k, $len = 60) use ($pago) {
+            return isset($pago[$k]) && $pago[$k] !== ''
+                ? mb_substr(trim((string) $pago[$k]), 0, $len)
+                : null;
+        };
+
+        DB::table('pagos')->insert([
+            'venta_id'       => $ventaId,
+            'metodo'         => $pago['metodo'],
+            'monto'          => $monto ?: 0,
+            'moneda'         => $moneda,
+            'tasa'           => $tasa,
+            'monto_usd'      => $montoUsd,
+            'referencia'     => $corta('referencia'),
+            'ref_emisor'     => $corta('ref_emisor', 20),
+            'ref_receptor'   => $corta('ref_receptor', 20),
+            'banco_emisor'   => $corta('banco_emisor'),
+            'banco_receptor' => $corta('banco_receptor'),
+            'correo'         => $corta('correo', 120),
+            'titular'        => $corta('titular', 120),
+            'telefono'       => $corta('telefono', 30),
+            'confirmacion'   => $corta('confirmacion'),
+            'id_orden'       => $corta('id_orden'),
+            'nota'           => $corta('nota', 200),
+            'fecha'          => now()->toDateString(),
+            'created_at'     => now(),
+            'updated_at'     => now(),
+        ]);
+    }
+
     public function destroy($id)
     {
         $venta = DB::table('ventas')->find($id);
