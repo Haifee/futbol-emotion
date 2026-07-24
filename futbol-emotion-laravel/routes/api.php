@@ -59,6 +59,7 @@ Route::middleware('auth.pin')->group(function () {
     Route::get('/transacciones',      [TransaccionController::class, 'index']);
     Route::post('/transacciones',     [TransaccionController::class, 'store']);
     Route::get('/transacciones/cierre', [TransaccionController::class, 'cierre']);
+    Route::delete('/transacciones/{id}', [TransaccionController::class, 'destroy']);
 
     // Actividad / Notificaciones (historial compartido entre encargado y dueño)
     Route::get('/actividad',          [ActividadController::class, 'index']);
