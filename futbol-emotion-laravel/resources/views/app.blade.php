@@ -1496,7 +1496,13 @@ function renderPedido(){
       <div style="font-size:18px;font-weight:800;margin-bottom:4px">Hacer un pedido</div>
       <div style="font-size:13px;color:var(--txm);margin-bottom:16px">¿A qué proveedor le pides?</div>
       <div class="prov-grid">
-        ${[1,2,3,4].map(n=>`<div class="prov-card" onclick="selProv(${n})"><div class="prov-num">${n}</div></div>`).join('')}
+        ${[1,2,3,4].map(n=>{
+          const nom=(CONFIG['proveedor_'+n]||'').trim();
+          const mostrar=(role==='owner'&&nom);
+          return `<div class="prov-card" onclick="selProv(${n})">${mostrar
+            ? `<div style="font-size:16px;font-weight:800;color:var(--gd);text-align:center;padding:0 8px;line-height:1.25">${nom}</div><div style="font-size:11px;font-weight:700;color:var(--txh);margin-top:4px">Proveedor ${n}</div>`
+            : `<div class="prov-num">${n}</div>`}</div>`;
+        }).join('')}
       </div>`;
   } else {
     cont.innerHTML=`
