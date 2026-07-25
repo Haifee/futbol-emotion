@@ -2,14 +2,18 @@
     "$schema": "https://getcomposer.org/schema.json",
     "name": "haifee/futbol-emotion",
     "type": "project",
-    "description": "Sistema de gestión interno Fútbol Emotion",
-    "keywords": ["laravel", "futbol-emotion"],
+    "description": "Sistema de gesti\u00f3n interno F\u00fatbol Emotion",
+    "keywords": [
+        "laravel",
+        "futbol-emotion"
+    ],
     "license": "MIT",
     "require": {
         "php": "^8.2",
         "laravel/framework": "^11.31",
         "laravel/sanctum": "^4.0",
-        "laravel/tinker": "^2.9"
+        "laravel/tinker": "^2.9",
+        "minishlink/web-push": "^9.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
