@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\PushService;
 
 class VentaController extends Controller
 {
@@ -123,6 +124,21 @@ class VentaController extends Controller
             $stockNuevo = $camiseta
                 ? DB::table('camisetas')->find($request->camiseta_id)->$col
                 : null;
+
+            // ── Notificaciones push ──
+            $actor = $request->input('_rol') === 'owner' ? 'owner' : 'manager';
+            $nombreProd = $request->input('equipo', 'Producto');
+            $tallaTxt = ($request->talla && $request->talla !== '—') ? (' talla ' . $request->talla) : '';
+            PushService::evento('venta', $actor, 'Nueva venta 💰',
+                "{$nombreProd}{$tallaTxt} · \${$request->importe}");
+
+            // Aviso de stock crítico
+            if ($camiseta && $stockNuevo !== null && $stockNuevo <= 2) {
+                $cam = DB::table('camisetas')->find($request->camiseta_id);
+                $nombre = $cam->equipo . ' ' . $cam->tipo;
+                PushService::evento('stock_critico', 'nadie', 'Stock crítico ⚠️',
+                    "{$nombre} talla {$request->talla}: quedan {$stockNuevo} UND");
+            }
 
             return response()->json([
                 'venta'       => $venta,

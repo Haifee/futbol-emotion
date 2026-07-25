@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\PushService;
 
 class PedidoController extends Controller
 {
@@ -76,6 +77,10 @@ class PedidoController extends Controller
             }
 
             DB::commit();
+            $actor = $request->input('_rol') === 'owner' ? 'owner' : 'manager';
+            PushService::evento('pedido_creado', $actor, 'Nuevo pedido 📦',
+                'Se creó el pedido #' . $id . ' al proveedor');
+
             return response()->json(['ok' => true, 'id' => $id], 201);
 
         } catch (\Exception $e) {

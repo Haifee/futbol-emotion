@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\PushService;
 
 class DevolucionController extends Controller
 {
@@ -34,6 +35,10 @@ class DevolucionController extends Controller
             'created_at'          => now(),
             'updated_at'          => now(),
         ]);
+
+        $actor = $request->input('_rol') === 'owner' ? 'owner' : 'manager';
+        PushService::evento('devolucion', $actor, 'Nueva devolución ↩️',
+            'Se registró una devolución/cambio');
 
         return response()->json(DB::table('devoluciones')->find($id), 201);
     }

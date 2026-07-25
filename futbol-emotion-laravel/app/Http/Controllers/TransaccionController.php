@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\PushService;
 
 class TransaccionController extends Controller
 {
@@ -32,6 +33,13 @@ class TransaccionController extends Controller
             'created_at'  => now(),
             'updated_at'  => now(),
         ]);
+
+        // Notificar el gasto al dueño (si lo registró el encargado)
+        $actor = $request->input('_rol') === 'owner' ? 'owner' : 'manager';
+        if ($request->tipo === 'gasto') {
+            PushService::evento('gasto', $actor, 'Nuevo gasto 🧾',
+                $request->descripcion . ' · $' . number_format((float)$request->importe, 2));
+        }
 
         return response()->json(DB::table('transacciones')->find($id), 201);
     }
