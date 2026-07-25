@@ -23,6 +23,7 @@ class ConfigController extends Controller
         'titular_pago'      => '',
         'telefono_pago'     => '',
         'cedula_pago'       => '',
+        'clave_cierre'      => '',
     ];
 
     public function index(Request $request)
@@ -43,8 +44,13 @@ class ConfigController extends Controller
                 'titular_pago'      => $config['titular_pago'],
                 'telefono_pago'     => $config['telefono_pago'],
                 'cedula_pago'       => $config['cedula_pago'],
+                'clave_cierre_activa' => !empty($config['clave_cierre']) ? '1' : '0',
             ]);
         }
+
+        // La clave de cierre nunca se envía; solo si está configurada o no
+        $config['clave_cierre_activa'] = !empty($config['clave_cierre']) ? '1' : '0';
+        unset($config['clave_cierre']);
 
         return response()->json($config);
     }
