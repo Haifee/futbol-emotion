@@ -288,6 +288,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <div class="tright">
       <span class="chip" id="rchip"></span>
       <button class="btnout" id="hdr-hist" onclick="goTo('historial')" style="display:none;position:relative"><i class="ti ti-bell"></i></button>
+      <button class="btnout" id="hdr-push-mgr" onclick="abrirPushModal()" style="display:none"><i class="ti ti-bell"></i></button>
       <button class="btnout" id="hdr-ajustes" onclick="goTo('ajustes')" style="display:none"><i class="ti ti-settings"></i></button>
       <button class="btnout" onclick="doLogout()"><i class="ti ti-logout"></i></button>
     </div>
@@ -333,6 +334,15 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <textarea class="fi" id="e-notas" rows="2" style="resize:none" placeholder="Ej: El cliente pidió envolver para regalo"></textarea>
     <input type="hidden" id="e-id">
     <button class="abtn abtn-g" onclick="saveEnvio()"><i class="ti ti-check"></i> Guardar envío</button>
+  </div>
+</div>
+
+<!-- MODAL: NOTIFICACIONES (encargado) -->
+<div class="mbg" id="m-push">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle">Notificaciones <button class="mclose" onclick="closeM('m-push')"><i class="ti ti-x"></i></button></div>
+    <div id="push-estado-mgr" style="margin-top:6px">Cargando…</div>
   </div>
 </div>
 
@@ -906,6 +916,7 @@ function buildNav(){
   // Historial y Ajustes pasan al encabezado (solo dueño)
   document.getElementById('hdr-hist').style.display=role==='owner'?'flex':'none';
   document.getElementById('hdr-ajustes').style.display=role==='owner'?'flex':'none';
+  document.getElementById('hdr-push-mgr').style.display=role==='manager'?'flex':'none';
   updateBadges();
   actualizarBadgeNotif();
 }
@@ -3016,8 +3027,12 @@ async function probarPush(){
   }catch(e){ toast('No se pudo enviar la prueba'); }
 }
 
-async function pintarEstadoPush(){
-  const cont=document.getElementById('push-estado');
+function abrirPushModal(){
+  openM('m-push');
+  pintarEstadoPush('push-estado-mgr');
+}
+async function pintarEstadoPush(contId='push-estado'){
+  const cont=document.getElementById(contId);
   if(!cont) return;
   const estado=await estadoPush();
   const mapa={
