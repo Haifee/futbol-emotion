@@ -2792,6 +2792,9 @@ function renderAjustes(){
     <div style="font-size:19px;font-weight:800;margin-bottom:4px">Ajustes</div>
     <div style="font-size:13px;color:var(--txm);margin-bottom:20px">Gestión de datos de la app</div>
 
+    <div class="stitle">Notificaciones push</div>
+    <div class="card" id="push-estado">Cargando…</div>
+
     <div class="stitle">Tasas del día (Bs)</div>
     <div class="card">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
@@ -2927,6 +2930,7 @@ function renderAjustes(){
       </div>
     </div>
   `;
+  pintarEstadoPush();
 }
 
 function exportarTodo(){
@@ -2941,6 +2945,94 @@ function exportarTodo(){
   a.download=`futbol-emotion-backup-${hoy()}.json`;
   a.click();
   toast('Copia de seguridad guardada ✓');
+}
+
+// ── NOTIFICACIONES PUSH ───────────────────────────────────────────────────────
+function urlB64ToUint8Array(base64){
+  const padding='='.repeat((4-base64.length%4)%4);
+  const b64=(base64+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(b64); const arr=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) arr[i]=raw.charCodeAt(i);
+  return arr;
+}
+
+async function estadoPush(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)) return 'no-soportado';
+  if(Notification.permission==='denied') return 'bloqueado';
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    return sub ? 'activo' : 'inactivo';
+  }catch(e){ return 'inactivo'; }
+}
+
+async function activarPush(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    toast('Tu dispositivo no soporta notificaciones push'); return;
+  }
+  if(!MODO_SERVIDOR){ toast('Necesitas conexión con el servidor'); return; }
+  try{
+    const permiso=await Notification.requestPermission();
+    if(permiso!=='granted'){ toast('No diste permiso de notificaciones'); return; }
+
+    const {clave}=await apiCall('GET','/push/clave');
+    if(!clave){ toast('El servidor aún no tiene configuradas las notificaciones'); return; }
+
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      sub=await reg.pushManager.subscribe({
+        userVisibleOnly:true,
+        applicationServerKey:urlB64ToUint8Array(clave),
+      });
+    }
+    const data=sub.toJSON();
+    await apiCall('POST','/push/suscribir',{rol:role,endpoint:data.endpoint,keys:data.keys});
+    toast('Notificaciones activadas 🔔');
+    registrarActividad('ajuste','Notificaciones push activadas','');
+    renderAjustes();
+  }catch(e){ toast('No se pudieron activar las notificaciones'); }
+}
+
+async function desactivarPush(){
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    if(sub){
+      const ep=sub.toJSON().endpoint;
+      await sub.unsubscribe();
+      if(MODO_SERVIDOR) await apiCall('POST','/push/desuscribir',{endpoint:ep}).catch(()=>{});
+    }
+    toast('Notificaciones desactivadas');
+    renderAjustes();
+  }catch(e){ toast('No se pudo desactivar'); }
+}
+
+async function probarPush(){
+  if(!MODO_SERVIDOR){ toast('Necesitas conexión'); return; }
+  try{
+    await apiCall('POST','/push/prueba',{rol:role});
+    toast('Enviada — debería llegarte en unos segundos 🔔');
+  }catch(e){ toast('No se pudo enviar la prueba'); }
+}
+
+async function pintarEstadoPush(){
+  const cont=document.getElementById('push-estado');
+  if(!cont) return;
+  const estado=await estadoPush();
+  const mapa={
+    'activo':{txt:'Activadas',col:'var(--gd)',bg:'var(--gl)',ico:'ti-bell-ringing',btn:`<button class="abtn abtn-gray" onclick="probarPush()" style="margin-top:0;margin-bottom:8px"><i class="ti ti-send"></i> Enviar prueba</button><button class="abtn abtn-gray" onclick="desactivarPush()" style="margin-top:0"><i class="ti ti-bell-off"></i> Desactivar</button>`},
+    'inactivo':{txt:'Desactivadas',col:'var(--txm)',bg:'var(--gray)',ico:'ti-bell',btn:`<button class="abtn abtn-g" onclick="activarPush()" style="margin-top:0"><i class="ti ti-bell"></i> Activar notificaciones</button>`},
+    'bloqueado':{txt:'Bloqueadas por el navegador',col:'var(--rd)',bg:'var(--rl)',ico:'ti-bell-x',btn:`<div style="font-size:12px;color:var(--txm)">Actívalas desde los ajustes del navegador o del teléfono para esta app.</div>`},
+    'no-soportado':{txt:'No disponibles en este dispositivo',col:'var(--txm)',bg:'var(--gray)',ico:'ti-bell-x',btn:`<div style="font-size:12px;color:var(--txm)">En iPhone: agrega la app a la pantalla de inicio desde Safari para habilitarlas.</div>`},
+  };
+  const e=mapa[estado]||mapa['inactivo'];
+  cont.innerHTML=`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <div style="width:42px;height:42px;border-radius:11px;background:${e.bg};display:flex;align-items:center;justify-content:center;font-size:22px;color:${e.col}"><i class="ti ${e.ico}"></i></div>
+      <div><div style="font-size:15px;font-weight:800;color:${e.col}">${e.txt}</div><div style="font-size:12px;color:var(--txm)">Ventas, gastos, stock crítico y más</div></div>
+    </div>
+    ${e.btn}`;
 }
 
 async function guardarDatosCobro(){
