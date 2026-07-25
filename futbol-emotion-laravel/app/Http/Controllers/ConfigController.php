@@ -15,11 +15,14 @@ class ConfigController extends Controller
         'proveedor_4'       => '',
         'manager_bloqueado' => '0',
         'tasa_bcv'          => '0',
+        'tasa_euro'         => '0',
+        'tasa_binance'      => '0',
         'tasa_fecha'        => '',
         'tasa_origen'       => 'manual',
         'banco_receptor'    => '',
         'titular_pago'      => '',
         'telefono_pago'     => '',
+        'cedula_pago'       => '',
     ];
 
     public function index(Request $request)
@@ -32,11 +35,14 @@ class ConfigController extends Controller
             return response()->json([
                 'manager_bloqueado' => $config['manager_bloqueado'],
                 'tasa_bcv'          => $config['tasa_bcv'],
+                'tasa_euro'         => $config['tasa_euro'],
+                'tasa_binance'      => $config['tasa_binance'],
                 'tasa_fecha'        => $config['tasa_fecha'],
                 'tasa_origen'       => $config['tasa_origen'],
                 'banco_receptor'    => $config['banco_receptor'],
                 'titular_pago'      => $config['titular_pago'],
                 'telefono_pago'     => $config['telefono_pago'],
+                'cedula_pago'       => $config['cedula_pago'],
             ]);
         }
 
@@ -58,7 +64,7 @@ class ConfigController extends Controller
 
             $valor = (string) $request->input($clave);
 
-            if ($clave === 'tasa_bcv') {
+            if (in_array($clave, ['tasa_bcv', 'tasa_euro', 'tasa_binance'], true)) {
                 $num = (float) str_replace(',', '.', $valor);
                 if ($num < 0 || $num > 1000000) {
                     return response()->json(['error' => 'La tasa no es válida'], 422);
@@ -91,55 +97,62 @@ class ConfigController extends Controller
             return response()->json(['error' => 'Solo el dueño puede actualizar la tasa'], 403);
         }
 
-        $fuentes = [
-            ['url' => 'https://ve.dolarapi.com/v1/dolares/oficial', 'campo' => 'promedio'],
-            ['url' => 'https://pydolarve.org/api/v1/dollar?page=bcv', 'campo' => null],
-        ];
+        $resultado = [];
+        $hoy = now()->toDateString();
 
-        foreach ($fuentes as $f) {
-            try {
-                $ctx = stream_context_create([
-                    'http' => ['timeout' => 8, 'header' => "User-Agent: FutbolEmotion/1.0\r\n"],
-                    'ssl'  => ['verify_peer' => true, 'verify_peer_name' => true],
-                ]);
-                $raw = @file_get_contents($f['url'], false, $ctx);
-                if ($raw === false) continue;
-
-                $json = json_decode($raw, true);
-                if (!is_array($json)) continue;
-
-                $tasa = null;
-                if ($f['campo'] && isset($json[$f['campo']])) {
-                    $tasa = (float) $json[$f['campo']];
-                } elseif (isset($json['monitors']['bcv']['price'])) {
-                    $tasa = (float) $json['monitors']['bcv']['price'];
-                }
-
-                if ($tasa && $tasa > 0) {
-                    $tasa = number_format($tasa, 4, '.', '');
-                    $hoy  = now()->toDateString();
-
-                    foreach ([['tasa_bcv', $tasa], ['tasa_fecha', $hoy], ['tasa_origen', 'BCV automática']] as $par) {
-                        DB::table('configuracion')->updateOrInsert(
-                            ['clave' => $par[0]],
-                            ['valor' => $par[1], 'updated_at' => now(), 'created_at' => now()]
-                        );
-                    }
-
-                    return response()->json([
-                        'ok'     => true,
-                        'tasa'   => $tasa,
-                        'fecha'  => $hoy,
-                        'origen' => 'BCV automática',
-                    ]);
-                }
-            } catch (\Throwable $e) {
-                continue;
-            }
+        // 1) Dólar y Euro oficiales BCV (DolarAPI, sin registro)
+        $dolar = $this->pedirJson('https://ve.dolarapi.com/v1/dolares/oficial');
+        if ($dolar && isset($dolar['promedio']) && $dolar['promedio'] > 0) {
+            $resultado['tasa_bcv'] = number_format((float) $dolar['promedio'], 4, '.', '');
         }
 
-        return response()->json([
-            'error' => 'No se pudo consultar la tasa oficial ahora. Escríbela a mano.',
-        ], 503);
+        $euro = $this->pedirJson('https://ve.dolarapi.com/v1/euros/oficial');
+        if ($euro && isset($euro['promedio']) && $euro['promedio'] > 0) {
+            $resultado['tasa_euro'] = number_format((float) $euro['promedio'], 4, '.', '');
+        }
+
+        // 2) Binance (pydolarve, campo monitors.binance.price)
+        $py = $this->pedirJson('https://pydolarve.org/api/v1/dollar?page=binance');
+        if ($py && isset($py['monitors']['binance']['price']) && $py['monitors']['binance']['price'] > 0) {
+            $resultado['tasa_binance'] = number_format((float) $py['monitors']['binance']['price'], 4, '.', '');
+        }
+
+        if (empty($resultado)) {
+            return response()->json([
+                'error' => 'No se pudieron consultar las tasas ahora. Escríbelas a mano.',
+            ], 503);
+        }
+
+        // Guardar lo que se haya podido traer
+        $resultado['tasa_fecha']  = $hoy;
+        $resultado['tasa_origen'] = 'automática';
+        foreach ($resultado as $clave => $valor) {
+            DB::table('configuracion')->updateOrInsert(
+                ['clave' => $clave],
+                ['valor' => $valor, 'updated_at' => now(), 'created_at' => now()]
+            );
+        }
+
+        return response()->json(['ok' => true, 'tasas' => $resultado, 'fecha' => $hoy]);
     }
+
+    /**
+     * GET a una URL con timeout corto. Devuelve el JSON como array o null.
+     */
+    private function pedirJson(string $url)
+    {
+        try {
+            $ctx = stream_context_create([
+                'http' => ['timeout' => 8, 'header' => "User-Agent: FutbolEmotion/1.0\r\n"],
+                'ssl'  => ['verify_peer' => true, 'verify_peer_name' => true],
+            ]);
+            $raw = @file_get_contents($url, false, $ctx);
+            if ($raw === false) return null;
+            $json = json_decode($raw, true);
+            return is_array($json) ? $json : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
 }
