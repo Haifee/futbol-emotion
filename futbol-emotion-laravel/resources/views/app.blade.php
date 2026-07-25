@@ -1165,8 +1165,24 @@ function selectBanco(id,label,sel=''){
 }
 function bancoReceptorFijo(label){
   const fijo=(CONFIG.banco_receptor||'').trim();
-  // Si ya configuraste tu banco en Ajustes, queda puesto; si no, lista normal
   return selectBanco('pg-banco-receptor',label,fijo);
+}
+function datosCobroFijos(){
+  const banco=(CONFIG.banco_receptor||'').trim();
+  const tel=(CONFIG.telefono_pago||'').trim();
+  const ced=(CONFIG.cedula_pago||'').trim();
+  if(!banco && !tel && !ced){
+    // Sin datos configurados: mostrar el selector normal + aviso
+    return `<div style="background:var(--al);border-radius:10px;padding:10px;font-size:12px;color:var(--ad);font-weight:600;margin-bottom:8px"><i class="ti ti-info-circle"></i> Configura tus datos de pago móvil en Ajustes para que salgan automáticos.</div>${selectBanco('pg-banco-receptor','¿A qué banco cayó el dinero?')}`;
+  }
+  // Con datos: tarjeta de solo lectura con tus datos + input oculto para guardarlos
+  return `<div style="background:var(--gl);border:1.5px solid var(--gm);border-radius:11px;padding:11px;margin-bottom:8px">
+    <div style="font-size:11px;font-weight:800;color:var(--gd);text-transform:uppercase;margin-bottom:5px">Tu pago móvil</div>
+    ${banco?`<div style="font-size:13px;font-weight:700;color:var(--gd)"><i class="ti ti-building-bank" style="font-size:13px"></i> ${banco}</div>`:''}
+    ${tel?`<div style="font-size:13px;font-weight:700;color:var(--gd)"><i class="ti ti-device-mobile" style="font-size:13px"></i> ${tel}</div>`:''}
+    ${ced?`<div style="font-size:13px;font-weight:700;color:var(--gd)"><i class="ti ti-id" style="font-size:13px"></i> ${ced}</div>`:''}
+  </div>
+  <input type="hidden" id="pg-banco-receptor" value="${banco.replace(/"/g,'&quot;')}">`;
 }
 
 function renderMetodosPago(){
@@ -1201,7 +1217,7 @@ function setMetodoPago(k){
   const plantillas={
     efectivo_usd: '',
     efectivo_bs:  '',
-    pago_movil:   `${bancoReceptorFijo('¿A qué banco cayó el dinero?')}
+    pago_movil:   `${datosCobroFijos()}
                    ${selectBanco('pg-banco-emisor','¿De qué banco te pagaron?')}
                    <label class="fl">Referencia</label><input class="fi" id="pg-referencia" inputmode="numeric" placeholder="Número de referencia">`,
     punto_venta:  `${selectBanco('pg-banco-receptor','Punto de venta (banco receptor)')}
@@ -1210,7 +1226,7 @@ function setMetodoPago(k){
                      <div><label class="fl">Últimos 6 · emisor</label><input class="fi" id="pg-ref-emisor" ${refCorta} placeholder="000000"></div>
                      <div><label class="fl">Últimos 6 · receptor</label><input class="fi" id="pg-ref-receptor" ${refCorta} placeholder="000000"></div>
                    </div>`,
-    transferencia:`${bancoReceptorFijo('¿A qué banco cayó el dinero?')}
+    transferencia:`${datosCobroFijos()}
                    ${selectBanco('pg-banco-emisor','¿De qué banco te pagaron?')}
                    <label class="fl">Referencia</label><input class="fi" id="pg-referencia" inputmode="numeric" placeholder="Número de referencia">`,
     zelle:        `<label class="fl">Correo de quien envía</label><input class="fi" id="pg-correo" type="email" inputmode="email" placeholder="cliente@correo.com">
@@ -2742,22 +2758,36 @@ function renderAjustes(){
     <div style="font-size:19px;font-weight:800;margin-bottom:4px">Ajustes</div>
     <div style="font-size:13px;color:var(--txm);margin-bottom:20px">Gestión de datos de la app</div>
 
-    <div class="stitle">Tasa del día (Bs por $)</div>
+    <div class="stitle">Tasas del día (Bs)</div>
     <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div>
-          <div style="font-size:26px;font-weight:800;color:var(--gd)">${(parseFloat(CONFIG.tasa_bcv)||0).toLocaleString('es-VE',{minimumFractionDigits:2})}</div>
-          <div style="font-size:12px;color:var(--txm)">${CONFIG.tasa_fecha?`${CONFIG.tasa_origen||'manual'} · ${CONFIG.tasa_fecha}`:'Sin configurar todavía'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+        <div style="text-align:center;padding:12px 6px;border-radius:11px;background:var(--gl)">
+          <div style="font-size:11px;font-weight:700;color:var(--gd)">💵 Dólar BCV</div>
+          <div style="font-size:18px;font-weight:800;color:var(--gd);margin-top:3px">${(parseFloat(CONFIG.tasa_bcv)||0).toLocaleString('es-VE',{minimumFractionDigits:2})}</div>
         </div>
-        <div style="width:46px;height:46px;border-radius:12px;background:var(--gl);display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--gd)"><i class="ti ti-currency-dollar"></i></div>
+        <div style="text-align:center;padding:12px 6px;border-radius:11px;background:var(--bl)">
+          <div style="font-size:11px;font-weight:700;color:var(--bd)">💶 Euro BCV</div>
+          <div style="font-size:18px;font-weight:800;color:var(--bd);margin-top:3px">${(parseFloat(CONFIG.tasa_euro)||0).toLocaleString('es-VE',{minimumFractionDigits:2})}</div>
+        </div>
+        <div style="text-align:center;padding:12px 6px;border-radius:11px;background:var(--al)">
+          <div style="font-size:11px;font-weight:700;color:var(--ad)">🅱️ Binance</div>
+          <div style="font-size:18px;font-weight:800;color:var(--ad);margin-top:3px">${(parseFloat(CONFIG.tasa_binance)||0).toLocaleString('es-VE',{minimumFractionDigits:2})}</div>
+        </div>
       </div>
-      <button class="abtn abtn-g" onclick="traerTasaBcv()" style="margin-top:0;margin-bottom:8px"><i class="ti ti-refresh"></i> Traer tasa oficial del BCV</button>
-      <label class="fl">O escríbela a mano</label>
+      <div style="font-size:12px;color:var(--txm);text-align:center;margin-bottom:10px">${CONFIG.tasa_fecha?`Actualizado: ${CONFIG.tasa_fecha} (${CONFIG.tasa_origen||'manual'})`:'Sin configurar todavía'}</div>
+      <button class="abtn abtn-g" onclick="traerTasaBcv()" style="margin-top:0;margin-bottom:12px"><i class="ti ti-refresh"></i> Traer las 3 tasas automáticamente</button>
+
+      <label class="fl" style="margin-top:0">Dólar BCV (la que se usa al cobrar en Bs)</label>
       <div style="display:flex;gap:8px;align-items:flex-end">
         <input class="fi" id="cfg-tasa" type="number" min="0" step="0.0001" value="${parseFloat(CONFIG.tasa_bcv)||''}" placeholder="Ej: 305.4200" style="flex:1">
         <button class="abtn abtn-gray" onclick="guardarTasaManual()" style="margin-top:0;width:auto;padding:13px 18px"><i class="ti ti-check"></i></button>
       </div>
-      <div style="font-size:12px;color:var(--txm);margin-top:10px">Los precios siguen en dólares. Al cobrar en bolívares, la app calcula el equivalente con esta tasa.</div>
+      <div class="frow" style="margin-top:8px">
+        <div><label class="fl">Euro BCV</label><input class="fi" id="cfg-euro" type="number" min="0" step="0.0001" value="${parseFloat(CONFIG.tasa_euro)||''}" placeholder="Manual"></div>
+        <div><label class="fl">Binance</label><input class="fi" id="cfg-binance" type="number" min="0" step="0.0001" value="${parseFloat(CONFIG.tasa_binance)||''}" placeholder="Manual"></div>
+      </div>
+      <button class="abtn abtn-gray" onclick="guardarTasasManual()" style="margin-top:8px"><i class="ti ti-check"></i> Guardar euro y Binance</button>
+      <div style="font-size:12px;color:var(--txm);margin-top:10px">Los precios siguen en dólares. Al cobrar en bolívares se usa la tasa del <b>dólar BCV</b>. Euro y Binance son de referencia.</div>
     </div>
 
     <div class="stitle">Datos para cobrar (pago móvil)</div>
@@ -2765,6 +2795,12 @@ function renderAjustes(){
       <div style="font-size:13px;color:var(--txm);margin-bottom:12px">Estos datos quedan puestos automáticamente al registrar un pago móvil o transferencia. El encargado solo agrega la referencia y el banco del cliente.</div>
       <label class="fl" style="margin-top:0">Tu banco (a dónde cae el dinero)</label>
       <select class="fi" id="cfg-banco-rec"><option value="">— Selecciona —</option>${BANCOS_VE.map(b=>`<option${b===(CONFIG.banco_receptor||'')?' selected':''}>${b}</option>`).join('')}</select>
+      <label class="fl">Teléfono del pago móvil</label>
+      <input class="fi" id="cfg-tel-pago" inputmode="tel" value="${CONFIG.telefono_pago||''}" placeholder="Ej: 0414 000 0000" maxlength="20">
+      <label class="fl">Cédula o RIF</label>
+      <input class="fi" id="cfg-ced-pago" value="${CONFIG.cedula_pago||''}" placeholder="Ej: V-12345678" maxlength="20">
+      <label class="fl">Nombre del titular (opcional)</label>
+      <input class="fi" id="cfg-tit-pago" value="${CONFIG.titular_pago||''}" placeholder="Ej: María Pérez" maxlength="60">
       <button class="abtn abtn-g" onclick="guardarDatosCobro()"><i class="ti ti-check"></i> Guardar datos de cobro</button>
     </div>
 
@@ -2874,25 +2910,49 @@ function exportarTodo(){
 }
 
 async function guardarDatosCobro(){
-  const banco=document.getElementById('cfg-banco-rec').value;
+  const datos={
+    banco_receptor:document.getElementById('cfg-banco-rec').value,
+    telefono_pago:document.getElementById('cfg-tel-pago').value.trim(),
+    cedula_pago:document.getElementById('cfg-ced-pago').value.trim(),
+    titular_pago:document.getElementById('cfg-tit-pago').value.trim(),
+  };
   try{
-    if(MODO_SERVIDOR) await apiCall('POST','/config',{banco_receptor:banco});
-    CONFIG.banco_receptor=banco;
+    if(MODO_SERVIDOR) await apiCall('POST','/config',datos);
+    CONFIG={...CONFIG, ...datos};
     toast('Datos de cobro guardados ✓');
-    registrarActividad('ajuste','Banco de cobro actualizado',banco);
+    registrarActividad('ajuste','Datos de cobro actualizados',datos.banco_receptor);
   }catch(e){/* apiCall ya avisó */}
 }
 
 async function traerTasaBcv(){
   if(!MODO_SERVIDOR){toast('Necesitas conexión con el servidor');return}
-  toast('Consultando el BCV…');
+  toast('Consultando las tasas…');
   try{
     const r=await apiCall('POST','/config/tasa-bcv',{});
-    CONFIG.tasa_bcv=r.tasa; CONFIG.tasa_fecha=r.fecha; CONFIG.tasa_origen=r.origen;
-    toast(`Tasa actualizada: ${parseFloat(r.tasa).toLocaleString('es-VE',{minimumFractionDigits:2})} Bs/$`);
-    registrarActividad('ajuste',`Tasa BCV actualizada: ${r.tasa} Bs/$`,'');
+    const t=r.tasas||{};
+    if(t.tasa_bcv!==undefined) CONFIG.tasa_bcv=t.tasa_bcv;
+    if(t.tasa_euro!==undefined) CONFIG.tasa_euro=t.tasa_euro;
+    if(t.tasa_binance!==undefined) CONFIG.tasa_binance=t.tasa_binance;
+    CONFIG.tasa_fecha=r.fecha; CONFIG.tasa_origen='automática';
+    const partes=[];
+    if(t.tasa_bcv) partes.push('Dólar '+parseFloat(t.tasa_bcv).toFixed(2));
+    if(t.tasa_euro) partes.push('Euro '+parseFloat(t.tasa_euro).toFixed(2));
+    if(t.tasa_binance) partes.push('Binance '+parseFloat(t.tasa_binance).toFixed(2));
+    toast('✓ '+partes.join(' · '));
+    registrarActividad('ajuste','Tasas actualizadas automáticamente',partes.join(' · '));
     renderAjustes();
   }catch(e){/* apiCall ya mostró el motivo */}
+}
+
+async function guardarTasasManual(){
+  const euro=+document.getElementById('cfg-euro').value||0;
+  const binance=+document.getElementById('cfg-binance').value||0;
+  try{
+    if(MODO_SERVIDOR) await apiCall('POST','/config',{tasa_euro:String(euro),tasa_binance:String(binance)});
+    CONFIG.tasa_euro=String(euro); CONFIG.tasa_binance=String(binance);
+    toast('Tasas guardadas ✓');
+    renderAjustes();
+  }catch(e){/* apiCall ya avisó */}
 }
 
 async function guardarTasaManual(){
