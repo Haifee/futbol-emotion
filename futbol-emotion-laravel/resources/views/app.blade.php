@@ -337,6 +337,19 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
   </div>
 </div>
 
+<!-- MODAL: CERRAR CAJA -->
+<div class="mbg" id="m-cierre">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle">Cerrar caja del día <button class="mclose" onclick="closeM('m-cierre')"><i class="ti ti-x"></i></button></div>
+    <div id="cierre-resumen" style="background:var(--gray);border-radius:12px;padding:14px;margin-bottom:14px"></div>
+    <label class="fl" style="margin-top:0">Clave de cierre</label>
+    <input class="fi" id="cierre-clave" type="password" inputmode="numeric" placeholder="••••" autocomplete="off">
+    <div id="cierre-err" style="color:var(--rd);font-size:13px;font-weight:600;margin-top:6px;min-height:16px"></div>
+    <button class="abtn abtn-g" onclick="confirmarCierre()" id="cierre-btn"><i class="ti ti-lock-check"></i> Confirmar cierre</button>
+  </div>
+</div>
+
 <!-- MODAL: NOTIFICACIONES (encargado) -->
 <div class="mbg" id="m-push">
   <div class="modal">
@@ -891,6 +904,7 @@ async function cargarDatosServidor(){
     notifsVistas = act.vistas;
     actualizarBadgeNotif();
     try{ CONFIG={...CONFIG, ...(await apiCall('GET','/config'))}; }catch(e){}
+    try{ cierresCaja=await apiCall('GET','/cierres'); }catch(e){ cierresCaja=[]; }
     toast('✓ Datos cargados');
   }catch(e){
     toast('Error cargando datos — usando datos locales');
@@ -2635,11 +2649,68 @@ function renderCaja(){
           </div>
         </div>`).join('')||'<div style="font-size:13px;color:var(--txm);text-align:center;padding:10px">Sin movimientos aún</div>'}
     </div>
+
+    <button class="abtn abtn-g" onclick="abrirCierreCaja()" style="margin-top:16px;background:var(--tx)"><i class="ti ti-lock-check"></i> Cerrar caja del día</button>
+    ${cierresCaja.length?`<div class="stitle">Cierres recientes</div><div class="card">${cierresCaja.slice(0,8).map(c=>`
+      <div class="li">
+        <div class="liico ig"><i class="ti ti-receipt"></i></div>
+        <div class="libody"><div class="liname">Cierre ${c.fecha}</div><div class="lisub">${c.cerrado_por==='owner'?'Dueño':'Encargado'} · ${c.num_ventas} ventas · Benef. ${fmt(parseFloat(c.beneficio))}</div></div>
+        <div class="liright" style="font-weight:800;color:var(--gd);font-size:12px;text-align:right">$${parseFloat(c.total_divisas||0).toFixed(0)}<br><span style="font-size:10px;color:var(--txm)">${fmtBs(parseFloat(c.total_bs||0))}</span></div>
+      </div>`).join('')}</div>`:''}
   `;
+}
+
+// ── CERRAR CAJA ───────────────────────────────────────────────────────────────
+function abrirCierreCaja(){
+  if(CONFIG.clave_cierre_activa!=='1'){
+    toast('Primero el dueño debe crear la clave de cierre en Ajustes');
+    return;
+  }
+  const d=datosPeriodo('dia');
+  const money=ventasHoyPorMoneda();
+  document.getElementById('cierre-resumen').innerHTML=`
+    <div style="font-size:13px;color:var(--txm);margin-bottom:8px">Resumen de hoy · ${hoy()}</div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Ingresos</span><b style="color:var(--gd)">${fmt(d.ing)}</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Gastos</span><b style="color:var(--rd)">${fmt(d.gas)}</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Beneficio</span><b>${fmt(d.neto)}</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Ventas</span><b>${d.vts.length}</b></div>
+    <hr style="border:none;border-top:1px solid var(--grayb);margin:8px 0">
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Cobrado en $</span><b style="color:var(--gd)">${fmt(money.divisas)}</b></div>
+    <div style="display:flex;justify-content:space-between"><span>Cobrado en Bs</span><b style="color:var(--gd)">${fmtBs(money.bs)}</b></div>`;
+  document.getElementById('cierre-clave').value='';
+  document.getElementById('cierre-err').textContent='';
+  openM('m-cierre');
+}
+
+let cerrando=false;
+async function confirmarCierre(){
+  if(cerrando) return;
+  const clave=document.getElementById('cierre-clave').value.trim();
+  if(!clave){document.getElementById('cierre-err').textContent='Escribe la clave de cierre';return}
+  const d=datosPeriodo('dia');
+  const money=ventasHoyPorMoneda();
+  cerrando=true;
+  document.getElementById('cierre-btn').disabled=true;
+  try{
+    const r=await apiCall('POST','/cierres',{
+      clave, ingresos:d.ing, gastos:d.gas, num_ventas:d.vts.length,
+      total_divisas:money.divisas, total_bs:money.bs,
+    });
+    cierresCaja.unshift({id:r.id,fecha:hoy(),cerrado_por:role,ingresos:d.ing,gastos:d.gas,beneficio:d.neto,num_ventas:d.vts.length,total_divisas:money.divisas,total_bs:money.bs});
+    closeM('m-cierre');
+    toast('Caja cerrada ✓');
+    registrarActividad('caja',`Cierre de caja · ${d.vts.length} ventas · Beneficio ${fmt(d.neto)}`,'');
+    if(curPage==='caja') renderCaja();
+  }catch(e){
+    document.getElementById('cierre-err').textContent=e.message||'No se pudo cerrar la caja';
+  }
+  cerrando=false;
+  document.getElementById('cierre-btn').disabled=false;
 }
 
 // ── EXPORTAR REPORTES (PDF / Excel) ──────────────────────────────────────────
 let exportPeriodo=null;
+let cierresCaja=[];
 
 // Calcula rango y datos del período (independiente de renderCaja)
 function datosPeriodo(clave){
@@ -2802,6 +2873,17 @@ function renderAjustes(){
   cont.innerHTML=`
     <div style="font-size:19px;font-weight:800;margin-bottom:4px">Ajustes</div>
     <div style="font-size:13px;color:var(--txm);margin-bottom:20px">Gestión de datos de la app</div>
+
+    <div class="stitle">Clave de cierre de caja</div>
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div style="width:42px;height:42px;border-radius:11px;background:${CONFIG.clave_cierre_activa==='1'?'var(--gl)':'var(--gray)'};display:flex;align-items:center;justify-content:center;font-size:22px;color:${CONFIG.clave_cierre_activa==='1'?'var(--gd)':'var(--txm)'}"><i class="ti ti-lock-check"></i></div>
+        <div><div style="font-size:15px;font-weight:800;color:${CONFIG.clave_cierre_activa==='1'?'var(--gd)':'var(--txm)'}">${CONFIG.clave_cierre_activa==='1'?'Clave configurada':'Sin clave todavía'}</div><div style="font-size:12px;color:var(--txm)">Distinta a los PINs de acceso</div></div>
+      </div>
+      <label class="fl" style="margin-top:0">${CONFIG.clave_cierre_activa==='1'?'Cambiar la clave':'Crear clave de cierre'}</label>
+      <input class="fi" id="cfg-clave-cierre" type="password" inputmode="numeric" placeholder="Ej: 4 a 8 dígitos" maxlength="12" autocomplete="off">
+      <button class="abtn abtn-g" onclick="guardarClaveCierre()"><i class="ti ti-check"></i> Guardar clave</button>
+    </div>
 
     <div class="stitle">Notificaciones push</div>
     <div class="card" id="push-estado">Cargando…</div>
@@ -3048,6 +3130,18 @@ async function pintarEstadoPush(contId='push-estado'){
       <div><div style="font-size:15px;font-weight:800;color:${e.col}">${e.txt}</div><div style="font-size:12px;color:var(--txm)">Ventas, gastos, stock crítico y más</div></div>
     </div>
     ${e.btn}`;
+}
+
+async function guardarClaveCierre(){
+  const clave=document.getElementById('cfg-clave-cierre').value.trim();
+  if(clave.length<4){toast('La clave debe tener al menos 4 caracteres');return}
+  try{
+    if(MODO_SERVIDOR) await apiCall('POST','/config',{clave_cierre:clave});
+    CONFIG.clave_cierre_activa='1';
+    toast('Clave de cierre guardada ✓');
+    registrarActividad('seguridad','Clave de cierre de caja actualizada','');
+    renderAjustes();
+  }catch(e){/* apiCall ya avisó */}
 }
 
 async function guardarDatosCobro(){
