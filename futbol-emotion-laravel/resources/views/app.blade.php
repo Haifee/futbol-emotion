@@ -504,11 +504,12 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <label class="fl">¿Cómo pagó?</label>
       <div id="v-pago-metodos" style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:6px"></div>
       <div id="v-pago-bs" style="display:none;background:var(--gl);border:1.5px solid var(--gm);border-radius:11px;padding:11px;margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
           <span style="font-size:12px;font-weight:700;color:var(--gd)">A pagar en bolívares</span>
           <span style="font-size:11px;color:var(--gd);opacity:.8" id="v-tasa-info">—</span>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+        <div style="display:flex;gap:6px;margin-bottom:7px" id="v-tasa-selector"></div>
+        <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:20px;font-weight:800;color:var(--gd)">Bs</span>
           <input class="fi" id="v-monto-bs" type="number" min="0" step="0.01" style="font-size:18px;font-weight:800;padding:8px 10px;background:#fff">
         </div>
@@ -1157,7 +1158,32 @@ const METODOS_PAGO={
 
 let metodoPago=null;
 
-function tasaActual(){ return parseFloat(CONFIG.tasa_bcv)||0; }
+let tasaElegida='bcv'; // bcv | euro | binance
+function tasaValor(cual){
+  const mapa={bcv:CONFIG.tasa_bcv,euro:CONFIG.tasa_euro,binance:CONFIG.tasa_binance};
+  return parseFloat(mapa[cual])||0;
+}
+function tasaActual(){ return tasaValor(tasaElegida); }
+function renderSelectorTasa(){
+  const cont=document.getElementById('v-tasa-selector');
+  if(!cont) return;
+  const opciones=[{k:'bcv',label:'Dólar BCV'},{k:'euro',label:'Euro BCV'},{k:'binance',label:'Binance'}];
+  cont.innerHTML=opciones.map(o=>{
+    const val=tasaValor(o.k);
+    const act=tasaElegida===o.k;
+    const dis=val<=0;
+    return `<button type="button" ${dis?'disabled':''} onclick="setTasaElegida('${o.k}')" style="flex:1;padding:6px 4px;border-radius:8px;cursor:${dis?'not-allowed':'pointer'};font-size:11px;font-weight:800;border:2px solid ${act?'var(--gd)':'var(--gm)'};background:${act?'var(--gd)':'#fff'};color:${act?'#fff':(dis?'var(--txh)':'var(--gd)')};opacity:${dis?.5:1}">${o.label}<br><span style="font-size:9px;font-weight:600">${val>0?val.toLocaleString('es-VE',{minimumFractionDigits:2}):'—'}</span></button>`;
+  }).join('');
+}
+function setTasaElegida(k){
+  if(tasaValor(k)<=0){toast('Esa tasa no está configurada (Ajustes)');return}
+  tasaElegida=k;
+  renderSelectorTasa();
+  const nombres={bcv:'Dólar BCV',euro:'Euro BCV',binance:'Binance'};
+  const info=document.getElementById('v-tasa-info');
+  if(info) info.textContent=`${nombres[k]}: ${tasaActual().toLocaleString('es-VE',{minimumFractionDigits:2})} Bs/$`;
+  recalcularBs();
+}
 function fmtBs(n){ return 'Bs ' + (n||0).toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
 function selectBanco(id,label,sel=''){
@@ -1205,8 +1231,14 @@ function setMetodoPago(k){
   const boxBs=document.getElementById('v-pago-bs');
   boxBs.style.display=m.bs?'block':'none';
   if(m.bs){
-    document.getElementById('v-tasa-info').textContent=tasa>0
-      ? `Tasa: ${tasa.toLocaleString('es-VE',{minimumFractionDigits:2})} Bs/$${CONFIG.tasa_fecha?' · '+CONFIG.tasa_fecha:''}`
+    // Si la tasa elegida no existe, caer a la primera disponible
+    if(tasaValor(tasaElegida)<=0){
+      tasaElegida=['bcv','euro','binance'].find(k=>tasaValor(k)>0)||'bcv';
+    }
+    renderSelectorTasa();
+    const nombres={bcv:'Dólar BCV',euro:'Euro BCV',binance:'Binance'};
+    document.getElementById('v-tasa-info').textContent=tasaActual()>0
+      ? `${nombres[tasaElegida]}: ${tasaActual().toLocaleString('es-VE',{minimumFractionDigits:2})} Bs/$`
       : '⚠️ Sin tasa configurada (Ajustes)';
     recalcularBs();
   }
@@ -1277,6 +1309,7 @@ function datosPago(){
   const d={metodo:metodoPago};
   if(m.bs){
     d.tasa=tasaActual();
+    d.tasa_tipo=tasaElegida;
     d.monto=+document.getElementById('v-monto-bs').value||0;
   }else{
     d.monto=importeVentaActual();
@@ -2046,6 +2079,7 @@ function openVentaModal(){
     : '<option value="">Sin camisetas en inventario</option>';
   toggleTallaVenta();
   metodoPago=null;
+  tasaElegida='bcv';
   document.getElementById('v-pago-campos').innerHTML='';
   document.getElementById('v-pago-bs').style.display='none';
   renderMetodosPago();
@@ -3212,6 +3246,13 @@ function renderMisVentas(){
         <div class="mcv" style="color:var(--b)">${fmt(totalOnl)}</div>
         <div class="mcs" style="color:var(--txm)">${online.length} ventas</div>
       </div>
+    </div>
+
+    <!-- VENTAS DE HOY POR MONEDA -->
+    <div class="stitle" style="margin-top:0">Cobrado hoy</div>
+    <div class="mgrid" style="margin-bottom:16px">
+      <div class="mc mc-g"><i class="ti ti-cash mc-ico"></i><div class="mcl">En divisas ($)</div><div class="mcv">${fmt(ventasHoyPorMoneda().divisas)}</div><div class="mcs">efectivo $, Zelle, Binance…</div></div>
+      <div class="mc mc-cyan"><i class="ti ti-businessplan mc-ico"></i><div class="mcl">En bolívares</div><div class="mcv" style="font-size:19px">${fmtBs(ventasHoyPorMoneda().bs)}</div><div class="mcs">pago móvil, PDV, efectivo Bs</div></div>
     </div>
 
     <!-- BOTÓN NUEVA VENTA -->
