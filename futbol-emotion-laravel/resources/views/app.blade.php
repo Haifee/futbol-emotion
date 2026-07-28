@@ -337,6 +337,29 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
   </div>
 </div>
 
+<!-- MODAL: CALCULADORA DE BOLÍVARES -->
+<div class="mbg" id="m-calc">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle">Calculadora de bolívares <button class="mclose" onclick="closeM('m-calc')"><i class="ti ti-x"></i></button></div>
+
+    <div style="display:flex;gap:6px;margin-bottom:12px" id="calc-tasas"></div>
+
+    <label class="fl" style="margin-top:0">Monto en dólares ($)</label>
+    <input class="fi" id="calc-usd" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" oninput="calcularBs()" style="font-size:22px;font-weight:800;text-align:center;padding:14px">
+
+    <div style="text-align:center;margin:14px 0;color:var(--txh);font-size:22px"><i class="ti ti-arrows-down"></i></div>
+
+    <div style="background:var(--gl);border:2px solid var(--gm);border-radius:14px;padding:18px;text-align:center">
+      <div style="font-size:12px;font-weight:700;color:var(--gd);text-transform:uppercase">Equivale a</div>
+      <div id="calc-bs" style="font-size:30px;font-weight:800;color:var(--gd);margin-top:4px">Bs 0,00</div>
+      <div id="calc-tasa-info" style="font-size:12px;color:var(--gd);opacity:.75;margin-top:4px">—</div>
+    </div>
+
+    <div style="font-size:12px;color:var(--txm);margin-top:14px;text-align:center">Solo para consultar. No registra ninguna venta.</div>
+  </div>
+</div>
+
 <!-- MODAL: CERRAR CAJA -->
 <div class="mbg" id="m-cierre">
   <div class="modal">
@@ -600,10 +623,23 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <label class="fl">Cliente</label><input class="fi" id="d-cliente" placeholder="Nombre del cliente">
     <label class="fl">Motivo</label>
     <select class="fi" id="d-motivo"><option>Talla incorrecta</option><option>Equipo incorrecto</option><option>Defecto de fábrica</option><option>Otro</option></select>
-    <label class="fl">Camiseta que devuelve</label>
-    <input class="fi" id="d-dev" placeholder="Ej: Barça Local M 24/25">
-    <label class="fl">Camiseta que quiere</label>
-    <input class="fi" id="d-sol" placeholder="Ej: Barça Local L 24/25">
+    <label class="fl">Camiseta que devuelve <span style="font-size:11px;color:var(--txh)">(vuelve al stock)</span></label>
+    <div style="display:flex;gap:6px;margin-bottom:5px">
+      <button type="button" id="d-dev-modo-inv" onclick="setDevModo('dev','inv')" style="flex:1;padding:7px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;border:2px solid var(--gm);background:var(--gl);color:var(--gd)">Del inventario</button>
+      <button type="button" id="d-dev-modo-txt" onclick="setDevModo('dev','txt')" style="flex:1;padding:7px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;border:2px solid var(--grayb);background:#fff;color:var(--txm)">Escribir</button>
+    </div>
+    <select class="fi" id="d-dev-cam" onchange="fillTallasDev('dev')" style="margin-bottom:6px"></select>
+    <select class="fi" id="d-dev-talla"></select>
+    <input class="fi" id="d-dev" placeholder="Ej: Barça Local M 24/25" style="display:none">
+
+    <label class="fl">Camiseta que quiere <span style="font-size:11px;color:var(--txh)">(sale del stock)</span></label>
+    <div style="display:flex;gap:6px;margin-bottom:5px">
+      <button type="button" id="d-sol-modo-inv" onclick="setDevModo('sol','inv')" style="flex:1;padding:7px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;border:2px solid var(--gm);background:var(--gl);color:var(--gd)">Del inventario</button>
+      <button type="button" id="d-sol-modo-txt" onclick="setDevModo('sol','txt')" style="flex:1;padding:7px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;border:2px solid var(--grayb);background:#fff;color:var(--txm)">Escribir</button>
+    </div>
+    <select class="fi" id="d-sol-cam" onchange="fillTallasDev('sol')" style="margin-bottom:6px"></select>
+    <select class="fi" id="d-sol-talla"></select>
+    <input class="fi" id="d-sol" placeholder="Ej: Barça Local L 24/25" style="display:none">
     <label class="fl">Importe ($)</label>
     <input class="fi" id="d-imp" type="number" min="0" step="0.01" placeholder="0.00">
     <input type="hidden" id="d-id">
@@ -897,7 +933,7 @@ async function cargarDatosServidor(){
     camisetas = c;
     pedidos = p.map(x=>({id:x.id,provId:x.proveedor_id,lineas:x.lineas,notas:x.notas,estado:x.estado,fecha:x.fecha}));
     envios = e.map(x=>({id:x.id,cliente:x.cliente,prods:x.productos,origen:x.origen,trans:x.transportista,dir:x.direccion,imp:parseFloat(x.importe),estado:x.estado,notas:x.notas,fecha:x.fecha}));
-    devoluciones = d.map(x=>({id:x.id,cliente:x.cliente,motivo:x.motivo,dev:x.camiseta_devuelta,sol:x.camiseta_solicitada,imp:parseFloat(x.importe),estado:x.estado,fecha:x.fecha}));
+    devoluciones = d.map(x=>({id:x.id,cliente:x.cliente,motivo:x.motivo,dev:x.camiseta_devuelta,sol:x.camiseta_solicitada,devCamId:x.dev_camiseta_id,devTalla:x.dev_talla,solCamId:x.sol_camiseta_id,solTalla:x.sol_talla,imp:parseFloat(x.importe),estado:x.estado,fecha:x.fecha}));
     ventas = v.map(x=>({id:x.id,camId:x.camiseta_id,equipo:x.equipo,talla:x.talla,cant:x.cantidad,canal:x.canal,cliente:x.cliente,numeroVenta:x.numero_venta,imp:parseFloat(x.importe),fecha:x.fecha,pagos:x.pagos||[]}));
     transacciones = t.map(x=>({id:x.id,tipo:x.tipo,desc:x.descripcion,imp:parseFloat(x.importe),canal:x.canal,fecha:x.fecha,venta_id:x.venta_id||null}));
     actividad = act.actividad;
@@ -2283,24 +2319,70 @@ function devCard(d){
     ${acciones}
   </div>`;
 }
+let devModo={dev:'inv',sol:'inv'}; // inv | txt
+function llenarCamsDev(lado){
+  const sel=document.getElementById(`d-${lado}-cam`);
+  sel.innerHTML='<option value="">— Elige camiseta —</option>'+camisetas.map(c=>`<option value="${c.id}">${nombreProducto(c)}</option>`).join('');
+  fillTallasDev(lado);
+}
+function fillTallasDev(lado){
+  const camId=+document.getElementById(`d-${lado}-cam`).value;
+  const cam=camisetas.find(c=>c.id===camId);
+  const sel=document.getElementById(`d-${lado}-talla`);
+  if(!cam){sel.innerHTML='<option value="">— Talla —</option>';return}
+  const tallas=tallasDe(cam);
+  sel.innerHTML=tallas.map(t=>{
+    const st=cam.tallas[t]||0;
+    return `<option value="${t}">${t==='U'?'Única':t} · ${st} en stock</option>`;
+  }).join('');
+}
+function setDevModo(lado,modo){
+  devModo[lado]=modo;
+  const esInv=modo==='inv';
+  document.getElementById(`d-${lado}-modo-inv`).style.cssText=`flex:1;padding:7px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;border:2px solid ${esInv?'var(--gm)':'var(--grayb)'};background:${esInv?'var(--gl)':'#fff'};color:${esInv?'var(--gd)':'var(--txm)'}`;
+  document.getElementById(`d-${lado}-modo-txt`).style.cssText=`flex:1;padding:7px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;border:2px solid ${!esInv?'var(--gm)':'var(--grayb)'};background:${!esInv?'var(--gl)':'#fff'};color:${!esInv?'var(--gd)':'var(--txm)'}`;
+  document.getElementById(`d-${lado}-cam`).style.display=esInv?'block':'none';
+  document.getElementById(`d-${lado}-talla`).style.display=esInv?'block':'none';
+  document.getElementById(`d-${lado}`).style.display=esInv?'none':'block';
+}
 function openDevModal(){
   ['d-cliente','d-dev','d-sol'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('d-imp').value='';
   document.getElementById('d-id').value='';
+  devModo={dev:'inv',sol:'inv'};
+  llenarCamsDev('dev'); llenarCamsDev('sol');
+  setDevModo('dev','inv'); setDevModo('sol','inv');
   openM('m-dev');
+}
+function ladoDevolucion(lado){
+  // Devuelve {texto, camId, talla} según el modo elegido
+  if(devModo[lado]==='inv'){
+    const camId=+document.getElementById(`d-${lado}-cam`).value;
+    const cam=camisetas.find(c=>c.id===camId);
+    const talla=document.getElementById(`d-${lado}-talla`).value;
+    if(cam){
+      const tallaTxt=talla==='U'?'Única':talla;
+      return {texto:`${nombreProducto(cam)} talla ${tallaTxt}`.trim(), camId, talla};
+    }
+    return {texto:'', camId:null, talla:null};
+  }
+  return {texto:document.getElementById(`d-${lado}`).value.trim(), camId:null, talla:null};
 }
 async function saveDevolucion(){
   const cliente=document.getElementById('d-cliente').value.trim();
   if(!cliente){toast('Escribe el nombre del cliente');return}
   const editId=+document.getElementById('d-id').value;
-  const data={cliente,motivo:document.getElementById('d-motivo').value,dev:document.getElementById('d-dev').value.trim(),sol:document.getElementById('d-sol').value.trim(),imp:+document.getElementById('d-imp').value||0,estado:'pendiente',fecha:hoy()};
+  const ladoDev=ladoDevolucion('dev'), ladoSol=ladoDevolucion('sol');
+  if(!ladoDev.texto){toast('Indica la camiseta que devuelve');return}
+  if(!ladoSol.texto){toast('Indica la camiseta que quiere');return}
+  const data={cliente,motivo:document.getElementById('d-motivo').value,dev:ladoDev.texto,sol:ladoSol.texto,devCamId:ladoDev.camId,devTalla:ladoDev.talla,solCamId:ladoSol.camId,solTalla:ladoSol.talla,imp:+document.getElementById('d-imp').value||0,estado:'pendiente',fecha:hoy()};
   try{
     if(editId){
       const i=devoluciones.findIndex(d=>d.id===editId);
       if(i>=0)devoluciones[i]={...devoluciones[i],...data};
     } else {
       if(MODO_SERVIDOR){
-        const payload={cliente:data.cliente,motivo:data.motivo,camiseta_devuelta:data.dev,camiseta_solicitada:data.sol,importe:data.imp};
+        const payload={cliente:data.cliente,motivo:data.motivo,camiseta_devuelta:data.dev,camiseta_solicitada:data.sol,dev_camiseta_id:data.devCamId,dev_talla:data.devTalla,sol_camiseta_id:data.solCamId,sol_talla:data.solTalla,importe:data.imp};
         const creado=await syncDevolucion('add',payload);
         data.id=creado.id;
       } else {
@@ -2335,10 +2417,26 @@ async function rechazarCambio(id){
   }catch(e){ toast('No se pudo rechazar: '+e.message); }
 }
 async function completarCambio(id){
-  const i=devoluciones.findIndex(d=>d.id===id);
-  if(i>=0){devoluciones[i].estado='cambiado'; if(!MODO_SERVIDOR)sd('devoluciones',devoluciones); await syncDevolucion('completar',null,id);}
-  const devUpd=devoluciones.find(d=>d.id===id); if(devUpd) registrarActividad('devolucion',`Cambio completado: ${devUpd.cliente}`,`${devUpd.dev} → ${devUpd.sol}`);
-  toast('Cambio completado ✓');renderDev();renderHome();
+  const dev=devoluciones.find(d=>d.id===id);
+  // Aviso si la talla que se lleva está en 0 (pero se permite igual)
+  if(dev && dev.solCamId && dev.solTalla){
+    const cam=camisetas.find(c=>c.id===dev.solCamId);
+    if(cam && (cam.tallas[dev.solTalla]||0)<=0){
+      if(!confirm('⚠️ La camiseta que se lleva el cliente está en 0 en esa talla. ¿Completar el cambio igual?')) return;
+    }
+  }
+  try{
+    if(MODO_SERVIDOR){
+      await syncDevolucion('completar',null,id);
+      await cargarDatosServidor(); // refrescar stock ajustado por el servidor
+    }else{
+      const i=devoluciones.findIndex(d=>d.id===id);
+      if(i>=0){devoluciones[i].estado='cambiado';sd('devoluciones',devoluciones);}
+    }
+    if(dev) registrarActividad('devolucion',`Cambio completado: ${dev.cliente}`,`${dev.dev} → ${dev.sol}`);
+    toast('Cambio completado ✓ Stock actualizado');
+    renderDev();renderHome();
+  }catch(e){ toast('No se pudo completar: '+e.message); }
 }
 
 // ── APROBAR PEDIDOS (dueño) ───────────────────────────────────────────────────
@@ -2634,6 +2732,7 @@ function renderCaja(){
         <span style="font-size:11px;font-weight:600;color:var(--gd);opacity:.75">Dinero que entra aparte de ventas</span>
       </button>`:''}
     </div>
+    <button class="abtn abtn-gray" onclick="abrirCalcBs()" style="margin-bottom:18px"><i class="ti ti-calculator"></i> Calculadora de bolívares</button>
     ${bloqueResumen('Cierre del día','ti-sun','var(--g)',dia,hoyStr,'dia')}
     ${bloqueResumen('Cierre de la semana','ti-calendar-week','var(--b)',sem,`${inicioSemStr} → ${hoyStr}`,'sem')}
     ${bloqueResumen('Cierre del mes','ti-calendar-month','var(--p)',mes,inicioMesStr.slice(0,7),'mes')}
@@ -2658,6 +2757,40 @@ function renderCaja(){
         <div class="liright" style="font-weight:800;color:var(--gd);font-size:12px;text-align:right">$${parseFloat(c.total_divisas||0).toFixed(0)}<br><span style="font-size:10px;color:var(--txm)">${fmtBs(parseFloat(c.total_bs||0))}</span></div>
       </div>`).join('')}</div>`:''}
   `;
+}
+
+// ── CALCULADORA DE BOLÍVARES ──────────────────────────────────────────────────
+let calcTasa='bcv';
+function abrirCalcBs(){
+  // Si la tasa elegida no existe, usar la primera disponible
+  if(tasaValor(calcTasa)<=0) calcTasa=['bcv','euro','binance'].find(k=>tasaValor(k)>0)||'bcv';
+  document.getElementById('calc-usd').value='';
+  renderCalcTasas();
+  calcularBs();
+  openM('m-calc');
+  setTimeout(()=>document.getElementById('calc-usd').focus(),200);
+}
+function renderCalcTasas(){
+  const cont=document.getElementById('calc-tasas');
+  const ops=[{k:'bcv',label:'Dólar BCV'},{k:'euro',label:'Euro BCV'},{k:'binance',label:'Binance'}];
+  cont.innerHTML=ops.map(o=>{
+    const val=tasaValor(o.k), act=calcTasa===o.k, dis=val<=0;
+    return `<button type="button" ${dis?'disabled':''} onclick="setCalcTasa('${o.k}')" style="flex:1;padding:8px 4px;border-radius:9px;cursor:${dis?'not-allowed':'pointer'};font-size:11px;font-weight:800;border:2px solid ${act?'var(--gd)':'var(--gm)'};background:${act?'var(--gd)':'#fff'};color:${act?'#fff':(dis?'var(--txh)':'var(--gd)')};opacity:${dis?.5:1}">${o.label}<br><span style="font-size:9px;font-weight:600">${val>0?val.toLocaleString('es-VE',{minimumFractionDigits:2}):'—'}</span></button>`;
+  }).join('');
+}
+function setCalcTasa(k){
+  if(tasaValor(k)<=0){toast('Esa tasa no está configurada');return}
+  calcTasa=k; renderCalcTasas(); calcularBs();
+}
+function calcularBs(){
+  const usd=+document.getElementById('calc-usd').value||0;
+  const tasa=tasaValor(calcTasa);
+  const bs=usd*tasa;
+  document.getElementById('calc-bs').textContent=fmtBs(bs);
+  const nombres={bcv:'Dólar BCV',euro:'Euro BCV',binance:'Binance'};
+  document.getElementById('calc-tasa-info').textContent=tasa>0
+    ? `${nombres[calcTasa]}: ${tasa.toLocaleString('es-VE',{minimumFractionDigits:2})} Bs/$`
+    : 'Sin tasa configurada (Ajustes)';
 }
 
 // ── CERRAR CAJA ───────────────────────────────────────────────────────────────
