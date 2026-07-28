@@ -1115,7 +1115,7 @@ async function sumarUnaUnidad(camId, talla){
   toast(`✓ ${camisetas[i].equipo} ${talla} — ahora ${camisetas[i].tallas[talla]} UND`);
   const st=document.getElementById('scan-status');
   if(st) st.textContent=`✓ ${contadorSesion} escaneada${contadorSesion>1?'s':''} esta sesión. Sigue escaneando o cierra al terminar.`;
-  if(curPage==='stock') renderStock();
+  if(curPage==='stock'){ stkQuery=''; renderStock(); } // limpiar búsqueda para que la escaneada siempre se vea
 }
 function prepararAsociar(codigo){
   pendingCodigo=codigo;
