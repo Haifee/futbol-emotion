@@ -1857,18 +1857,44 @@ async function enviarPedido(){
 }
 
 // ── STOCK (encargado) ─────────────────────────────────────────────────────────
+let stkQuery='';
+function filtrarCamisetas(q){
+  if(!q||!q.trim()) return camisetas;
+  const t=q.toLowerCase().trim();
+  return camisetas.filter(c=>{
+    const campos=[c.equipo,c.tipo,c.temp,c.categoria].filter(Boolean).join(' ').toLowerCase();
+    return campos.includes(t);
+  });
+}
+function filtrarStock(){
+  stkQuery=document.getElementById('stk-search').value;
+  // Re-render sin perder el foco del input
+  const val=stkQuery, pos=document.getElementById('stk-search').selectionStart;
+  renderStock();
+  const inp=document.getElementById('stk-search');
+  if(inp){inp.focus();try{inp.setSelectionRange(pos,pos)}catch(e){}}
+}
+function limpiarBusquedaStock(){
+  stkQuery='';
+  renderStock();
+}
 function renderStock(){
   const cont=document.getElementById('stk-c');
   const criticos=camisetas.filter(c=>stockStatus(c)==='critico');
   cont.innerHTML=`
     ${criticos.length?`<div class="abox abox-r" style="margin-bottom:12px"><i class="ti ti-alert-triangle"></i><div><div class="abox-title">Stock crítico — reponer urgente</div><div class="abox-sub">${criticos.map(c=>nombreProducto(c)).join(' · ')}</div></div></div>`:''}
     <button class="abtn abtn-g" onclick="abrirScannerInventario()" style="margin-top:0;margin-bottom:9px"><i class="ti ti-scan"></i> Escanear mercancía (entrada de stock)</button>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px">
       <button class="abtn abtn-gray abtn-sm" onclick="abrirNuevaCamiseta()" style="margin-top:0"><i class="ti ti-plus"></i> Nueva camiseta</button>
       <button class="abtn abtn-gray abtn-sm" onclick="openVentaModal()" style="margin-top:0"><i class="ti ti-shopping-cart"></i> Registrar venta</button>
     </div>
+    <div style="position:relative;margin-bottom:14px">
+      <i class="ti ti-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--txh);font-size:17px"></i>
+      <input class="fi" id="stk-search" placeholder="Buscar por equipo, tipo, temporada…" oninput="filtrarStock()" style="padding-left:38px;margin:0" value="${stkQuery.replace(/"/g,'&quot;')}">
+      ${stkQuery?`<button onclick="limpiarBusquedaStock()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--txh);font-size:18px"><i class="ti ti-x"></i></button>`:''}
+    </div>
     ${camisetas.length===0?`<div class="empty"><i class="ti ti-shirt"></i><p>Sin camisetas en inventario.<br>Pulsa "Nueva camiseta" para empezar.</p></div>`:''}
-    ${camisetas.map(c=>{
+    ${(()=>{const lista=filtrarCamisetas(stkQuery);return lista.length===0&&camisetas.length>0?`<div class="empty"><i class="ti ti-search-off"></i><p>Nada coincide con "${stkQuery}"</p></div>`:lista.map(c=>{
       const s=stockStatus(c);
       const clr=s==='ok'?'var(--g)':s==='bajo'?'var(--a)':'var(--r)';
       const lbl=s==='ok'?'OK':s==='bajo'?'Stock bajo':'Crítico';
@@ -1897,7 +1923,7 @@ function renderStock(){
           <button class="abtn abtn-g abtn-sm" style="font-size:12px" onclick="pedirEste(${c.id})"><i class="ti ti-clipboard-list"></i> Pedir</button>
         </div>
       </div>`;
-    }).join('')}`;
+    }).join('')})()}`;
 }
 function abrirNuevaCamiseta(){
   document.getElementById('ncam-title').textContent='Nuevo producto';
