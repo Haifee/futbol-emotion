@@ -28,7 +28,11 @@ class DevolucionController extends Controller
             'cliente'             => $request->cliente,
             'motivo'              => $request->motivo,
             'camiseta_devuelta'   => $request->camiseta_devuelta,
+            'dev_camiseta_id'     => $request->input('dev_camiseta_id'),
+            'dev_talla'           => $request->input('dev_talla'),
             'camiseta_solicitada' => $request->camiseta_solicitada,
+            'sol_camiseta_id'     => $request->input('sol_camiseta_id'),
+            'sol_talla'           => $request->input('sol_talla'),
             'importe'             => $request->input('importe', 0),
             'estado'              => 'pendiente',
             'fecha'               => now()->toDateString(),
@@ -86,10 +90,50 @@ class DevolucionController extends Controller
             return response()->json(['error' => 'El dueño debe aprobar este cambio primero'], 422);
         }
 
-        DB::table('devoluciones')->where('id', $id)->update([
-            'estado'     => 'cambiado',
-            'updated_at' => now(),
-        ]);
+        // Columnas de talla válidas
+        $tallaCol = function ($talla) {
+            $t = strtolower((string) $talla);
+            $validas = ['s','m','l','xl','xxl','10','12','14','16','u'];
+            return in_array($t, $validas, true) ? 'talla_' . $t : null;
+        };
+
+        DB::beginTransaction();
+        try {
+            // Solo ajustar una vez
+            if (!$dev->stock_aplicado) {
+                // La camiseta que se lleva el cliente: RESTA del stock
+                if ($dev->sol_camiseta_id && ($col = $tallaCol($dev->sol_talla))) {
+                    $cam = DB::table('camisetas')->find($dev->sol_camiseta_id);
+                    if ($cam) {
+                        $actual = (int) $cam->$col;
+                        $nuevo = max(0, $actual - 1); // nunca negativo
+                        DB::table('camisetas')->where('id', $dev->sol_camiseta_id)->update([$col => $nuevo, 'updated_at' => now()]);
+                    }
+                }
+
+                // La camiseta que devuelve el cliente: SUMA al stock
+                if ($dev->dev_camiseta_id && ($col = $tallaCol($dev->dev_talla))) {
+                    $cam = DB::table('camisetas')->find($dev->dev_camiseta_id);
+                    if ($cam) {
+                        DB::table('camisetas')->where('id', $dev->dev_camiseta_id)->update([
+                            $col => (int) $cam->$col + 1,
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+            }
+
+            DB::table('devoluciones')->where('id', $id)->update([
+                'estado'         => 'cambiado',
+                'stock_aplicado' => true,
+                'updated_at'     => now(),
+            ]);
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'No se pudo completar el cambio'], 500);
+        }
 
         return response()->json(['ok' => true]);
     }
