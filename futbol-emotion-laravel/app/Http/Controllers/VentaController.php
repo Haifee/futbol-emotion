@@ -10,7 +10,14 @@ class VentaController extends Controller
 {
     public function index(Request $request)
     {
-        $ventas = DB::table('ventas')
+        // Rendimiento: por defecto la app pide solo lo reciente (?desde=YYYY-MM-DD).
+        // Con ?desde=all se devuelve TODO el historico (reportes de meses viejos).
+        $desde = $request->query('desde');
+        $q = DB::table('ventas');
+        if ($desde && $desde !== 'all') {
+            $q->where('fecha', '>=', $desde);
+        }
+        $ventas = $q
             ->orderBy('fecha', 'desc')
             ->orderBy('id', 'desc')
             ->get();

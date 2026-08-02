@@ -8,10 +8,16 @@ use App\Services\PushService;
 
 class TransaccionController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        // Rendimiento: por defecto solo lo reciente (?desde=YYYY-MM-DD); ?desde=all = todo.
+        $desde = $request->query('desde');
+        $q = DB::table('transacciones');
+        if ($desde && $desde !== 'all') {
+            $q->where('fecha', '>=', $desde);
+        }
         return response()->json(
-            DB::table('transacciones')->orderBy('fecha', 'desc')->orderBy('id', 'desc')->get()
+            $q->orderBy('fecha', 'desc')->orderBy('id', 'desc')->get()
         );
     }
 
