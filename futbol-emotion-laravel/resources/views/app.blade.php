@@ -886,6 +886,11 @@ let transacciones=ld('transacciones',[
   {id:3,tipo:'ingreso',desc:'Venta Barça Local M x2',imp:179.98,canal:'Instagram',fecha:'2026-06-24'},
   {id:4,tipo:'ingreso',desc:'Venta Real Madrid Local L',imp:89.99,canal:'WhatsApp',fecha:'2026-06-23'},
 ]);
+// ── Rendimiento: por defecto se carga solo lo reciente; el histórico viejo se pide bajo demanda ──
+const MESES_CARGA_INICIAL=3;
+function cutoffCargaInicial(){ const d=new Date(); d.setMonth(d.getMonth()-MESES_CARGA_INICIAL); return d.toISOString().slice(0,10); }
+let historialCompleto=false;            // true cuando ya se trajo TODO el histórico
+let cutoffCarga=cutoffCargaInicial();   // fecha desde la que están cargadas ventas/transacciones
 let ids={ped:1,env:4,dev:2,ven:4,tx:5,c:6,ventaTienda:ld('ventaTienda',1)};
 let pedActual={provId:null,lineas:[]};
 let envFilter='activos', devFilter='todos', tipoVenta=null;
@@ -925,14 +930,16 @@ function iniciarApp(){
 }
 async function cargarDatosServidor(){
   toast('Cargando datos del servidor...');
+  historialCompleto=false;
+  cutoffCarga=cutoffCargaInicial();
   try{
     const [c,p,e,d,v,t,act]=await Promise.all([
       apiCall('GET','/camisetas'),
       apiCall('GET','/pedidos'),
       apiCall('GET','/envios'),
       apiCall('GET','/devoluciones'),
-      apiCall('GET','/ventas'),
-      apiCall('GET','/transacciones'),
+      apiCall('GET','/ventas?desde='+cutoffCarga),
+      apiCall('GET','/transacciones?desde='+cutoffCarga),
       apiCall('GET','/actividad?rol='+role),
     ]);
     camisetas = c;
@@ -953,6 +960,31 @@ async function cargarDatosServidor(){
   }catch(e){
     toast('Error cargando datos — usando datos locales');
   }
+}
+// Trae TODO el histórico (ventas + transacciones) bajo demanda. Idempotente.
+async function cargarHistorialCompleto(){
+  if(historialCompleto) return true;
+  if(typeof MODO_SERVIDOR!=='undefined' && !MODO_SERVIDOR){ historialCompleto=true; return true; }
+  toast('Cargando histórico completo...');
+  try{
+    const [v,t]=await Promise.all([
+      apiCall('GET','/ventas?desde=all'),
+      apiCall('GET','/transacciones?desde=all'),
+    ]);
+    ventas = v.map(x=>({id:x.id,camId:x.camiseta_id,equipo:x.equipo,talla:x.talla,cant:x.cantidad,canal:x.canal,cliente:x.cliente,numeroVenta:x.numero_venta,imp:parseFloat(x.importe),fecha:x.fecha,pagos:x.pagos||[]}));
+    transacciones = t.map(x=>({id:x.id,tipo:x.tipo,desc:x.descripcion,imp:parseFloat(x.importe),canal:x.canal,fecha:x.fecha,venta_id:x.venta_id||null}));
+    historialCompleto=true;
+    cutoffCarga='2000-01-01';
+    toast('✓ Histórico completo cargado');
+    return true;
+  }catch(e){
+    toast('No se pudo cargar el histórico completo');
+    return false;
+  }
+}
+async function cargarHistorialCompletoUI(){
+  const ok=await cargarHistorialCompleto();
+  if(ok && typeof curPage!=='undefined' && curPage==='caja' && typeof renderCaja==='function') renderCaja();
 }
 function doLogout(){
   role=null;
@@ -2767,6 +2799,7 @@ function renderCaja(){
       </button>`:''}
     </div>
     <button class="abtn abtn-gray" onclick="abrirCalcBs()" style="margin-bottom:18px"><i class="ti ti-calculator"></i> Calculadora de bolívares</button>
+    ${(role==='owner'&&!historialCompleto)?`<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;background:var(--gl)"><div style="font-size:12.5px;color:var(--txm);line-height:1.4"><i class="ti ti-clock-hour-4"></i> Mostrando los últimos ${MESES_CARGA_INICIAL} meses. Los reportes de meses viejos se cargan solos al exportar.</div><button onclick="cargarHistorialCompletoUI()" style="flex:none;background:var(--tx);color:#fff;border:none;border-radius:9px;padding:8px 12px;cursor:pointer;font-size:12px;font-weight:700;white-space:nowrap">Cargar todo</button></div>`:''}
     ${bloqueResumen('Cierre del día','ti-sun','var(--g)',dia,hoyStr,'dia')}
     ${bloqueResumen('Cierre de la semana','ti-calendar-week','var(--b)',sem,`${inicioSemStr} → ${hoyStr}`,'sem')}
     ${bloqueResumen('Cierre del mes','ti-calendar-month','var(--p)',mes,inicioMesStr.slice(0,7),'mes')}
@@ -3013,8 +3046,14 @@ function abrirExport(clave){
   openM('m-export');
 }
 
-function exportarReporte(formato){
-  const d=datosPeriodo(exportPeriodo);
+async function exportarReporte(formato){
+  let d=datosPeriodo(exportPeriodo);
+  // Si el período pedido empieza antes de lo que está cargado, traemos el histórico completo primero
+  if(!historialCompleto && d.desde < cutoffCarga){
+    const ok=await cargarHistorialCompleto();
+    if(!ok) return;
+    d=datosPeriodo(exportPeriodo);
+  }
   const nombre='futbol-emotion_'+exportPeriodo+'_'+hoy();
   try{
     if(formato==='pdf') generarPDF(d,nombre);
