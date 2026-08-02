@@ -2886,7 +2886,8 @@ function abrirCierreCaja(){
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Ventas</span><b>${d.vts.length}</b></div>
     <hr style="border:none;border-top:1px solid var(--grayb);margin:8px 0">
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Cobrado en $</span><b style="color:var(--gd)">${fmt(money.divisas)}</b></div>
-    <div style="display:flex;justify-content:space-between"><span>Cobrado en Bs</span><b style="color:var(--gd)">${fmtBs(money.bs)}</b></div>`;
+    <div style="display:flex;justify-content:space-between"><span>Cobrado en Bs</span><b style="color:var(--gd)">${fmtBs(money.bs)}</b></div>
+    ${d.vts.length===0&&d.ing===0&&d.gas===0?`<div style="background:var(--al);border-radius:9px;padding:9px;margin-top:10px;font-size:12px;color:var(--ad);font-weight:700"><i class="ti ti-alert-circle"></i> Día sin movimientos. Si vendiste algo, regístralo antes de cerrar.</div>`:''}`;
   document.getElementById('cierre-clave').value='';
   document.getElementById('cierre-err').textContent='';
   openM('m-cierre');
@@ -2907,6 +2908,12 @@ async function confirmarCierre(){
   }else{
     const d=datosPeriodo('dia'); const money=ventasHoyPorMoneda();
     ing=d.ing; gas=d.gas; nv=d.vts.length; divisas=money.divisas; bs=money.bs; neto=d.neto;
+  }
+  // Advertir si el día está en 0 (sin ventas ni movimientos)
+  if(nv===0 && ing===0 && gas===0){
+    if(!confirm('⚠️ Este día no tiene ventas ni movimientos registrados.\n\n¿Seguro que quieres cerrar la caja en 0? Si vendiste algo, cancela y regístralo primero.')){
+      return;
+    }
   }
   cerrando=true;
   document.getElementById('cierre-btn').disabled=true;
