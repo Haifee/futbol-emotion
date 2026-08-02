@@ -2793,13 +2793,57 @@ function renderCaja(){
         <div class="liright" style="font-weight:800;color:var(--gd);font-size:12px;text-align:right">$${parseFloat(m.total_divisas||0).toFixed(0)}<br><span style="font-size:10px;color:var(--txm)">${fmtBs(parseFloat(m.total_bs||0))}</span></div>
       </div>`;
     }).join('')}</div>`:''}
-    ${cierresCaja.length?`<div class="stitle">Cierres recientes</div><div class="card">${cierresCaja.slice(0,8).map(c=>`
+    ${cierresCaja.length?`<div class="stitle" style="display:flex;justify-content:space-between;align-items:center">Cierres recientes ${role==='owner'?`<button onclick="exportarCierres()" style="background:none;border:none;cursor:pointer;color:var(--g);font-size:13px;font-weight:700"><i class="ti ti-download"></i> Exportar</button>`:''}</div><div class="card">${cierresCaja.slice(0,15).map(c=>`
       <div class="li">
         <div class="liico ig"><i class="ti ti-receipt"></i></div>
-        <div class="libody"><div class="liname">Cierre ${c.fecha}</div><div class="lisub">${c.cerrado_por==='owner'?'Dueño':'Encargado'} · ${c.num_ventas} ventas · Benef. ${fmt(parseFloat(c.beneficio))}</div></div>
-        <div class="liright" style="font-weight:800;color:var(--gd);font-size:12px;text-align:right">$${parseFloat(c.total_divisas||0).toFixed(0)}<br><span style="font-size:10px;color:var(--txm)">${fmtBs(parseFloat(c.total_bs||0))}</span></div>
+        <div class="libody"><div class="liname">Cierre ${c.fecha}</div><div class="lisub">${nombreRol(c.cerrado_por)} · ${c.num_ventas} ventas · Benef. ${fmt(parseFloat(c.beneficio))}</div></div>
+        <div class="liright" style="display:flex;align-items:center;gap:8px">
+          <div style="font-weight:800;color:var(--gd);font-size:12px;text-align:right">$${parseFloat(c.total_divisas||0).toFixed(0)}<br><span style="font-size:10px;color:var(--txm)">${fmtBs(parseFloat(c.total_bs||0))}</span></div>
+          ${role==='owner'?`<button onclick="anularCierre(${c.id},'${c.fecha}')" style="background:none;border:none;cursor:pointer;color:var(--txh);font-size:16px;padding:2px"><i class="ti ti-trash"></i></button>`:''}
+        </div>
       </div>`).join('')}</div>`:''}
   `;
+}
+
+// ── ANULAR Y EXPORTAR CIERRES ─────────────────────────────────────────────────
+async function anularCierre(id,fecha){
+  if(CONFIG.clave_cierre_activa!=='1'){toast('No hay clave de cierre configurada');return}
+  const clave=prompt(`Para anular el cierre del ${fecha}, escribe la clave de cierre:`);
+  if(clave===null) return;
+  if(!clave.trim()){toast('Clave vacía');return}
+  try{
+    await apiCall('DELETE','/cierres/'+id,{clave:clave.trim()});
+    cierresCaja=cierresCaja.filter(c=>c.id!==id);
+    toast('Cierre anulado ✓');
+    registrarActividad('caja',`Cierre anulado: ${fecha}`,'');
+    // Ese día vuelve a estar "sin cerrar": recalcular el aviso
+    try{ const est=await apiCall('GET','/cierres/estado'); cajaPendiente=est.caja_pendiente||null; mostrarAvisoCajaPendiente(); }catch(e){}
+    if(curPage==='caja') renderCaja();
+  }catch(e){ toast(e.message||'No se pudo anular'); }
+}
+
+function exportarCierres(){
+  if(!cierresCaja.length){toast('No hay cierres para exportar');return}
+  try{
+    const wb=XLSX.utils.book_new();
+    // Hoja 1: Cierres diarios
+    const filas=[['Fecha','Cerró','Ingresos','Gastos','Beneficio','Ventas','Cobrado $','Cobrado Bs']]
+      .concat(cierresCaja.map(c=>[c.fecha,nombreRol(c.cerrado_por),parseFloat(c.ingresos),parseFloat(c.gastos),parseFloat(c.beneficio),c.num_ventas,parseFloat(c.total_divisas||0),parseFloat(c.total_bs||0)]));
+    const ws1=XLSX.utils.aoa_to_sheet(filas);
+    ws1['!cols']=[{wch:12},{wch:14},{wch:11},{wch:11},{wch:11},{wch:8},{wch:12},{wch:14}];
+    XLSX.utils.book_append_sheet(wb,ws1,'Cierres diarios');
+    // Hoja 2: Cierres mensuales (si hay)
+    if(cierresMensuales.length){
+      const meses=['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      const fm=[['Mes','Ingresos','Gastos','Beneficio','Ventas','Cobrado $','Cobrado Bs']]
+        .concat(cierresMensuales.map(m=>{const[a,me]=m.mes.split('-');return[`${meses[+me]} ${a}`,parseFloat(m.ingresos),parseFloat(m.gastos),parseFloat(m.beneficio),m.num_ventas,parseFloat(m.total_divisas||0),parseFloat(m.total_bs||0)]}));
+      const ws2=XLSX.utils.aoa_to_sheet(fm);
+      ws2['!cols']=[{wch:18},{wch:11},{wch:11},{wch:11},{wch:8},{wch:12},{wch:14}];
+      XLSX.utils.book_append_sheet(wb,ws2,'Cierres mensuales');
+    }
+    XLSX.writeFile(wb,`cierres_futbol-emotion_${hoy()}.xlsx`);
+    toast('Cierres exportados ✓');
+  }catch(e){ toast('No se pudo exportar'); }
 }
 
 // ── AVISO DE CAJA PENDIENTE ───────────────────────────────────────────────────

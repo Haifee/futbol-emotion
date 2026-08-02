@@ -190,4 +190,25 @@ class CierreController extends Controller
             // nunca romper la app por esto
         }
     }
+
+    /** Anula un cierre de caja (solo dueño, con la clave de cierre) */
+    public function destroy(Request $request, $id)
+    {
+        if ($request->input('_rol') !== 'owner') {
+            return response()->json(['error' => 'Solo el dueño puede anular un cierre'], 403);
+        }
+
+        $fila = DB::table('configuracion')->where('clave', 'clave_cierre')->first();
+        $claveGuardada = $fila->valor ?? '';
+        if ($claveGuardada === '' || !hash_equals($claveGuardada, (string) $request->input('clave'))) {
+            return response()->json(['error' => 'Clave de cierre incorrecta.'], 401);
+        }
+
+        $cierre = DB::table('cierres_caja')->find($id);
+        if (!$cierre) return response()->json(['error' => 'Cierre no encontrado'], 404);
+
+        DB::table('cierres_caja')->where('id', $id)->delete();
+
+        return response()->json(['ok' => true]);
+    }
 }

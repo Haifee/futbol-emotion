@@ -78,6 +78,7 @@ Route::middleware('auth.pin')->group(function () {
     Route::get('/cierres/estado',    [CierreController::class, 'estado']);
     Route::get('/cierres/mensuales', [CierreController::class, 'mensuales']);
     Route::get('/cierres/dia/{fecha}',[CierreController::class, 'resumenDia']);
+    Route::delete('/cierres/{id}',   [CierreController::class, 'destroy']);
 
     // Actividad / Notificaciones (historial compartido entre encargado y dueño)
     Route::get('/actividad',          [ActividadController::class, 'index']);
