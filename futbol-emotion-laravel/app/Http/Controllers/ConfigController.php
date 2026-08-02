@@ -24,6 +24,8 @@ class ConfigController extends Controller
         'telefono_pago'     => '',
         'cedula_pago'       => '',
         'clave_cierre'      => '',
+        'nombre_owner'      => '',
+        'nombre_manager'    => '',
     ];
 
     public function index(Request $request)
@@ -45,6 +47,8 @@ class ConfigController extends Controller
                 'telefono_pago'     => $config['telefono_pago'],
                 'cedula_pago'       => $config['cedula_pago'],
                 'clave_cierre_activa' => !empty($config['clave_cierre']) ? '1' : '0',
+                'nombre_owner'      => $config['nombre_owner'],
+                'nombre_manager'    => $config['nombre_manager'],
             ]);
         }
 

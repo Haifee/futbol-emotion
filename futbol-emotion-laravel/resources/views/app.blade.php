@@ -825,6 +825,11 @@ async function apiCall(method, endpoint, data=null){
 // ── DATOS ────────────────────────────────────────────────────────────────────
 // Los PINs viven en el servidor (variables de entorno). Nunca en el código.
 let CONFIG={proveedor_1:'',proveedor_2:'',proveedor_3:'',proveedor_4:'',manager_bloqueado:'0'};
+function nombreRol(r=role){
+  const nom=(r==='owner'?CONFIG.nombre_owner:CONFIG.nombre_manager)||'';
+  if(nom.trim()) return nom.trim();
+  return r==='manager'?'Encargado':'Dueño';
+}
 function nombreProv(n){
   const nom=(CONFIG['proveedor_'+n]||'').trim();
   return (role==='owner'&&nom) ? nom : 'Proveedor '+n;
@@ -913,7 +918,7 @@ function iniciarApp(){
   document.getElementById('lerr').textContent='';
   document.getElementById('ls').style.display='none';
   document.getElementById('app').style.display='flex';
-  document.getElementById('rchip').textContent=role==='manager'?'Encargado':'Dueño';
+  document.getElementById('rchip').textContent=nombreRol();
   document.getElementById('rchip').className='chip '+(role==='manager'?'chip-m':'chip-o');
   if(MODO_SERVIDOR) cargarDatosServidor().then(()=>{buildNav();goTo('home');});
   else {buildNav();goTo('home');}
@@ -941,6 +946,9 @@ async function cargarDatosServidor(){
     actualizarBadgeNotif();
     try{ CONFIG={...CONFIG, ...(await apiCall('GET','/config'))}; }catch(e){}
     try{ cierresCaja=await apiCall('GET','/cierres'); }catch(e){ cierresCaja=[]; }
+    try{ cierresMensuales=await apiCall('GET','/cierres/mensuales'); }catch(e){ cierresMensuales=[]; }
+    try{ const est=await apiCall('GET','/cierres/estado'); cajaPendiente=est.caja_pendiente||null; }catch(e){ cajaPendiente=null; }
+    mostrarAvisoCajaPendiente();
     toast('✓ Datos cargados');
   }catch(e){
     toast('Error cargando datos — usando datos locales');
@@ -2776,6 +2784,15 @@ function renderCaja(){
     </div>
 
     <button class="abtn abtn-g" onclick="abrirCierreCaja()" style="margin-top:16px;background:var(--tx)"><i class="ti ti-lock-check"></i> Cerrar caja del día</button>
+    ${cierresMensuales.length?`<div class="stitle">Meses cerrados</div><div class="card">${cierresMensuales.slice(0,12).map(m=>{
+      const [a,me]=m.mes.split('-');
+      const meses=['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      return `<div class="li">
+        <div class="liico ip"><i class="ti ti-calendar-stats"></i></div>
+        <div class="libody"><div class="liname">${meses[+me]} ${a}</div><div class="lisub">${m.num_ventas} ventas · Benef. ${fmt(parseFloat(m.beneficio))}</div></div>
+        <div class="liright" style="font-weight:800;color:var(--gd);font-size:12px;text-align:right">$${parseFloat(m.total_divisas||0).toFixed(0)}<br><span style="font-size:10px;color:var(--txm)">${fmtBs(parseFloat(m.total_bs||0))}</span></div>
+      </div>`;
+    }).join('')}</div>`:''}
     ${cierresCaja.length?`<div class="stitle">Cierres recientes</div><div class="card">${cierresCaja.slice(0,8).map(c=>`
       <div class="li">
         <div class="liico ig"><i class="ti ti-receipt"></i></div>
@@ -2783,6 +2800,39 @@ function renderCaja(){
         <div class="liright" style="font-weight:800;color:var(--gd);font-size:12px;text-align:right">$${parseFloat(c.total_divisas||0).toFixed(0)}<br><span style="font-size:10px;color:var(--txm)">${fmtBs(parseFloat(c.total_bs||0))}</span></div>
       </div>`).join('')}</div>`:''}
   `;
+}
+
+// ── AVISO DE CAJA PENDIENTE ───────────────────────────────────────────────────
+function mostrarAvisoCajaPendiente(){
+  const prev=document.getElementById('aviso-caja');
+  if(prev) prev.remove();
+  if(!cajaPendiente) return;
+  const div=document.createElement('div');
+  div.id='aviso-caja';
+  div.style.cssText='position:fixed;top:0;left:0;right:0;z-index:200;background:var(--ad);color:#fff;padding:11px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,.2);font-size:13px;font-weight:700';
+  div.innerHTML=`<i class="ti ti-alert-triangle" style="font-size:20px"></i>
+    <div style="flex:1">Tienes la caja del ${cajaPendiente} sin cerrar</div>
+    <button onclick="cerrarCajaPendiente()" style="background:#fff;color:var(--ad);border:none;border-radius:8px;padding:7px 12px;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap">Cerrar ahora</button>`;
+  document.body.appendChild(div);
+}
+async function cerrarCajaPendiente(){
+  if(CONFIG.clave_cierre_activa!=='1'){ toast('El dueño debe crear la clave de cierre primero'); goTo('ajustes'); return; }
+  // Traer el resumen de ese día del servidor
+  let resumen;
+  try{ resumen=await apiCall('GET','/cierres/dia/'+cajaPendiente); }
+  catch(e){ toast('No se pudo cargar el resumen del día'); return; }
+  document.getElementById('cierre-resumen').innerHTML=`
+    <div style="font-size:13px;color:var(--txm);margin-bottom:8px">Caja atrasada · ${cajaPendiente}</div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Ingresos</span><b style="color:var(--gd)">${fmt(resumen.ingresos)}</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Gastos</span><b style="color:var(--rd)">${fmt(resumen.gastos)}</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Beneficio</span><b>${fmt(resumen.ingresos-resumen.gastos)}</b></div>
+    <div style="display:flex;justify-content:space-between"><span>Ventas</span><b>${resumen.num_ventas}</b></div>`;
+  document.getElementById('cierre-clave').value='';
+  document.getElementById('cierre-err').textContent='';
+  // Guardar el día pendiente para que confirmarCierre lo use
+  cierreFechaObjetivo=cajaPendiente;
+  cierreResumenObjetivo=resumen;
+  openM('m-cierre');
 }
 
 // ── CALCULADORA DE BOLÍVARES ──────────────────────────────────────────────────
@@ -2825,6 +2875,7 @@ function abrirCierreCaja(){
     toast('Primero el dueño debe crear la clave de cierre en Ajustes');
     return;
   }
+  cierreFechaObjetivo=null; cierreResumenObjetivo=null;
   const d=datosPeriodo('dia');
   const money=ventasHoyPorMoneda();
   document.getElementById('cierre-resumen').innerHTML=`
@@ -2842,23 +2893,36 @@ function abrirCierreCaja(){
 }
 
 let cerrando=false;
+let cierreFechaObjetivo=null;   // null = cierre de hoy; fecha = día atrasado
+let cierreResumenObjetivo=null;
 async function confirmarCierre(){
   if(cerrando) return;
   const clave=document.getElementById('cierre-clave').value.trim();
   if(!clave){document.getElementById('cierre-err').textContent='Escribe la clave de cierre';return}
-  const d=datosPeriodo('dia');
-  const money=ventasHoyPorMoneda();
+  // Datos: de hoy o del día atrasado
+  let ing,gas,nv,divisas,bs,neto;
+  if(cierreFechaObjetivo && cierreResumenObjetivo){
+    const r=cierreResumenObjetivo;
+    ing=r.ingresos; gas=r.gastos; nv=r.num_ventas; divisas=r.total_divisas; bs=r.total_bs; neto=ing-gas;
+  }else{
+    const d=datosPeriodo('dia'); const money=ventasHoyPorMoneda();
+    ing=d.ing; gas=d.gas; nv=d.vts.length; divisas=money.divisas; bs=money.bs; neto=d.neto;
+  }
   cerrando=true;
   document.getElementById('cierre-btn').disabled=true;
   try{
     const r=await apiCall('POST','/cierres',{
-      clave, ingresos:d.ing, gastos:d.gas, num_ventas:d.vts.length,
-      total_divisas:money.divisas, total_bs:money.bs,
+      clave, ingresos:ing, gastos:gas, num_ventas:nv,
+      total_divisas:divisas, total_bs:bs,
+      fecha:cierreFechaObjetivo||undefined,
     });
-    cierresCaja.unshift({id:r.id,fecha:hoy(),cerrado_por:role,ingresos:d.ing,gastos:d.gas,beneficio:d.neto,num_ventas:d.vts.length,total_divisas:money.divisas,total_bs:money.bs});
+    cierresCaja.unshift({id:r.id,fecha:cierreFechaObjetivo||hoy(),cerrado_por:role,ingresos:ing,gastos:gas,beneficio:neto,num_ventas:nv,total_divisas:divisas,total_bs:bs});
     closeM('m-cierre');
     toast('Caja cerrada ✓');
-    registrarActividad('caja',`Cierre de caja · ${d.vts.length} ventas · Beneficio ${fmt(d.neto)}`,'');
+    registrarActividad('caja',`Cierre de caja · ${nv} ventas · Beneficio ${fmt(neto)}`,'');
+    // Si era la caja pendiente, quitar el aviso
+    if(cierreFechaObjetivo){ cajaPendiente=null; mostrarAvisoCajaPendiente(); }
+    cierreFechaObjetivo=null; cierreResumenObjetivo=null;
     if(curPage==='caja') renderCaja();
   }catch(e){
     document.getElementById('cierre-err').textContent=e.message||'No se pudo cerrar la caja';
@@ -2870,6 +2934,8 @@ async function confirmarCierre(){
 // ── EXPORTAR REPORTES (PDF / Excel) ──────────────────────────────────────────
 let exportPeriodo=null;
 let cierresCaja=[];
+let cierresMensuales=[];
+let cajaPendiente=null;
 
 // Calcula rango y datos del período (independiente de renderCaja)
 function datosPeriodo(clave){
@@ -3032,6 +3098,16 @@ function renderAjustes(){
   cont.innerHTML=`
     <div style="font-size:19px;font-weight:800;margin-bottom:4px">Ajustes</div>
     <div style="font-size:13px;color:var(--txm);margin-bottom:20px">Gestión de datos de la app</div>
+
+    <div class="stitle">Nombres</div>
+    <div class="card">
+      <div style="font-size:13px;color:var(--txm);margin-bottom:12px">Aparecen en el historial y las notificaciones en vez de "Dueño" / "Encargado".</div>
+      <label class="fl" style="margin-top:0">Tu nombre (dueño)</label>
+      <input class="fi" id="cfg-nombre-owner" value="${(CONFIG.nombre_owner||'').replace(/"/g,'&quot;')}" placeholder="Ej: Haifeé" maxlength="40">
+      <label class="fl">Nombre del encargado</label>
+      <input class="fi" id="cfg-nombre-manager" value="${(CONFIG.nombre_manager||'').replace(/"/g,'&quot;')}" placeholder="Ej: María" maxlength="40">
+      <button class="abtn abtn-g" onclick="guardarNombres()"><i class="ti ti-check"></i> Guardar nombres</button>
+    </div>
 
     <div class="stitle">Clave de cierre de caja</div>
     <div class="card">
@@ -3291,6 +3367,21 @@ async function pintarEstadoPush(contId='push-estado'){
     ${e.btn}`;
 }
 
+async function guardarNombres(){
+  const datos={
+    nombre_owner:document.getElementById('cfg-nombre-owner').value.trim(),
+    nombre_manager:document.getElementById('cfg-nombre-manager').value.trim(),
+  };
+  try{
+    if(MODO_SERVIDOR) await apiCall('POST','/config',datos);
+    CONFIG={...CONFIG, ...datos};
+    document.getElementById('rchip').textContent=nombreRol();
+    toast('Nombres guardados ✓');
+    registrarActividad('ajuste','Nombres actualizados','');
+    renderAjustes();
+  }catch(e){/* apiCall ya avisó */}
+}
+
 async function guardarClaveCierre(){
   const clave=document.getElementById('cfg-clave-cierre').value.trim();
   if(clave.length<4){toast('La clave debe tener al menos 4 caracteres');return}
@@ -3462,7 +3553,7 @@ function registrarActividad(tipo, descripcion, extra=''){
     desc: descripcion,
     extra,
     rol: role,
-    quien: role==='manager'?'Encargado':'Dueño',
+    quien: nombreRol(),
     fecha: hoy(),
     hora: new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}),
     visto: false,
