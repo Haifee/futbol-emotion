@@ -252,6 +252,48 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 .bigbtn{transition:all .18s}
 .bigbtn:active{transform:scale(.985)}
 
+
+/* ══ RESPONSIVE: la app se adapta a escritorio. En móvil (< 860px) NO cambia nada. ══ */
+#app.on{display:flex}
+@media (min-width:860px){
+  #app.on{
+    max-width:1180px;
+    display:grid;
+    grid-template-columns:240px 1fr;
+    grid-template-rows:auto 1fr;
+    grid-template-areas:"top top" "nav main";
+    border-left:1px solid #e2e8f0;
+    border-right:1px solid #e2e8f0;
+  }
+  .topbar{grid-area:top}
+  .pages{grid-area:main;min-height:0}
+  .bnav{
+    grid-area:nav;
+    flex-direction:column;
+    align-items:stretch;
+    justify-content:flex-start;
+    border-top:none;
+    border-right:1px solid #e2e8f0;
+    padding:14px 10px;
+    gap:2px;
+  }
+  .ni{
+    flex:none;
+    flex-direction:row;
+    justify-content:flex-start;
+    gap:13px;
+    padding:12px 16px;
+    border-radius:11px;
+    font-size:14px;
+    position:relative;
+  }
+  .ni i{font-size:21px}
+  .ni.active{background:var(--gl,#dcfce7)}
+  .ni.active::after{display:none}
+  .nbadge{top:50%;right:14px;transform:translateY(-50%)}
+  .page{padding:26px 30px;max-width:920px;margin:0 auto}
+  .mgrid{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+}
 </style>
 </head>
 <body>
@@ -930,7 +972,7 @@ function doLogin(){
 function iniciarApp(){
   document.getElementById('lerr').textContent='';
   document.getElementById('ls').style.display='none';
-  document.getElementById('app').style.display='flex';
+  document.getElementById('app').classList.add('on');
   document.getElementById('rchip').textContent=nombreRol();
   document.getElementById('rchip').className='chip '+(role==='manager'?'chip-m':'chip-o');
   if(MODO_SERVIDOR) cargarDatosServidor().then(()=>{buildNav();goTo('home');});
@@ -998,7 +1040,7 @@ function doLogout(){
   role=null;
   if(MODO_SERVIDOR) apiCall('POST','/logout').catch(()=>{});
   document.getElementById('ls').style.display='flex';
-  document.getElementById('app').style.display='none';
+  document.getElementById('app').classList.remove('on');
   document.getElementById('lpin').value='';
   document.getElementById('lr-m').classList.remove('sel');
   document.getElementById('lr-o').classList.remove('sel');
