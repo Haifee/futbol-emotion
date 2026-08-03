@@ -383,6 +383,14 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 </div>
 
 <!-- MODAL: EXPORTAR REPORTE -->
+<div class="mbg" id="m-repo">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle">Reposición sugerida <button class="mclose" onclick="closeM('m-repo')"><i class="ti ti-x"></i></button></div>
+    <div style="font-size:13px;color:var(--txm);margin-bottom:12px">Tallas que se venden y están por agotarse, con cuánto pedir según las ventas del último mes.</div>
+    <div id="repo-list"></div>
+  </div>
+</div>
 <div class="mbg" id="m-export">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -1676,6 +1684,70 @@ function getHora(){
   return new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
 }
 
+// ══ REPOSICIÓN: cruza stock actual vs. ventas reales para sugerir qué y cuánto pedir ══
+const REPO_DIAS = 30;
+function fechaHace(dias){ const d=new Date(); d.setDate(d.getDate()-dias); return d.toISOString().slice(0,10); }
+function reposicionSugerida(dias){
+  dias = dias || REPO_DIAS;
+  const desde = fechaHace(dias);
+  const vendidas = {};
+  ventas.forEach(v=>{
+    if(v.camId==null || !v.talla) return;
+    if(v.fecha < desde) return;
+    const k = v.camId+'|'+v.talla;
+    vendidas[k] = (vendidas[k]||0) + (v.cant||1);
+  });
+  const items = [];
+  camisetas.forEach(c=>{
+    Object.entries(c.tallas).forEach(([t,stock])=>{
+      const vend = vendidas[c.id+'|'+t] || 0;
+      if(vend<=0) return;
+      if(stock>c.min) return;
+      const objetivo = Math.max(c.min, vend);
+      const sugerido = Math.max(1, objetivo - stock);
+      items.push({camId:c.id, equipo:c.equipo, tipo:c.tipo, prov:c.prov, talla:t, stock, min:c.min, vend, sugerido, agotada: stock===0});
+    });
+  });
+  items.sort((a,b)=>(b.agotada-a.agotada)||(b.vend-a.vend));
+  return items;
+}
+function repoIco(i){ return i.agotada ? '<div class="liico" style="background:var(--rl);color:var(--r)"><i class="ti ti-shirt"></i></div>' : '<div class="liico ia"><i class="ti ti-shirt"></i></div>'; }
+function renderRepoCard(){
+  const items = reposicionSugerida();
+  if(!items.length) return `<div class="abox abox-g"><i class="ti ti-circle-check"></i><div><div class="abox-title">Inventario al día</div><div class="abox-sub">Ninguna talla con ventas está por agotarse</div></div></div>`;
+  const agotadas = items.filter(i=>i.agotada).length;
+  const top = items.slice(0,3);
+  return `<div class="card" style="border-left:4px solid var(--a)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div><div style="font-size:15px;font-weight:800">${items.length} talla${items.length>1?'s':''} por reponer</div>
+      <div style="font-size:12px;color:var(--txm)">${agotadas?agotadas+' agotada'+(agotadas>1?'s':'')+' · ':''}según ventas de ${REPO_DIAS} días</div></div>
+      <button onclick="abrirRepo()" style="background:var(--gray);border:none;border-radius:9px;padding:7px 11px;cursor:pointer;font-size:12px;font-weight:700;color:var(--txm)">Ver todo</button>
+    </div>
+    ${top.map(i=>`<div class="li">${repoIco(i)}
+      <div class="libody"><div class="liname">${i.equipo} · ${i.talla}</div><div class="lisub">${i.agotada?'Agotada':'Quedan '+i.stock} · ${i.vend} vend./${REPO_DIAS}d</div></div>
+      <div class="liright" style="text-align:right"><div style="font-weight:800;color:var(--g)">+${i.sugerido}</div><div style="font-size:10px;color:var(--txm)">reponer</div></div>
+    </div>`).join('')}
+  </div>`;
+}
+function renderRepoModal(){
+  const cont = document.getElementById('repo-list');
+  if(!cont) return;
+  const items = reposicionSugerida();
+  if(!items.length){ cont.innerHTML='<div style="text-align:center;color:var(--txm);padding:24px">Nada que reponer por ahora 👍</div>'; return; }
+  const porProv = {};
+  items.forEach(i=>{ (porProv[i.prov]=porProv[i.prov]||[]).push(i); });
+  cont.innerHTML = Object.entries(porProv).map(([prov,arr])=>`
+    <div class="stitle">Proveedor ${prov} · ${arr.length} talla${arr.length>1?'s':''}</div>
+    <div class="card">
+      ${arr.map(i=>`<div class="li">${repoIco(i)}
+        <div class="libody"><div class="liname">${i.equipo} <span style="font-size:11px;color:var(--txm)">${i.tipo}</span> · ${i.talla}</div>
+        <div class="lisub">${i.agotada?'⚠️ Agotada':'Quedan '+i.stock+' (mín '+i.min+')'} · ${i.vend} vend./${REPO_DIAS}d</div></div>
+        <div class="liright" style="text-align:right"><div style="font-weight:800;color:var(--g);font-size:16px">+${i.sugerido}</div><div style="font-size:10px;color:var(--txm)">reponer</div></div>
+      </div>`).join('')}
+    </div>`).join('') + `<button class="abtn abtn-g" onclick="closeM('m-repo');goTo('pedido')" style="margin-top:14px"><i class="ti ti-clipboard-list"></i> Ir a hacer el pedido</button>`;
+}
+function abrirRepo(){ renderRepoModal(); openM('m-repo'); }
+
 function renderHome(){
   const cont=document.getElementById('home-c');
   const criticos=camisetas.filter(c=>stockStatus(c)==='critico');
@@ -1764,6 +1836,8 @@ function renderHome(){
       </div>
       <div class="stitle">Alertas</div>
       ${alertas}
+      <div class="stitle">Reposición sugerida</div>
+      ${renderRepoCard()}
       <div class="stitle">Top ventas</div>
       <div class="card">
         ${top.map(([eq,v],i)=>`<div class="li"><div class="liico ${i===0?'ig':i===1?'ia':'igr'}" style="font-size:15px;font-weight:800">${i+1}</div><div class="libody"><div class="liname">${eq}</div></div><div class="liright" style="font-weight:800;color:var(--g)">${fmt(v)}</div></div>`).join('')||'<div style="font-size:13px;color:var(--txm);padding:8px 0">Sin ventas registradas aún</div>'}
