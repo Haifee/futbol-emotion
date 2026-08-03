@@ -257,7 +257,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 #app.on{display:flex}
 @media (min-width:860px){
   #app.on{
-    max-width:1180px;
+    max-width:1320px;
     display:grid;
     grid-template-columns:240px 1fr;
     grid-template-rows:auto 1fr;
@@ -266,7 +266,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     border-right:1px solid #e2e8f0;
   }
   .topbar{grid-area:top}
-  .pages{grid-area:main;min-height:0}
+  .pages{grid-area:main;min-height:0;overflow-x:hidden}
   .bnav{
     grid-area:nav;
     flex-direction:column;
@@ -274,8 +274,8 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     justify-content:flex-start;
     border-top:none;
     border-right:1px solid #e2e8f0;
-    padding:14px 10px;
-    gap:2px;
+    padding:16px 12px;
+    gap:3px;
   }
   .ni{
     flex:none;
@@ -291,7 +291,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
   .ni.active{background:var(--gl,#dcfce7)}
   .ni.active::after{display:none}
   .nbadge{top:50%;right:14px;transform:translateY(-50%)}
-  .page{padding:26px 30px;max-width:920px;margin:0 auto}
+  .page{padding:28px 40px;max-width:1080px;margin:0 auto}
   .mgrid{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
 }
 </style>
