@@ -60,12 +60,19 @@ class VentaController extends Controller
                 return response()->json(['error' => 'Camiseta no encontrada'], 404);
             }
 
-            $col = 'talla_' . strtolower($request->talla);
+            // Talla válida: evita construir una columna inexistente (y cierra un hueco de validación)
+            $tallasValidas = ['S', 'M', 'L', 'XL', 'XXL', '10', '12', '14', '16', 'U'];
+            $tallaNorm = strtoupper($request->talla);
+            if (!in_array($tallaNorm, $tallasValidas)) {
+                return response()->json(['error' => 'Talla inválida'], 422);
+            }
+            $col = 'talla_' . strtolower($tallaNorm);
             $stockActual = $camiseta->$col ?? 0;
 
+            // Pre-chequeo amable para el caso común; el descuento atómico de abajo es la garantía real
             if ($stockActual < $request->cantidad) {
                 return response()->json([
-                    'error' => "Solo hay {$stockActual} UND en talla {$request->talla}"
+                    'error' => "Solo hay {$stockActual} UND en talla {$tallaNorm}"
                 ], 422);
             }
 
@@ -76,16 +83,25 @@ class VentaController extends Controller
         DB::beginTransaction();
         try {
             if ($camiseta) {
-                DB::table('camisetas')
+                // Descuento atómico y condicional: solo resta si AÚN queda suficiente.
+                // Si dos ventas compiten por la última unidad, la BD sólo deja pasar una.
+                $afectadas = DB::table('camisetas')
                     ->where('id', $request->camiseta_id)
+                    ->where($col, '>=', $request->cantidad)
                     ->decrement($col, $request->cantidad);
+                if ($afectadas === 0) {
+                    DB::rollBack();
+                    return response()->json([
+                        'error' => "Stock insuficiente en talla {$tallaNorm} — otra venta se adelantó"
+                    ], 409);
+                }
             }
 
             // Número de venta para tienda física
             $numeroVenta = null;
             $cliente     = $request->input('cliente');
             if ($request->canal === 'Tienda física') {
-                $contador    = DB::table('configuracion')->where('clave', 'contador_ventas')->first();
+                $contador    = DB::table('configuracion')->where('clave', 'contador_ventas')->lockForUpdate()->first();
                 $num         = $contador ? (int)$contador->valor + 1 : 1;
                 $numeroVenta = '#' . str_pad($num, 3, '0', STR_PAD_LEFT);
                 $cliente     = $numeroVenta;
