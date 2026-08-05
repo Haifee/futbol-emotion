@@ -293,7 +293,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
   .nbadge{top:50%;right:14px;transform:translateY(-50%)}
   .page{padding:28px 40px;max-width:1080px;margin:0 auto}
   .mgrid{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
-  .stock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;align-items:start}
+  .stock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;align-items:start}
   .stock-grid .card{margin-bottom:0}
 }
 </style>
@@ -2058,7 +2058,7 @@ function renderStock(){
       ${stkQuery?`<button onclick="limpiarBusquedaStock()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--txh);font-size:18px"><i class="ti ti-x"></i></button>`:''}
     </div>
     ${camisetas.length===0?`<div class="empty"><i class="ti ti-shirt"></i><p>Sin camisetas en inventario.<br>Pulsa "Nueva camiseta" para empezar.</p></div>`:''}
-    ${(()=>{const lista=filtrarCamisetas(stkQuery);return lista.length===0&&camisetas.length>0?`<div class="empty"><i class="ti ti-search-off"></i><p>Nada coincide con "${stkQuery}"</p></div>`:lista.map(c=>{
+    ${(()=>{const lista=filtrarCamisetas(stkQuery);return lista.length===0&&camisetas.length>0?`<div class="empty"><i class="ti ti-search-off"></i><p>Nada coincide con "${stkQuery}"</p></div>`:'<div class="stock-grid">'+lista.map(c=>{
       const s=stockStatus(c);
       const clr=s==='ok'?'var(--g)':s==='bajo'?'var(--a)':'var(--r)';
       const lbl=s==='ok'?'OK':s==='bajo'?'Stock bajo':'Crítico';
@@ -2087,7 +2087,7 @@ function renderStock(){
           <button class="abtn abtn-g abtn-sm" style="font-size:12px" onclick="pedirEste(${c.id})"><i class="ti ti-clipboard-list"></i> Pedir</button>
         </div>
       </div>`;
-    }).join('')})()}`;
+    }).join('')+'</div>'})()}`;
 }
 function abrirNuevaCamiseta(){
   document.getElementById('ncam-title').textContent='Nuevo producto';
