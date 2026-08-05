@@ -293,6 +293,8 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
   .nbadge{top:50%;right:14px;transform:translateY(-50%)}
   .page{padding:28px 40px;max-width:1080px;margin:0 auto}
   .mgrid{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+  .stock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;align-items:start}
+  .stock-grid .card{margin-bottom:0}
 }
 </style>
 </head>
@@ -2695,7 +2697,7 @@ function renderVerStock(){
   const criticos=camisetas.filter(c=>stockStatus(c)!=='ok');
   cont.innerHTML=`
     ${criticos.length?`<div class="abox abox-a" style="margin-bottom:12px"><i class="ti ti-alert-circle"></i><div><div class="abox-title">Necesitan reposición</div><div class="abox-sub">${criticos.map(c=>nombreProducto(c)).join(' · ')}</div></div></div>`:''}
-    ${camisetas.map(c=>{
+    <div class="stock-grid">${camisetas.map(c=>{
       const s=stockStatus(c);
       const clr=s==='ok'?'var(--g)':s==='bajo'?'var(--a)':'var(--r)';
       const total=Object.values(c.tallas).reduce((a,b)=>a+b,0);
@@ -2708,7 +2710,7 @@ function renderVerStock(){
           ${tallasDe(c).map(t=>`<div class="tbox"><div class="tbox-lab">${t==='U'?'Única':t}</div><div class="tbox-val" style="color:${(c.tallas[t]||0)<c.min?'var(--r)':'var(--tx)'}">${c.tallas[t]||0}</div><div class="tbox-und">UND</div></div>`).join('')}
         </div>
       </div>`;
-    }).join('')}`;
+    }).join('')}</div>`;
 }
 
 // ── FINANZAS (dueño) ──────────────────────────────────────────────────────────
