@@ -295,6 +295,10 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
   .mgrid{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
   .stock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;align-items:start}
   .stock-grid .card{margin-bottom:0}
+  .acc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .acc-grid .bigbtn{margin-bottom:0}
+  .ventas-lista{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:10px;padding:10px}
+  .ventas-lista .li{border-bottom:none;background:var(--gray);border-radius:12px;padding:12px}
 }
 </style>
 </head>
@@ -1830,6 +1834,7 @@ function renderHome(){
       <div class="stitle">Alertas</div>
       ${alertas}
       <div class="stitle">Acciones rápidas</div>
+      <div class="acc-grid">
       <button class="bigbtn" onclick="goTo('pedido')">
         <div class="bbico" style="background:var(--gl);color:var(--g)"><i class="ti ti-clipboard-list"></i></div>
         <div><div class="bbtitle">Hacer un pedido</div><div class="bbsub">Pedir camisetas al proveedor</div></div>
@@ -1854,7 +1859,7 @@ function renderHome(){
         <div class="bbico" style="background:var(--al);color:var(--a)"><i class="ti ti-refresh"></i></div>
         <div><div class="bbtitle">Cambios y devoluciones</div><div class="bbsub">${pendDev>0?pendDev+' pendiente(s)':'Gestionar cambios de talla'}</div></div>
         <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
-      </button>`;
+      </button></div>`;
   } else {
     const ing=transacciones.filter(t=>t.tipo==='ingreso').reduce((s,t)=>s+t.imp,0);
     const gas=transacciones.filter(t=>t.tipo==='gasto').reduce((s,t)=>s+t.imp,0);
@@ -1902,6 +1907,7 @@ function renderHome(){
           </div>`).join('')}
       </div>
       <div class="stitle">Acciones rápidas</div>
+      <div class="acc-grid">
       <button class="bigbtn" onclick="goTo('verstock')">
         <div class="bbico" style="background:var(--gl);color:var(--g)"><i class="ti ti-shirt"></i></div>
         <div><div class="bbtitle">Ver stock</div><div class="bbsub">Inventario completo por tallas</div></div>
@@ -1921,7 +1927,7 @@ function renderHome(){
         <div class="bbico" style="background:var(--bl);color:var(--b)"><i class="ti ti-timeline"></i></div>
         <div><div class="bbtitle">Ver historial</div><div class="bbsub">Todo lo que hizo el encargado hoy</div></div>
         <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
-      </button>`;
+      </button></div>`;
   }
 }
 
@@ -3928,13 +3934,13 @@ function renderMisVentas(){
     <!-- FÍSICAS -->
     <div class="stitle">Tienda física</div>
     ${fisicas.length
-      ? `<div class="card">${fisicas.map(v=>ventaCard(v)).join('')}</div>`
+      ? `<div class="card ventas-lista">${fisicas.map(v=>ventaCard(v)).join('')}</div>`
       : `<div class="card"><div class="empty" style="padding:20px"><i class="ti ti-building-store"></i><p>Sin ventas físicas registradas</p></div></div>`}
 
     <!-- ONLINE -->
     <div class="stitle">Online (Instagram · WhatsApp · Web)</div>
     ${online.length
-      ? `<div class="card">${online.map(v=>ventaCard(v)).join('')}</div>`
+      ? `<div class="card ventas-lista">${online.map(v=>ventaCard(v)).join('')}</div>`
       : `<div class="card"><div class="empty" style="padding:20px"><i class="ti ti-device-mobile"></i><p>Sin ventas online registradas</p></div></div>`}
   `;
 }
