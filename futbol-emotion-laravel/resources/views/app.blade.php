@@ -822,6 +822,12 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 const SERVIDOR = window.location.origin;
 const MODO_SERVIDOR = !!SERVIDOR;
 
+// Zona horaria de la tienda: TODAS las fechas del frontend se calculan en Venezuela,
+// igual que el backend (Laravel = America/Caracas). Antes se usaba UTC y el día se
+// adelantaba después de las 8pm. 'en-CA' formatea como YYYY-MM-DD.
+const TZ = 'America/Caracas';
+const fechaISO = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: TZ });
+
 // ── CAPA DE DATOS (localStorage o Laravel según el modo) ──────────────────────
 const ld=(k,d)=>{try{return JSON.parse(localStorage.getItem('fe4_'+k))||d}catch{return d}};
 const sd=(k,v)=>localStorage.setItem('fe4_'+k,JSON.stringify(v));
@@ -938,7 +944,7 @@ let transacciones=ld('transacciones',[
 ]);
 // ── Rendimiento: por defecto se carga solo lo reciente; el histórico viejo se pide bajo demanda ──
 const MESES_CARGA_INICIAL=3;
-function cutoffCargaInicial(){ const d=new Date(); d.setMonth(d.getMonth()-MESES_CARGA_INICIAL); return d.toISOString().slice(0,10); }
+function cutoffCargaInicial(){ const d=new Date(); d.setMonth(d.getMonth()-MESES_CARGA_INICIAL); return fechaISO(d); }
 let historialCompleto=false;            // true cuando ya se trajo TODO el histórico
 let cutoffCarga=cutoffCargaInicial();   // fecha desde la que están cargadas ventas/transacciones
 let ids={ped:1,env:4,dev:2,ven:4,tx:5,c:6,ventaTienda:ld('ventaTienda',1)};
@@ -1728,7 +1734,7 @@ function getHora(){
 
 // ══ REPOSICIÓN: cruza stock actual vs. ventas reales para sugerir qué y cuánto pedir ══
 const REPO_DIAS = 30;
-function fechaHace(dias){ const d=new Date(); d.setDate(d.getDate()-dias); return d.toISOString().slice(0,10); }
+function fechaHace(dias){ const d=new Date(); d.setDate(d.getDate()-dias); return fechaISO(d); }
 function reposicionSugerida(dias){
   dias = dias || REPO_DIAS;
   const desde = fechaHace(dias);
@@ -2820,7 +2826,7 @@ function renderCaja(){
   // Calcular inicio de semana (lunes)
   const diasSemana=ahora.getDay()===0?6:ahora.getDay()-1;
   const inicioSem=new Date(ahora); inicioSem.setDate(ahora.getDate()-diasSemana);
-  const inicioSemStr=inicioSem.toISOString().slice(0,10);
+  const inicioSemStr=fechaISO(inicioSem);
 
   // Calcular inicio de mes
   const inicioMesStr=`${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,'0')}-01`;
@@ -3144,7 +3150,7 @@ function datosPeriodo(clave){
   const inicioSem=new Date(ahora); inicioSem.setDate(ahora.getDate()-diasSemana);
   const rangos={
     dia:{desde:hoyStr,titulo:'Cierre del día',etiqueta:hoyStr},
-    sem:{desde:inicioSem.toISOString().slice(0,10),titulo:'Cierre de la semana',etiqueta:inicioSem.toISOString().slice(0,10)+' al '+hoyStr},
+    sem:{desde:fechaISO(inicioSem),titulo:'Cierre de la semana',etiqueta:fechaISO(inicioSem)+' al '+hoyStr},
     mes:{desde:ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0')+'-01',titulo:'Cierre del mes',etiqueta:hoyStr.slice(0,7)},
   };
   const r=rangos[clave];
@@ -3745,7 +3751,7 @@ async function confirmarBorrar(tipo){
   }
   toast('Datos borrados ✓'); renderAjustes();
 }
-const hoy=()=>new Date().toISOString().slice(0,10);
+const hoy=()=>fechaISO();
 function renderVentas(){ renderMisVentas(); }
 
 // ── SISTEMA DE ACTIVIDAD / HISTORIAL / NOTIFICACIONES ─────────────────────────
