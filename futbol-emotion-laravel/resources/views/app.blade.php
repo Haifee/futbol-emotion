@@ -431,6 +431,13 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 </div>
 
 <!-- MODAL: EXPORTAR REPORTE -->
+<div class="mbg" id="m-analitica">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle">Analítica de ventas <button class="mclose" onclick="closeM('m-analitica')"><i class="ti ti-x"></i></button></div>
+    <div id="analitica-body"></div>
+  </div>
+</div>
 <div class="mbg" id="m-repo">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -1802,6 +1809,67 @@ function renderRepoModal(){
 }
 function abrirRepo(){ renderRepoModal(); openM('m-repo'); }
 
+// ══ ANALÍTICA DE VENTAS (sobre la ventana cargada: últimos 3 meses por defecto) ══
+function _semKey(f){ const [y,m,d]=f.split('-').map(Number); return Math.floor((Date.UTC(y,m-1,d)/86400000+3)/7); }
+function _lunesSem(k){ const dt=new Date((k*7-3)*86400000); return dt.toISOString().slice(5,10).replace('-','/'); }
+function analiticaDatos(){
+  const vts=ventas;
+  const totalRev=vts.reduce((a,v)=>a+(v.imp||0),0);
+  const nV=vts.length;
+  const ticket=nV?totalRev/nV:0;
+  let ing=0,gas=0;
+  transacciones.forEach(t=>{ if(t.tipo==='ingreso') ing+=(t.imp||0); else if(t.tipo==='gasto') gas+=(t.imp||0); });
+  const margen= ing>0 ? Math.round((ing-gas)/ing*100) : 0;
+  const porEq={};
+  vts.forEach(v=>{ const e=porEq[v.equipo]=porEq[v.equipo]||{rev:0,u:0}; e.rev+=(v.imp||0); e.u+=(v.cant||1); });
+  const top=Object.entries(porEq).map(([eq,o])=>({eq,rev:o.rev,u:o.u})).sort((a,b)=>b.rev-a.rev).slice(0,6);
+  let fisRev=0,fisN=0,onRev=0,onN=0;
+  vts.forEach(v=>{ if(v.canal==='Tienda física'){fisRev+=(v.imp||0);fisN++;} else {onRev+=(v.imp||0);onN++;} });
+  const porSem={};
+  vts.forEach(v=>{ if(!v.fecha) return; const k=_semKey(v.fecha); porSem[k]=(porSem[k]||0)+(v.imp||0); });
+  const hoyK=_semKey(hoy()); const serie=[];
+  for(let k=hoyK-7;k<=hoyK;k++) serie.push({rev:porSem[k]||0,label:_lunesSem(k)});
+  return {totalRev,nV,ticket,margen,top,fisRev,fisN,onRev,onN,serie};
+}
+function renderAnaliticaModal(){
+  const cont=document.getElementById('analitica-body'); if(!cont) return;
+  const a=analiticaDatos();
+  const maxRev=Math.max(1,...a.serie.map(s=>s.rev));
+  const totCanal=(a.fisRev+a.onRev)||1;
+  cont.innerHTML=`
+    <div class="mgrid" style="margin-bottom:14px">
+      <div class="mc mc-g"><div class="mcl">Total vendido</div><div class="mcv">${fmt(a.totalRev)}</div></div>
+      <div class="mc mc-b"><div class="mcl">Ticket promedio</div><div class="mcv">${fmt(a.ticket)}</div></div>
+      <div class="mc mc-p"><div class="mcl">Margen del negocio</div><div class="mcv">${a.margen}%</div></div>
+      <div class="mc"><div class="mcl">N.º de ventas</div><div class="mcv">${a.nV}</div></div>
+    </div>
+    <div class="stitle">Tendencia semanal</div>
+    <div class="card">
+      <div style="display:flex;align-items:flex-end;gap:6px;height:120px">
+        ${a.serie.map(sm=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">
+          <div style="font-size:9px;color:var(--txm);margin-bottom:3px">${sm.rev>0?'$'+Math.round(sm.rev):''}</div>
+          <div style="width:100%;background:var(--g);border-radius:5px 5px 0 0;height:${Math.max(2,Math.round(sm.rev/maxRev*88))}px"></div>
+          <div style="font-size:9px;color:var(--txh);margin-top:4px">${sm.label}</div>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="stitle">Top productos (por plata)</div>
+    <div class="card">
+      ${a.top.length?a.top.map((t,i)=>`<div class="li">
+        <div class="liico ${i===0?'ig':i===1?'ia':'igr'}" style="font-weight:800">${i+1}</div>
+        <div class="libody"><div class="liname">${t.eq}</div><div class="lisub">${t.u} unidad${t.u!==1?'es':''}</div></div>
+        <div class="liright"><b style="color:var(--g)">${fmt(t.rev)}</b></div>
+      </div>`).join(''):'<div style="text-align:center;color:var(--txm);padding:16px">Sin ventas en el período</div>'}
+    </div>
+    <div class="stitle">Por canal</div>
+    <div class="card">
+      <div class="li"><div class="liico ig"><i class="ti ti-building-store"></i></div><div class="libody"><div class="liname">Tienda física</div><div class="lisub">${a.fisN} venta${a.fisN!==1?'s':''} · ${Math.round(a.fisRev/totCanal*100)}%</div></div><div class="liright"><b>${fmt(a.fisRev)}</b></div></div>
+      <div class="li"><div class="liico ip"><i class="ti ti-device-mobile"></i></div><div class="libody"><div class="liname">Online (IG · WhatsApp · Web)</div><div class="lisub">${a.onN} venta${a.onN!==1?'s':''} · ${Math.round(a.onRev/totCanal*100)}%</div></div><div class="liright"><b>${fmt(a.onRev)}</b></div></div>
+    </div>
+    <div style="font-size:11px;color:var(--txh);text-align:center;margin-top:12px">Basado en los últimos 3 meses cargados. Para todo el historial usa "Cargar todo" en Inicio.</div>`;
+}
+function abrirAnalitica(){ renderAnaliticaModal(); openM('m-analitica'); }
+
 function renderHome(){
   const cont=document.getElementById('home-c');
   const criticos=camisetas.filter(c=>stockStatus(c)==='critico');
@@ -1835,6 +1903,11 @@ function renderHome(){
       ${alertas}
       <div class="stitle">Acciones rápidas</div>
       <div class="acc-grid">
+      <button class="bigbtn" onclick="abrirAnalitica()">
+        <div class="bbico" style="background:var(--pl);color:var(--p)"><i class="ti ti-chart-line"></i></div>
+        <div><div class="bbtitle">Analítica de ventas</div><div class="bbsub">Más vendidos, tendencia y canales</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
+      </button>
       <button class="bigbtn" onclick="goTo('pedido')">
         <div class="bbico" style="background:var(--gl);color:var(--g)"><i class="ti ti-clipboard-list"></i></div>
         <div><div class="bbtitle">Hacer un pedido</div><div class="bbsub">Pedir camisetas al proveedor</div></div>
