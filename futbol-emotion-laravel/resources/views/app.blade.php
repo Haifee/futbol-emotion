@@ -431,6 +431,19 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 </div>
 
 <!-- MODAL: EXPORTAR REPORTE -->
+<div class="mbg" id="m-buscarfecha">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle">Ventas por fecha <button class="mclose" onclick="closeM('m-buscarfecha')"><i class="ti ti-x"></i></button></div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button id="bf-tab-dia" onclick="bfModo('dia')">Por día</button>
+      <button id="bf-tab-mes" onclick="bfModo('mes')">Por mes</button>
+    </div>
+    <input type="date" id="bf-dia" class="fi" onchange="bfBuscar()">
+    <input type="month" id="bf-mes" class="fi" style="display:none" onchange="bfBuscar()">
+    <div id="bf-result" style="margin-top:14px"></div>
+  </div>
+</div>
 <div class="mbg" id="m-analitica">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -1870,6 +1883,63 @@ function renderAnaliticaModal(){
 }
 function abrirAnalitica(){ renderAnaliticaModal(); openM('m-analitica'); }
 
+// ══ VENTAS POR FECHA: revisar cualquier día o mes ══
+function datosPeriodoLibre(filtroFn){
+  const vts = ventas.filter(v=>v.fecha && filtroFn(v.fecha));
+  const txs = transacciones.filter(t=>t.fecha && filtroFn(t.fecha));
+  let ing=0,gas=0;
+  txs.forEach(t=>{ if(t.tipo==='ingreso') ing+=(t.imp||0); else if(t.tipo==='gasto') gas+=(t.imp||0); });
+  return {vts, ing, gas, neto:ing-gas};
+}
+let bfModoActual='dia';
+function bfSetTabs(){
+  const dia=bfModoActual==='dia';
+  const on='flex:1;padding:9px;border-radius:9px;border:none;cursor:pointer;font-size:13px;font-weight:700;background:var(--g);color:#fff';
+  const off='flex:1;padding:9px;border-radius:9px;border:none;cursor:pointer;font-size:13px;font-weight:700;background:var(--gray);color:var(--txm)';
+  document.getElementById('bf-tab-dia').style.cssText=dia?on:off;
+  document.getElementById('bf-tab-mes').style.cssText=dia?off:on;
+  document.getElementById('bf-dia').style.display=dia?'block':'none';
+  document.getElementById('bf-mes').style.display=dia?'none':'block';
+}
+function abrirBuscarFecha(){
+  bfModoActual='dia';
+  document.getElementById('bf-dia').value=hoy();
+  document.getElementById('bf-mes').value=hoy().slice(0,7);
+  bfSetTabs();
+  openM('m-buscarfecha');
+  bfBuscar();
+}
+function bfModo(m){ bfModoActual=m; bfSetTabs(); bfBuscar(); }
+async function bfBuscar(){
+  const dia=bfModoActual==='dia';
+  const val = dia ? document.getElementById('bf-dia').value : document.getElementById('bf-mes').value;
+  const cont=document.getElementById('bf-result');
+  if(!val){ cont.innerHTML=''; return; }
+  // Si la fecha es más vieja que lo cargado, traemos el historial completo primero
+  const refDate = dia ? val : val+'-01';
+  if(!historialCompleto && refDate < cutoffCarga){
+    cont.innerHTML='<div style="text-align:center;color:var(--txm);padding:18px">Cargando historial completo...</div>';
+    await cargarHistorialCompleto();
+  }
+  const filtro = dia ? (fe=>fe===val) : (fe=>fe.slice(0,7)===val);
+  const d = datosPeriodoLibre(filtro);
+  cont.innerHTML=`
+    <div class="mgrid" style="margin-bottom:12px">
+      <div class="mc mc-g"><div class="mcl">Ingresos</div><div class="mcv">${fmt(d.ing)}</div></div>
+      <div class="mc mc-r"><div class="mcl">Gastos</div><div class="mcv">${fmt(d.gas)}</div></div>
+      <div class="mc mc-p"><div class="mcl">Beneficio</div><div class="mcv">${fmt(d.neto)}</div></div>
+      <div class="mc"><div class="mcl">Ventas</div><div class="mcv">${d.vts.length}</div></div>
+    </div>
+    <div class="stitle">Ventas ${dia?'del día':'del mes'}</div>
+    <div class="card">
+      ${d.vts.length ? [...d.vts].reverse().map(v=>`<div class="li">
+        <div class="liico ig"><i class="ti ti-shopping-cart"></i></div>
+        <div class="libody"><div class="liname">${v.equipo}${v.talla&&v.talla!=='—'?' · '+v.talla:''}</div><div class="lisub">${v.canal||''}${v.cliente?' · '+v.cliente:''}${!dia&&v.fecha?' · '+v.fecha:''}</div></div>
+        <div class="liright"><b style="color:var(--g)">${fmt(v.imp)}</b></div>
+      </div>`).join('') : '<div style="text-align:center;color:var(--txm);padding:16px">Sin ventas en '+(dia?'este día':'este mes')+'</div>'}
+    </div>`;
+}
+
 function renderHome(){
   const cont=document.getElementById('home-c');
   const criticos=camisetas.filter(c=>stockStatus(c)==='critico');
@@ -1906,6 +1976,11 @@ function renderHome(){
       <button class="bigbtn" onclick="abrirAnalitica()">
         <div class="bbico" style="background:var(--pl);color:var(--p)"><i class="ti ti-chart-line"></i></div>
         <div><div class="bbtitle">Analítica de ventas</div><div class="bbsub">Más vendidos, tendencia y canales</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
+      </button>
+      <button class="bigbtn" onclick="abrirBuscarFecha()">
+        <div class="bbico" style="background:var(--bl);color:var(--b)"><i class="ti ti-calendar-search"></i></div>
+        <div><div class="bbtitle">Ventas por fecha</div><div class="bbsub">Revisa cualquier día o mes</div></div>
         <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
       </button>
       <button class="bigbtn" onclick="goTo('pedido')">
