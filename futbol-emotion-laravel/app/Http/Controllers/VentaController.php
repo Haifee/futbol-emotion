@@ -175,6 +175,133 @@ class VentaController extends Controller
     }
 
     // Editar una venta existente (corrige también stock y transacción vinculada)
+    // Venta multi-producto (carrito) con pago dividido, TODO en una sola transacción.
+    // Si cualquier línea falla (p.ej. stock insuficiente), se revierte la venta completa.
+    public function storeCarrito(Request $request)
+    {
+        $request->validate([
+            'lineas'            => 'required|array|min:1',
+            'lineas.*.cantidad' => 'required|integer|min:1',
+            'lineas.*.importe'  => 'required|numeric|min:0',
+            'canal'             => 'required|string|max:40',
+        ]);
+
+        $lineas = $request->input('lineas');
+        $canal  = $request->input('canal');
+        $pagos  = $request->input('pagos', []);
+        $tallasValidas = ['S', 'M', 'L', 'XL', 'XXL', '10', '12', '14', '16', 'U'];
+
+        DB::beginTransaction();
+        try {
+            // Un solo número de venta para toda la compra (si es tienda física)
+            $numeroVenta = null;
+            $clienteBase = $request->input('cliente');
+            if ($canal === 'Tienda física') {
+                $contador    = DB::table('configuracion')->where('clave', 'contador_ventas')->lockForUpdate()->first();
+                $num         = $contador ? (int) $contador->valor + 1 : 1;
+                $numeroVenta = '#' . str_pad($num, 3, '0', STR_PAD_LEFT);
+                $clienteBase = $numeroVenta;
+                DB::table('configuracion')->updateOrInsert(
+                    ['clave' => 'contador_ventas'],
+                    ['valor' => $num, 'updated_at' => now()]
+                );
+            }
+
+            $idsVentas = [];
+            $total     = 0;
+            $descItems = [];
+
+            foreach ($lineas as $ln) {
+                $camId   = $ln['camiseta_id'] ?? null;
+                $talla   = $ln['talla'] ?? '';
+                $cant    = (int) ($ln['cantidad'] ?? 1);
+                $importe = (float) ($ln['importe'] ?? 0);
+                $equipoNombre = $ln['equipo'] ?? 'Producto';
+
+                if ($camId) {
+                    $camiseta = DB::table('camisetas')->find($camId);
+                    if (!$camiseta) {
+                        DB::rollBack();
+                        return response()->json(['error' => "Un producto del carrito ya no existe"], 404);
+                    }
+                    $tallaNorm = strtoupper($talla);
+                    if (!in_array($tallaNorm, $tallasValidas)) {
+                        DB::rollBack();
+                        return response()->json(['error' => 'Talla inválida'], 422);
+                    }
+                    $col = 'talla_' . strtolower($tallaNorm);
+                    // Descuento atómico y condicional (a prueba de carreras)
+                    $afectadas = DB::table('camisetas')
+                        ->where('id', $camId)
+                        ->where($col, '>=', $cant)
+                        ->decrement($col, $cant);
+                    if ($afectadas === 0) {
+                        DB::rollBack();
+                        return response()->json([
+                            'error' => "Stock insuficiente en {$camiseta->equipo} talla {$tallaNorm}"
+                        ], 409);
+                    }
+                    $equipoNombre = $camiseta->equipo . ' ' . $camiseta->tipo . ' ' . $camiseta->temporada;
+                }
+
+                $id = DB::table('ventas')->insertGetId([
+                    'camiseta_id'  => $camId,
+                    'equipo'       => $equipoNombre,
+                    'talla'        => $talla,
+                    'cantidad'     => $cant,
+                    'canal'        => $canal,
+                    'cliente'      => $clienteBase,
+                    'numero_venta' => $numeroVenta,
+                    'importe'      => $importe,
+                    'fecha'        => now()->toDateString(),
+                    'created_at'   => now(),
+                    'updated_at'   => now(),
+                ]);
+                $idsVentas[] = $id;
+                $total      += $importe;
+                $descItems[] = ($ln['equipo'] ?? $equipoNombre) . ($talla ? " {$talla}" : '') . " x{$cant}";
+            }
+
+            $ventaPrincipal = $idsVentas[0];
+
+            // Una sola transacción de ingreso por el TOTAL de la compra
+            $descTx = count($lineas) > 1
+                ? ('Venta de ' . count($lineas) . ' productos: ' . implode(', ', array_slice($descItems, 0, 3)) . (count($descItems) > 3 ? '…' : ''))
+                : ('Venta ' . $descItems[0]);
+            DB::table('transacciones')->insert([
+                'venta_id'    => $ventaPrincipal,
+                'tipo'        => 'ingreso',
+                'descripcion' => mb_substr($descTx, 0, 190),
+                'importe'     => $total,
+                'canal'       => $canal,
+                'fecha'       => now()->toDateString(),
+                'created_at'  => now(),
+                'updated_at'  => now(),
+            ]);
+
+            // Pagos mixtos (uno o varios métodos), atados a la venta principal del grupo
+            if (is_array($pagos)) {
+                foreach ($pagos as $pg) {
+                    if (is_array($pg) && !empty($pg['metodo'])) {
+                        $this->guardarPago($pg, $ventaPrincipal, (float) ($pg['monto'] ?? 0));
+                    }
+                }
+            }
+
+            DB::commit();
+
+            $ventas = DB::table('ventas')->whereIn('id', $idsVentas)->orderBy('id')->get();
+            return response()->json([
+                'ventas'       => $ventas,
+                'numero_venta' => $numeroVenta,
+                'total'        => $total,
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'No se pudo registrar la venta: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function update(Request $request, $id)
     {
         $venta = DB::table('ventas')->find($id);
