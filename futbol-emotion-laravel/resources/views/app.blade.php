@@ -1881,7 +1881,11 @@ function renderAnaliticaModal(){
     </div>
     <div style="font-size:11px;color:var(--txh);text-align:center;margin-top:12px">Basado en los últimos 3 meses cargados. Para todo el historial usa "Cargar todo" en Inicio.</div>`;
 }
-function abrirAnalitica(){ renderAnaliticaModal(); openM('m-analitica'); }
+function abrirAnalitica(){
+  openM('m-analitica');
+  try{ renderAnaliticaModal(); }
+  catch(e){ const c=document.getElementById('analitica-body'); if(c) c.innerHTML='<div style="padding:18px;color:var(--txm);text-align:center">No se pudo cargar la analítica.</div>'; console.error('Analítica:',e); }
+}
 
 // ══ VENTAS POR FECHA: revisar cualquier día o mes ══
 function datosPeriodoLibre(filtroFn){
@@ -1902,12 +1906,14 @@ function bfSetTabs(){
   document.getElementById('bf-mes').style.display=dia?'none':'block';
 }
 function abrirBuscarFecha(){
-  bfModoActual='dia';
-  document.getElementById('bf-dia').value=hoy();
-  document.getElementById('bf-mes').value=hoy().slice(0,7);
-  bfSetTabs();
   openM('m-buscarfecha');
-  bfBuscar();
+  try{
+    bfModoActual='dia';
+    const di=document.getElementById('bf-dia'); if(di) di.value=hoy();
+    const me=document.getElementById('bf-mes'); if(me) me.value=hoy().slice(0,7);
+    bfSetTabs();
+    bfBuscar();
+  }catch(e){ console.error('Buscador:',e); }
 }
 function bfModo(m){ bfModoActual=m; bfSetTabs(); bfBuscar(); }
 async function bfBuscar(){
@@ -2199,7 +2205,15 @@ function limpiarBusquedaStock(){
 function renderStock(){
   const cont=document.getElementById('stk-c');
   const criticos=camisetas.filter(c=>stockStatus(c)==='critico');
+  const totalInv=camisetas.reduce((sm,c)=>sm+Object.values(c.tallas).reduce((a,b)=>a+b,0),0);
   cont.innerHTML=`
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div>
+        <div style="font-size:11px;color:var(--txm);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Total en inventario</div>
+        <div style="font-size:24px;font-weight:800">${totalInv} <span style="font-size:13px;font-weight:700;color:var(--txm)">unidades</span></div>
+      </div>
+      <div style="text-align:right;font-size:13px;color:var(--txm);font-weight:700">${camisetas.length} modelo${camisetas.length!==1?'s':''}</div>
+    </div>
     ${criticos.length?`<div class="abox abox-r" style="margin-bottom:12px"><i class="ti ti-alert-triangle"></i><div><div class="abox-title">Stock crítico — reponer urgente</div><div class="abox-sub">${criticos.map(c=>nombreProducto(c)).join(' · ')}</div></div></div>`:''}
     <button class="abtn abtn-g" onclick="abrirScannerInventario()" style="margin-top:0;margin-bottom:9px"><i class="ti ti-scan"></i> Escanear mercancía (entrada de stock)</button>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px">
