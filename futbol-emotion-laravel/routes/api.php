@@ -34,6 +34,7 @@ Route::middleware('auth.pin')->group(function () {
     // Ventas
     Route::get('/ventas',             [VentaController::class, 'index']);
     Route::post('/ventas',            [VentaController::class, 'store']);
+    Route::post('/ventas/carrito',    [VentaController::class, 'storeCarrito']);
     Route::get('/ventas/resumen',     [VentaController::class, 'resumen']);
     Route::put('/ventas/{id}',        [VentaController::class, 'update']);
     Route::delete('/ventas/{id}',     [VentaController::class, 'destroy']);
