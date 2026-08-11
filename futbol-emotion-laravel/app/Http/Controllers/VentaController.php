@@ -150,7 +150,7 @@ class VentaController extends Controller
 
             // ── Notificaciones push ──
             $actor = $request->input('_rol') === 'owner' ? 'owner' : 'manager';
-            $nombreProd = $request->input('equipo', 'Producto');
+            $nombreProd = $equipoNombre ?: 'Producto';
             $tallaTxt = ($request->talla && $request->talla !== '—') ? (' talla ' . $request->talla) : '';
             PushService::evento('venta', $actor, 'Nueva venta 💰',
                 "{$nombreProd}{$tallaTxt} · \${$request->importe}");
