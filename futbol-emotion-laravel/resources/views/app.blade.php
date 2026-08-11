@@ -2011,16 +2011,6 @@ function renderHome(){
       ${alertas}
       <div class="stitle">Acciones rápidas</div>
       <div class="acc-grid">
-      <button class="bigbtn" onclick="abrirAnalitica()">
-        <div class="bbico" style="background:var(--pl);color:var(--p)"><i class="ti ti-chart-line"></i></div>
-        <div><div class="bbtitle">Analítica de ventas</div><div class="bbsub">Más vendidos, tendencia y canales</div></div>
-        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
-      </button>
-      <button class="bigbtn" onclick="abrirBuscarFecha()">
-        <div class="bbico" style="background:var(--bl);color:var(--b)"><i class="ti ti-calendar-search"></i></div>
-        <div><div class="bbtitle">Ventas por fecha</div><div class="bbsub">Revisa cualquier día o mes</div></div>
-        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
-      </button>
       <button class="bigbtn" onclick="goTo('pedido')">
         <div class="bbico" style="background:var(--gl);color:var(--g)"><i class="ti ti-clipboard-list"></i></div>
         <div><div class="bbtitle">Hacer un pedido</div><div class="bbsub">Pedir camisetas al proveedor</div></div>
@@ -2094,6 +2084,16 @@ function renderHome(){
       </div>
       <div class="stitle">Acciones rápidas</div>
       <div class="acc-grid">
+      <button class="bigbtn" onclick="abrirAnalitica()">
+        <div class="bbico" style="background:var(--pl);color:var(--p)"><i class="ti ti-chart-line"></i></div>
+        <div><div class="bbtitle">Analítica de ventas</div><div class="bbsub">Más vendidos, tendencia y canales</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
+      </button>
+      <button class="bigbtn" onclick="abrirBuscarFecha()">
+        <div class="bbico" style="background:var(--bl);color:var(--b)"><i class="ti ti-calendar-search"></i></div>
+        <div><div class="bbtitle">Ventas por fecha</div><div class="bbsub">Revisa cualquier día o mes</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
+      </button>
       <button class="bigbtn" onclick="goTo('verstock')">
         <div class="bbico" style="background:var(--gl);color:var(--g)"><i class="ti ti-shirt"></i></div>
         <div><div class="bbtitle">Ver stock</div><div class="bbsub">Inventario completo por tallas</div></div>
