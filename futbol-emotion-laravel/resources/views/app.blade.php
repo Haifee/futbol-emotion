@@ -541,6 +541,38 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 </div>
 
 <!-- MODAL: NUEVA VENTA -->
+<div class="mbg" id="m-carrito">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle">Venta con varios productos <button class="mclose" onclick="closeM('m-carrito')"><i class="ti ti-x"></i></button></div>
+    <label class="fl">Tipo de venta</label>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button id="cart-tipo-tienda" onclick="carritoTipoSet('tienda')">Tienda física</button>
+      <button id="cart-tipo-online" onclick="carritoTipoSet('online')">Online</button>
+    </div>
+    <div id="cart-cliente-wrap" style="display:none;margin-bottom:6px">
+      <label class="fl">Cliente</label>
+      <input class="fi" id="cart-cliente" placeholder="Nombre del cliente" oninput="carritoActualizarConfirm()">
+      <label class="fl" style="margin-top:8px">Canal</label>
+      <select class="fi" id="cart-canal"><option>Instagram</option><option>WhatsApp</option><option>Web</option></select>
+    </div>
+    <div class="stitle">Agregar producto</div>
+    <select class="fi" id="cart-cam" onchange="carritoAutoPrecio()"></select>
+    <select class="fi" id="cart-talla" style="margin-top:8px"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option>10</option><option>12</option><option>14</option><option>16</option><option>U</option></select>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <div style="flex:1"><label class="fl">Cantidad</label><input class="fi" id="cart-cant" type="number" min="1" value="1"></div>
+      <div style="flex:1"><label class="fl">Precio ($ c/u)</label><input class="fi" id="cart-precio" type="number" min="0" step="0.01"></div>
+    </div>
+    <button class="abtn abtn-gray abtn-sm" onclick="carritoAgregarProducto()" style="margin-top:8px"><i class="ti ti-plus"></i> Agregar al carrito</button>
+    <div class="stitle">Carrito</div>
+    <div id="cart-items"></div>
+    <div class="stitle">Pago dividido</div>
+    <div id="cart-pagos"></div>
+    <button class="abtn abtn-gray abtn-sm" onclick="carritoAgregarPago()" style="margin-top:6px"><i class="ti ti-plus"></i> Agregar método de pago</button>
+    <div id="cart-resumen-pago"></div>
+    <button class="abtn abtn-g" id="cart-confirm" onclick="confirmarCarrito()" style="margin-top:14px;opacity:.4;pointer-events:none"><i class="ti ti-check"></i> Registrar venta</button>
+  </div>
+</div>
 <div class="mbg" id="m-venta">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -2474,6 +2506,138 @@ async function saveEnvio(){
 // ── VENTAS (encargado) ────────────────────────────────────────────────────────
 let modoVenta=null; // 'libre' o 'stock'
 
+// ══ CARRITO: venta multi-producto con pago dividido (usa POST /ventas/carrito) ══
+let carrito=[];       // {camId, equipo, talla, cant, precioUnit}
+let carritoPagos=[];  // {metodo, monto}  (monto en $)
+let carritoTipo=null; // 'tienda' | 'online'
+let carritoGuardando=false;
+
+function abrirCarrito(){
+  carrito=[]; carritoPagos=[]; carritoTipo=null;
+  const sel=document.getElementById('cart-cam');
+  sel.innerHTML=camisetas.length
+    ? camisetas.map(c=>`<option value="${c.id}">${nombreProducto(c)}</option>`).join('')
+    : '<option value="">Sin camisetas en inventario</option>';
+  document.getElementById('cart-cant').value=1;
+  document.getElementById('cart-cliente').value='';
+  document.getElementById('cart-cliente-wrap').style.display='none';
+  carritoTipoBotones();
+  carritoAutoPrecio();
+  carritoRenderItems();
+  carritoRenderPagos();
+  openM('m-carrito');
+}
+function carritoTipoBotones(){
+  const on='flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--g);background:var(--gl);color:var(--gd);font-weight:700;cursor:pointer';
+  const off='flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--grayb);background:#fff;color:var(--txm);font-weight:700;cursor:pointer';
+  document.getElementById('cart-tipo-tienda').style.cssText=carritoTipo==='tienda'?on:off;
+  document.getElementById('cart-tipo-online').style.cssText=carritoTipo==='online'?on:off;
+}
+function carritoTipoSet(t){
+  carritoTipo=t;
+  document.getElementById('cart-cliente-wrap').style.display=(t==='online')?'block':'none';
+  carritoTipoBotones(); carritoActualizarConfirm();
+}
+function carritoAutoPrecio(){
+  const c=camisetas.find(x=>x.id===+document.getElementById('cart-cam').value);
+  if(c && c.precio!=null) document.getElementById('cart-precio').value=(+c.precio).toFixed(2);
+}
+function carritoEnCarrito(camId,talla){ return carrito.filter(it=>it.camId===camId&&it.talla===talla).reduce((a,it)=>a+it.cant,0); }
+function carritoAgregarProducto(){
+  const camId=+document.getElementById('cart-cam').value;
+  const talla=document.getElementById('cart-talla').value;
+  const cant=+document.getElementById('cart-cant').value||1;
+  const precio=+document.getElementById('cart-precio').value||0;
+  const c=camisetas.find(x=>x.id===camId);
+  if(!c){ toast('Selecciona un producto'); return; }
+  const stock=c.tallas[talla]||0;
+  const ya=carritoEnCarrito(camId,talla);
+  if(ya+cant>stock){ toast(`Solo hay ${stock} UND en talla ${talla}${ya?` (ya tienes ${ya} en el carrito)`:''}`); return; }
+  carrito.push({camId, equipo:nombreProducto(c), talla, cant, precioUnit:precio});
+  document.getElementById('cart-cant').value=1;
+  carritoRenderItems(); carritoRenderPagos();
+}
+function carritoQuitarProducto(i){ carrito.splice(i,1); carritoRenderItems(); carritoRenderPagos(); }
+function carritoTotal(){ return carrito.reduce((a,it)=>a+it.precioUnit*it.cant,0); }
+function carritoPagado(){ return carritoPagos.reduce((a,p)=>a+(+p.monto||0),0); }
+function carritoRenderItems(){
+  const cont=document.getElementById('cart-items');
+  if(!carrito.length){ cont.innerHTML='<div style="text-align:center;color:var(--txm);padding:12px;font-size:13px">Aún no has agregado productos</div>'; carritoActualizarConfirm(); return; }
+  cont.innerHTML=`<div class="card" style="padding:4px 12px">${carrito.map((it,i)=>`<div class="li">
+    <div class="libody"><div class="liname">${it.equipo} · ${it.talla}</div><div class="lisub">${it.cant} × ${fmt(it.precioUnit)}</div></div>
+    <div class="liright" style="display:flex;align-items:center;gap:12px"><b style="color:var(--g)">${fmt(it.precioUnit*it.cant)}</b><button onclick="carritoQuitarProducto(${i})" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:17px;line-height:1"><i class="ti ti-trash"></i></button></div>
+  </div>`).join('')}
+    <div class="li" style="border-top:2px solid var(--grayb)"><div class="libody"><div class="liname">Total</div></div><div class="liright"><b style="font-size:18px">${fmt(carritoTotal())}</b></div></div>
+  </div>`;
+  carritoActualizarConfirm();
+}
+function carritoAgregarPago(){
+  const restante=+(carritoTotal()-carritoPagado()).toFixed(2);
+  carritoPagos.push({metodo:'efectivo_usd', monto:Math.max(0,restante)});
+  carritoRenderPagos();
+}
+function carritoQuitarPago(i){ carritoPagos.splice(i,1); carritoRenderPagos(); }
+function carritoSetPagoMetodo(i,m){ carritoPagos[i].metodo=m; carritoActualizarConfirm(); }
+function carritoSetPagoMonto(i,v){ carritoPagos[i].monto=+v||0; carritoRenderResumen(); carritoActualizarConfirm(); }
+function carritoRenderPagos(){
+  const cont=document.getElementById('cart-pagos');
+  cont.innerHTML=carritoPagos.map((p,i)=>{
+    const opts=Object.entries(METODOS_PAGO).map(([k,m])=>`<option value="${k}" ${k===p.metodo?'selected':''}>${m.label}</option>`).join('');
+    return `<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+      <select class="fi" style="flex:1" onchange="carritoSetPagoMetodo(${i},this.value)">${opts}</select>
+      <input class="fi" style="width:96px" type="number" min="0" step="0.01" value="${p.monto}" placeholder="$" oninput="carritoSetPagoMonto(${i},this.value)">
+      <button onclick="carritoQuitarPago(${i})" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:18px"><i class="ti ti-x"></i></button>
+    </div>`;
+  }).join('');
+  carritoRenderResumen(); carritoActualizarConfirm();
+}
+function carritoRenderResumen(){
+  const total=carritoTotal(), pagado=carritoPagado(), dif=+(total-pagado).toFixed(2);
+  let msg,color;
+  if(Math.abs(dif)<0.01){ msg='✓ Pago completo'; color='var(--g)'; }
+  else if(dif>0){ msg=`Faltan ${fmt(dif)}`; color='var(--ad)'; }
+  else { msg=`Sobran ${fmt(-dif)}`; color='var(--r)'; }
+  document.getElementById('cart-resumen-pago').innerHTML=`<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:12.5px;padding:8px 2px"><span style="color:var(--txm)">Total ${fmt(total)} · Pagado ${fmt(pagado)}</span><b style="color:${color}">${msg}</b></div>`;
+}
+function carritoActualizarConfirm(){
+  const btn=document.getElementById('cart-confirm'); if(!btn) return;
+  const total=carritoTotal();
+  const clienteOk = carritoTipo==='tienda' || (carritoTipo==='online' && document.getElementById('cart-cliente').value.trim());
+  const ok = carrito.length>0 && total>0 && carritoPagos.length>0 && Math.abs(total-carritoPagado())<0.01 && !!carritoTipo && clienteOk;
+  btn.style.opacity=ok?'1':'.4';
+  btn.style.pointerEvents=ok?'auto':'none';
+}
+async function confirmarCarrito(){
+  if(carritoGuardando) return;
+  carritoGuardando=true;
+  const btn=document.getElementById('cart-confirm'); if(btn){ btn.style.pointerEvents='none'; btn.style.opacity='.5'; }
+  try{
+    const canal = carritoTipo==='tienda' ? 'Tienda física' : document.getElementById('cart-canal').value;
+    const cliente = carritoTipo==='tienda' ? null : document.getElementById('cart-cliente').value.trim();
+    const payload={
+      lineas: carrito.map(it=>({camiseta_id:it.camId, equipo:it.equipo, talla:it.talla, cantidad:it.cant, importe:+(it.precioUnit*it.cant).toFixed(2)})),
+      canal, cliente,
+      pagos: carritoPagos.map(p=>({metodo:p.metodo, monto:+(+p.monto).toFixed(2)}))
+    };
+    const resp = await apiCall('POST','/ventas/carrito',payload);
+    if(resp && resp.ventas){
+      closeM('m-carrito');
+      toast('✓ Venta registrada' + (resp.numero_venta?` ${resp.numero_venta}`:''));
+      await cargarDatosServidor();
+      if(curPage==='misventas') renderMisVentas();
+      if(curPage==='stock') renderStock();
+      if(curPage==='home') renderHome();
+    } else {
+      toast(resp && resp.error ? resp.error : 'No se pudo registrar la venta');
+    }
+  }catch(e){
+    toast('Error: '+(e.message||'no se pudo registrar la venta'));
+  }finally{
+    carritoGuardando=false;
+    const b=document.getElementById('cart-confirm'); if(b){ b.style.pointerEvents='auto'; b.style.opacity='1'; }
+  }
+}
+
 function openVentaModal(){
   tipoVenta=null; modoVenta=null; impEditadoManual=false;
   // Reset campos
@@ -4089,8 +4253,11 @@ function renderMisVentas(){
     </div>
 
     <!-- BOTÓN NUEVA VENTA -->
-    <button class="abtn abtn-g" onclick="openVentaModal()" style="margin-top:0;margin-bottom:16px">
+    <button class="abtn abtn-g" onclick="openVentaModal()" style="margin-top:0;margin-bottom:8px">
       <i class="ti ti-plus"></i> Registrar nueva venta
+    </button>
+    <button class="abtn abtn-gray abtn-sm" onclick="abrirCarrito()" style="margin-top:0;margin-bottom:16px">
+      <i class="ti ti-shopping-cart"></i> Venta con varios productos
     </button>
 
     <!-- FÍSICAS -->
