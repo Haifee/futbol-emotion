@@ -2594,7 +2594,7 @@ async function _saveVentaInterno(){
     const v={id:ids.ven++,camId:null,equipo:nombreCamiseta,talla:'—',cant,canal,cliente,imp,fecha:hoy(),pagos:datosPago()?[{...datosPago(),moneda:METODOS_PAGO[metodoPago].bs?'VES':'USD'}]:[]};
     ventas.push(v); if(!MODO_SERVIDOR) sd('ventas',ventas);
     try{
-      if(MODO_SERVIDOR) await syncVenta({camiseta_id:null,equipo:nombreCamiseta,talla:'—',cantidad:cant,canal,cliente,importe:imp,pago:datosPago()});
+      if(MODO_SERVIDOR){ const _r=await syncVenta({camiseta_id:null,equipo:nombreCamiseta,talla:'—',cantidad:cant,canal,cliente,importe:imp,pago:datosPago()}); if(_r&&_r.venta){ v.id=_r.venta.id; v.cliente=_r.venta.cliente; v.numeroVenta=_r.venta.numero_venta; if(tipoVenta==='tienda') cliente=_r.venta.cliente; } }
     }catch(e){ toast('No se pudo guardar en el servidor: '+e.message); }
     const tx={id:ids.tx++,tipo:'ingreso',desc,imp,canal,fecha:hoy()};
     transacciones.push(tx); if(!MODO_SERVIDOR) sd('transacciones',transacciones);
@@ -2621,7 +2621,7 @@ async function _saveVentaInterno(){
     if(!MODO_SERVIDOR) sd('camisetas',camisetas);
     const v={id:ids.ven++,camId,equipo:`${cam.equipo} ${cam.tipo} ${cam.temp}`,talla,cant,canal,cliente,imp,fecha:hoy(),pagos:datosPago()?[{...datosPago(),moneda:METODOS_PAGO[metodoPago].bs?'VES':'USD'}]:[]};
     ventas.push(v); if(!MODO_SERVIDOR) sd('ventas',ventas);
-    await syncVenta({camiseta_id:camId,talla,cantidad:cant,canal,cliente,importe:imp,pago:datosPago()});
+    { const _r=await syncVenta({camiseta_id:camId,talla,cantidad:cant,canal,cliente,importe:imp,pago:datosPago()}); if(_r&&_r.venta){ v.id=_r.venta.id; v.cliente=_r.venta.cliente; v.numeroVenta=_r.venta.numero_venta; if(tipoVenta==='tienda') cliente=_r.venta.cliente; } }
     const tx={id:ids.tx++,tipo:'ingreso',desc,imp,canal,fecha:hoy()};
     transacciones.push(tx); if(!MODO_SERVIDOR) sd('transacciones',transacciones);
     registrarActividad('venta',`${tipoVenta==='tienda'?cliente+' —':cliente+' ·'} ${cam.equipo} ${cam.tipo} Talla ${talla}`,`${cant} UND · ${fmt(imp)}`);
