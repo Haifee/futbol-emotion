@@ -97,19 +97,19 @@ class VentaController extends Controller
                 }
             }
 
-            // Número de venta para tienda física
-            $numeroVenta = null;
+            // Número de venta para TODAS las ventas (física y online, misma secuencia)
             $cliente     = $request->input('cliente');
-            if ($request->canal === 'Tienda física') {
-                $contador    = DB::table('configuracion')->where('clave', 'contador_ventas')->lockForUpdate()->first();
-                $num         = $contador ? (int)$contador->valor + 1 : 1;
-                $numeroVenta = '#' . str_pad($num, 3, '0', STR_PAD_LEFT);
-                $cliente     = $numeroVenta;
-                DB::table('configuracion')->updateOrInsert(
-                    ['clave' => 'contador_ventas'],
-                    ['valor' => $num, 'updated_at' => now()]
-                );
+            $contador    = DB::table('configuracion')->where('clave', 'contador_ventas')->lockForUpdate()->first();
+            $num         = $contador ? (int)$contador->valor + 1 : 1;
+            $numeroVenta = '#' . str_pad($num, 3, '0', STR_PAD_LEFT);
+            // Física sin cliente → usa el número como nombre; online conserva el nombre real
+            if ($request->canal === 'Tienda física' && !$cliente) {
+                $cliente = $numeroVenta;
             }
+            DB::table('configuracion')->updateOrInsert(
+                ['clave' => 'contador_ventas'],
+                ['valor' => $num, 'updated_at' => now()]
+            );
 
             // Registrar venta
             $id = DB::table('ventas')->insertGetId([
@@ -193,19 +193,19 @@ class VentaController extends Controller
 
         DB::beginTransaction();
         try {
-            // Un solo número de venta para toda la compra (si es tienda física)
-            $numeroVenta = null;
+            // Un solo número de venta para toda la compra (TODAS las ventas, misma secuencia)
             $clienteBase = $request->input('cliente');
-            if ($canal === 'Tienda física') {
-                $contador    = DB::table('configuracion')->where('clave', 'contador_ventas')->lockForUpdate()->first();
-                $num         = $contador ? (int) $contador->valor + 1 : 1;
-                $numeroVenta = '#' . str_pad($num, 3, '0', STR_PAD_LEFT);
+            $contador    = DB::table('configuracion')->where('clave', 'contador_ventas')->lockForUpdate()->first();
+            $num         = $contador ? (int) $contador->valor + 1 : 1;
+            $numeroVenta = '#' . str_pad($num, 3, '0', STR_PAD_LEFT);
+            // Física sin cliente → usa el número como nombre; online conserva el nombre real
+            if ($canal === 'Tienda física' && !$clienteBase) {
                 $clienteBase = $numeroVenta;
-                DB::table('configuracion')->updateOrInsert(
-                    ['clave' => 'contador_ventas'],
-                    ['valor' => $num, 'updated_at' => now()]
-                );
             }
+            DB::table('configuracion')->updateOrInsert(
+                ['clave' => 'contador_ventas'],
+                ['valor' => $num, 'updated_at' => now()]
+            );
 
             $idsVentas = [];
             $total     = 0;
