@@ -2823,7 +2823,7 @@ function devCard(d){
       <button class="abtn abtn-a" style="flex:1;font-size:14px" onclick="aprobarCambio(${d.id})"><i class="ti ti-check"></i> Aprobar</button>
       <button class="abtn abtn-r" style="flex:1;font-size:14px" onclick="rechazarCambio(${d.id})"><i class="ti ti-x"></i> Rechazar</button>
     </div>`;
-  } else if(esAprobado&&role==='manager'){
+  } else if(esAprobado){
     acciones=`<button class="abtn abtn-a" onclick="completarCambio(${d.id})" style="margin-top:8px;font-size:14px"><i class="ti ti-check"></i> Cambio entregado al cliente</button>`;
   } else if(esP&&role==='manager'){
     acciones=`<div style="font-size:12px;color:var(--txm);margin-top:8px;font-style:italic">Esperando aprobación del dueño</div>`;
