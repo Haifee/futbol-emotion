@@ -4200,14 +4200,23 @@ function mostrarNotif(msg, tipo='g'){
   setTimeout(()=>{notif.style.opacity='1';notif.style.transform='translateX(-50%) translateY(0)'},50);
   setTimeout(()=>{notif.style.opacity='0';setTimeout(()=>notif.remove(),400)},3500);
 }
+// 1. Memoria del mes (coloca esto justo ANTES de la función)
+let mesSeleccionado = ""; 
+
+// 2. Función para actualizar la vista cuando cambies de mes
+function cambiarMesVentas(nuevoMes) {
+  mesSeleccionado = nuevoMes;
+  renderMisVentas(); 
+}
+
+// 3. Tu función actualizada con el buscador integrado
 function renderMisVentas(){
   const cont=document.getElementById('mv-c');
   
-  // Obtenemos el mes actual (ej. "2026-09") y filtramos la lista maestra
-  const mesActual = hoy().slice(0, 7);
+  // Usamos el mes elegido en el buscador. Si está vacío, usa el mes actual por defecto.
+  const mesActual = mesSeleccionado || hoy().slice(0, 7);
   const ventasDelMes = ventas.filter(v => (v.fecha || '').startsWith(mesActual));
 
-  // Ahora separamos físicas y online usando solo las ventas de este mes
   const fisicas=ventasDelMes.filter(v=>v.canal==='Tienda física').reverse();
   const online=ventasDelMes.filter(v=>v.canal!=='Tienda física').reverse();
   
@@ -4239,6 +4248,13 @@ function renderMisVentas(){
   };
 
   cont.innerHTML=`
+    <!-- AQUÍ ESTÁ EL NUEVO BUSCADOR DE MESES -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+      <div class="stitle" style="margin:0;">Historial de Ventas</div>
+      <input type="month" value="${mesActual}" onchange="cambiarMesVentas(this.value)" 
+             style="padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border, #ccc); font-family: inherit; font-size: 14px; outline: none; cursor: pointer;">
+    </div>
+
     <!-- RESUMEN -->
     <div class="mgrid" style="margin-bottom:16px">
       <div class="mc" style="border-left:4px solid var(--g);background:#fff">
@@ -4272,12 +4288,12 @@ function renderMisVentas(){
     <div class="stitle">Tienda física</div>
     ${fisicas.length
       ? `<div class="card ventas-lista">${fisicas.map(v=>ventaCard(v)).join('')}</div>`
-      : `<div class="card"><div class="empty" style="padding:20px"><i class="ti ti-building-store"></i><p>Sin ventas físicas registradas</p></div></div>`}
+      : `<div class="card"><div class="empty" style="padding:20px"><i class="ti ti-building-store"></i><p>Sin ventas físicas en este mes</p></div></div>`}
 
     <!-- ONLINE -->
     <div class="stitle">Online (Instagram · WhatsApp · Web)</div>
     ${online.length
       ? `<div class="card ventas-lista">${online.map(v=>ventaCard(v)).join('')}</div>`
-      : `<div class="card"><div class="empty" style="padding:20px"><i class="ti ti-device-mobile"></i><p>Sin ventas online registradas</p></div></div>`}
+      : `<div class="card"><div class="empty" style="padding:20px"><i class="ti ti-device-mobile"></i><p>Sin ventas online en este mes</p></div></div>`}
   `;
 }
