@@ -4202,8 +4202,15 @@ function mostrarNotif(msg, tipo='g'){
 }
 function renderMisVentas(){
   const cont=document.getElementById('mv-c');
-  const fisicas=ventas.filter(v=>v.canal==='Tienda física').reverse();
-  const online=ventas.filter(v=>v.canal!=='Tienda física').reverse();
+  
+  // Obtenemos el mes actual (ej. "2026-09") y filtramos la lista maestra
+  const mesActual = hoy().slice(0, 7);
+  const ventasDelMes = ventas.filter(v => (v.fecha || '').startsWith(mesActual));
+
+  // Ahora separamos físicas y online usando solo las ventas de este mes
+  const fisicas=ventasDelMes.filter(v=>v.canal==='Tienda física').reverse();
+  const online=ventasDelMes.filter(v=>v.canal!=='Tienda física').reverse();
+  
   const totalFis=fisicas.reduce((s,v)=>s+v.imp,0);
   const totalOnl=online.reduce((s,v)=>s+v.imp,0);
 
@@ -4274,14 +4281,3 @@ function renderMisVentas(){
       : `<div class="card"><div class="empty" style="padding:20px"><i class="ti ti-device-mobile"></i><p>Sin ventas online registradas</p></div></div>`}
   `;
 }
-
-</script>
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(()=>{});
-  });
-}
-</script>
-</body>
-</html>
