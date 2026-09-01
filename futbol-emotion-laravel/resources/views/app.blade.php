@@ -4200,12 +4200,12 @@ function mostrarNotif(msg, tipo='g'){
   setTimeout(()=>{notif.style.opacity='1';notif.style.transform='translateX(-50%) translateY(0)'},50);
   setTimeout(()=>{notif.style.opacity='0';setTimeout(()=>notif.remove(),400)},3500);
 }
-// 1. Memoria del mes (coloca esto justo ANTES de la función)
-let mesSeleccionado = ""; 
+// 1. Memoria segura del mes (usamos window para evitar que rompa el inicio de sesión)
+window.mesSeleccionado = window.mesSeleccionado || ""; 
 
 // 2. Función para actualizar la vista cuando cambies de mes
 function cambiarMesVentas(nuevoMes) {
-  mesSeleccionado = nuevoMes;
+  window.mesSeleccionado = nuevoMes;
   renderMisVentas(); 
 }
 
@@ -4213,8 +4213,8 @@ function cambiarMesVentas(nuevoMes) {
 function renderMisVentas(){
   const cont=document.getElementById('mv-c');
   
-  // Usamos el mes elegido en el buscador. Si está vacío, usa el mes actual por defecto.
-  const mesActual = mesSeleccionado || hoy().slice(0, 7);
+  // Usamos el mes elegido en el buscador de forma segura
+  const mesActual = window.mesSeleccionado || hoy().slice(0, 7);
   const ventasDelMes = ventas.filter(v => (v.fecha || '').startsWith(mesActual));
 
   const fisicas=ventasDelMes.filter(v=>v.canal==='Tienda física').reverse();
