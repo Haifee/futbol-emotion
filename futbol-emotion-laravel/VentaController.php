@@ -81,18 +81,21 @@ class VentaController extends Controller
                     ->decrement($col, $request->cantidad);
             }
 
-            // Número de venta para tienda física
+                      // Número de venta para tienda física
             $numeroVenta = null;
             $cliente     = $request->input('cliente');
+            
             if ($request->canal === 'Tienda física') {
-                $contador    = DB::table('configuracion')->where('clave', 'contador_ventas')->first();
-                $num         = $contador ? (int)$contador->valor + 1 : 1;
+                // Contar automáticamente las ventas de este mes y año
+                $ventasEsteMes = DB::table('ventas')
+                    ->where('canal', 'Tienda física')
+                    ->whereYear('fecha', now()->year)
+                    ->whereMonth('fecha', now()->month)
+                    ->count();
+            
+                $num         = $ventasEsteMes + 1;
                 $numeroVenta = '#' . str_pad($num, 3, '0', STR_PAD_LEFT);
                 $cliente     = $numeroVenta;
-                DB::table('configuracion')->updateOrInsert(
-                    ['clave' => 'contador_ventas'],
-                    ['valor' => $num, 'updated_at' => now()]
-                );
             }
 
             // Registrar venta
@@ -340,26 +343,47 @@ class VentaController extends Controller
         }
     }
 
-    public function resumen(Request $request)
+  public function resumen(Request $request)
     {
-        $hoy      = now()->toDateString();
+        $hoy       = now()->toDateString();
         $inicioSem = now()->startOfWeek()->toDateString();
         $inicioMes = now()->startOfMonth()->toDateString();
 
         $calcular = function ($desde) {
-            $txs = DB::table('transacciones')->where('fecha', '>=', $desde)->get();
-            $vtas = DB::table('ventas')->where('fecha', '>=', $desde)->get();
-            $envs = DB::table('envios')->where('fecha', '>=', $desde)->get();
+            try {
+                // Hacemos las sumas y conteos directamente en SQL
+                $ingresos = DB::table('transacciones')
+                    ->where('fecha', '>=', $desde)->where('tipo', 'ingreso')->sum('importe');
+                
+                $gastos = DB::table('transacciones')
+                    ->where('fecha', '>=', $desde)->where('tipo', 'gasto')->sum('importe');
+                
+                $ventasFisicasQuery = DB::table('ventas')
+                    ->where('fecha', '>=', $desde)->where('canal', 'Tienda física');
+                
+                $ventasOnlineQuery = DB::table('ventas')
+                    ->where('fecha', '>=', $desde)->where('canal', '!=', 'Tienda física');
 
-            return [
-                'ingresos' => $txs->where('tipo', 'ingreso')->sum('importe'),
-                'gastos'   => $txs->where('tipo', 'gasto')->sum('importe'),
-                'ventas_fisicas' => $vtas->where('canal', 'Tienda física')->count(),
-                'ventas_online'  => $vtas->where('canal', '!=', 'Tienda física')->count(),
-                'total_ventas_fisicas' => $vtas->where('canal', 'Tienda física')->sum('importe'),
-                'total_ventas_online'  => $vtas->where('canal', '!=', 'Tienda física')->sum('importe'),
-                'envios' => $envs->count(),
-            ];
+                $envios = DB::table('envios')->where('fecha', '>=', $desde)->count();
+
+                return [
+                    'ingresos'             => $ingresos,
+                    'gastos'               => $gastos,
+                    'neto'                 => $ingresos - $gastos, // AQUÍ ESTÁ LA SOLUCIÓN
+                    'ventas_fisicas'       => $ventasFisicasQuery->count(),
+                    'ventas_online'        => $ventasOnlineQuery->count(),
+                    'total_ventas_fisicas' => $ventasFisicasQuery->sum('importe'),
+                    'total_ventas_online'  => $ventasOnlineQuery->sum('importe'),
+                    'envios'               => $envios,
+                ];
+            } catch (\Exception $e) {
+                // Si falta alguna tabla, devolvemos valores en 0
+                return [
+                    'ingresos' => 0, 'gastos' => 0, 'neto' => 0, // TAMBIÉN AQUÍ
+                    'ventas_fisicas' => 0, 'ventas_online' => 0, 
+                    'total_ventas_fisicas' => 0, 'total_ventas_online' => 0, 'envios' => 0
+                ];
+            }
         };
 
         return response()->json([
@@ -368,4 +392,3 @@ class VentaController extends Controller
             'mes'    => $calcular($inicioMes),
         ]);
     }
-}
