@@ -2037,9 +2037,9 @@ function renderHome(){
         <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
       </button></div>`;
   } else {
-    const ing=transacciones.filter(t=>t.tipo==='ingreso').reduce((s,t)=>s+t.imp,0);
-    const gas=transacciones.filter(t=>t.tipo==='gasto').reduce((s,t)=>s+t.imp,0);
-    const neto=ing-gas;
+    const mesActual=hoy().slice(0,7);
+    const ing=transacciones.filter(t=>t.tipo==='ingreso'&&(t.fecha||'').slice(0,7)===mesActual).reduce((s,t)=>s+t.imp,0);
+    const gas=transacciones.filter(t=>t.tipo==='gasto'&&(t.fecha||'').slice(0,7)===mesActual).reduce((s,t)=>s+t.imp,0);
     let alertas='';
     if(pendPed) alertas+=`<div class="abox abox-p" style="cursor:pointer" onclick="goTo('aprobar')"><i class="ti ti-clipboard-check"></i><div><div class="abox-title">${pendPed} pedido(s) esperando tu aprobación</div><div class="abox-sub">Toca aquí para revisar y aprobar</div></div><i class="ti ti-chevron-right" style="color:var(--p);margin-left:auto;font-size:20px"></i></div>`;
     if(criticos.length) alertas+=`<div class="abox abox-r"><i class="ti ti-alert-triangle"></i><div><div class="abox-title">Sin stock suficiente</div><div class="abox-sub">${criticos.map(c=>nombreProducto(c)).join(' · ')}</div></div></div>`;
