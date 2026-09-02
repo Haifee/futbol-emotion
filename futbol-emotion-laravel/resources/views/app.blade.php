@@ -4297,3 +4297,6 @@ function renderMisVentas(){
       : `<div class="card"><div class="empty" style="padding:20px"><i class="ti ti-device-mobile"></i><p>Sin ventas online en este mes</p></div></div>`}
   `;
 }
+</script>
+</body>
+</html>
