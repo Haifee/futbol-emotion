@@ -86,16 +86,17 @@ class VentaController extends Controller
             $cliente     = $request->input('cliente');
             
             if ($request->canal === 'Tienda física') {
-                // Contar automáticamente las ventas de este mes y año
-                $ventasEsteMes = DB::table('ventas')
-                    ->where('canal', 'Tienda física')
-                    ->whereYear('fecha', now()->year)
-                    ->whereMonth('fecha', now()->month)
-                    ->count();
-            
-                $num         = $ventasEsteMes + 1;
+                // Contador por mes: la numeración reinicia en #001 cada mes.
+                // Usa un contador propio por mes (atómico y a prueba de borrados).
+                $claveMes = 'contador_ventas_' . now()->format('Y-m');
+                $contador = DB::table('configuracion')->where('clave', $claveMes)->lockForUpdate()->first();
+                $num      = $contador ? (int) $contador->valor + 1 : 1;
                 $numeroVenta = '#' . str_pad($num, 3, '0', STR_PAD_LEFT);
                 $cliente     = $numeroVenta;
+                DB::table('configuracion')->updateOrInsert(
+                    ['clave' => $claveMes],
+                    ['valor' => $num, 'updated_at' => now()]
+                );
             }
 
             // Registrar venta
