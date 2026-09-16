@@ -2560,7 +2560,8 @@ function carritoAgregarProducto(){
 }
 function carritoQuitarProducto(i){ carrito.splice(i,1); carritoRenderItems(); carritoRenderPagos(); }
 function carritoTotal(){ return carrito.reduce((a,it)=>a+it.precioUnit*it.cant,0); }
-function carritoPagado(){ return carritoPagos.reduce((a,p)=>a+(+p.monto||0),0); }
+function pagoEnUsd(p){ const m=METODOS_PAGO[p.metodo]; const val=+p.monto||0; if(m&&m.bs){ const t=tasaActual(); return t>0? val/t : 0; } return val; }
+function carritoPagado(){ return carritoPagos.reduce((a,p)=>a+pagoEnUsd(p),0); }
 function carritoRenderItems(){
   const cont=document.getElementById('cart-items');
   if(!carrito.length){ cont.innerHTML='<div style="text-align:center;color:var(--txm);padding:12px;font-size:13px">Aún no has agregado productos</div>'; carritoActualizarConfirm(); return; }
@@ -2578,16 +2579,30 @@ function carritoAgregarPago(){
   carritoRenderPagos();
 }
 function carritoQuitarPago(i){ carritoPagos.splice(i,1); carritoRenderPagos(); }
-function carritoSetPagoMetodo(i,m){ carritoPagos[i].metodo=m; carritoActualizarConfirm(); }
+function carritoSetPagoMetodo(i,m){ carritoPagos[i].metodo=m; const otros=carritoPagos.reduce((a,p,idx)=>idx===i?a:a+pagoEnUsd(p),0); const restUsd=Math.max(0,+(carritoTotal()-otros).toFixed(2)); const met=METODOS_PAGO[m]; carritoPagos[i].monto=(met&&met.bs)? +(restUsd*tasaActual()).toFixed(2) : restUsd; carritoRenderPagos(); }
+function carritoSetTasa(k){ if(tasaValor(k)<=0){toast('Esa tasa no está configurada (Ajustes)');return} tasaElegida=k; carritoRenderPagos(); }
 function carritoSetPagoMonto(i,v){ carritoPagos[i].monto=+v||0; carritoRenderResumen(); carritoActualizarConfirm(); }
 function carritoRenderPagos(){
   const cont=document.getElementById('cart-pagos');
-  cont.innerHTML=carritoPagos.map((p,i)=>{
-    const opts=Object.entries(METODOS_PAGO).map(([k,m])=>`<option value="${k}" ${k===p.metodo?'selected':''}>${m.label}</option>`).join('');
-    return `<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
-      <select class="fi" style="flex:1" onchange="carritoSetPagoMetodo(${i},this.value)">${opts}</select>
-      <input class="fi" style="width:96px" type="number" min="0" step="0.01" value="${p.monto}" placeholder="$" oninput="carritoSetPagoMonto(${i},this.value)">
-      <button onclick="carritoQuitarPago(${i})" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:18px"><i class="ti ti-x"></i></button>
+  const hayBs=carritoPagos.some(p=>METODOS_PAGO[p.metodo]&&METODOS_PAGO[p.metodo].bs);
+  let tasaHtml='';
+  if(hayBs){
+    const ops=[{k:'bcv',l:'BCV'},{k:'euro',l:'Euro'},{k:'binance',l:'Binance'}];
+    tasaHtml='<div style="font-size:11px;color:var(--txm);margin-bottom:4px">Tasa para los pagos en Bs:</div><div style="display:flex;gap:6px;margin-bottom:10px">'+ops.map(o=>{
+      const val=tasaValor(o.k), act=tasaElegida===o.k, dis=val<=0;
+      return `<button type="button" ${dis?'disabled':''} onclick="carritoSetTasa('${o.k}')" style="flex:1;padding:5px 3px;border-radius:8px;cursor:${dis?'not-allowed':'pointer'};font-size:11px;font-weight:800;border:2px solid ${act?'var(--gd)':'var(--gm)'};background:${act?'var(--gd)':'#fff'};color:${act?'#fff':'var(--gd)'};opacity:${dis?.5:1}">${o.l}<br><span style="font-size:9px;font-weight:600">${val>0?val.toLocaleString('es-VE'):'—'}</span></button>`;
+    }).join('')+'</div>';
+  }
+  cont.innerHTML=tasaHtml+carritoPagos.map((p,i)=>{
+    const m=METODOS_PAGO[p.metodo]; const esBs=m&&m.bs;
+    const opts=Object.entries(METODOS_PAGO).map(([k,mm])=>`<option value="${k}" ${k===p.metodo?'selected':''}>${mm.label}</option>`).join('');
+    const equiv=esBs?`<div style="font-size:10.5px;color:var(--txm);margin-top:2px;text-align:right">≈ ${fmt(pagoEnUsd(p))}</div>`:'';
+    return `<div style="margin-bottom:8px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <select class="fi" style="flex:1" onchange="carritoSetPagoMetodo(${i},this.value)">${opts}</select>
+        <input class="fi" style="width:104px" type="number" min="0" step="0.01" value="${p.monto}" placeholder="${esBs?'Bs':'$'}" oninput="carritoSetPagoMonto(${i},this.value)">
+        <button onclick="carritoQuitarPago(${i})" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:18px"><i class="ti ti-x"></i></button>
+      </div>${equiv}
     </div>`;
   }).join('');
   carritoRenderResumen(); carritoActualizarConfirm();
@@ -2604,7 +2619,7 @@ function carritoActualizarConfirm(){
   const btn=document.getElementById('cart-confirm'); if(!btn) return;
   const total=carritoTotal();
   const clienteOk = carritoTipo==='tienda' || (carritoTipo==='online' && document.getElementById('cart-cliente').value.trim());
-  const ok = carrito.length>0 && total>0 && carritoPagos.length>0 && Math.abs(total-carritoPagado())<0.01 && !!carritoTipo && clienteOk;
+  const ok = carrito.length>0 && total>0 && carritoPagos.length>0 && (carritoPagado() >= total-0.05) && !!carritoTipo && clienteOk;
   btn.style.opacity=ok?'1':'.4';
   btn.style.pointerEvents=ok?'auto':'none';
 }
@@ -2618,7 +2633,7 @@ async function confirmarCarrito(){
     const payload={
       lineas: carrito.map(it=>({camiseta_id:it.camId, equipo:it.equipo, talla:it.talla, cantidad:it.cant, importe:+(it.precioUnit*it.cant).toFixed(2)})),
       canal, cliente,
-      pagos: carritoPagos.map(p=>({metodo:p.metodo, monto:+(+p.monto).toFixed(2)}))
+      pagos: carritoPagos.map(p=>{ const met=METODOS_PAGO[p.metodo]; const o={metodo:p.metodo, monto:+(+p.monto).toFixed(2)}; if(met&&met.bs){ o.tasa=tasaActual(); o.tasa_tipo=tasaElegida; } return o; })
     };
     const resp = await apiCall('POST','/ventas/carrito',payload);
     if(resp && resp.ventas){
