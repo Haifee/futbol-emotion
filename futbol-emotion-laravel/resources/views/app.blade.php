@@ -2251,7 +2251,7 @@ function renderStock(){
     <button class="abtn abtn-g" onclick="abrirScannerInventario()" style="margin-top:0;margin-bottom:9px"><i class="ti ti-scan"></i> Escanear mercancía (entrada de stock)</button>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px">
       <button class="abtn abtn-gray abtn-sm" onclick="abrirNuevaCamiseta()" style="margin-top:0"><i class="ti ti-plus"></i> Nueva camiseta</button>
-      <button class="abtn abtn-gray abtn-sm" onclick="openVentaModal()" style="margin-top:0"><i class="ti ti-shopping-cart"></i> Registrar venta</button>
+      <button class="abtn abtn-gray abtn-sm" onclick="abrirCarrito()" style="margin-top:0"><i class="ti ti-shopping-cart"></i> Registrar venta</button>
     </div>
     <div style="position:relative;margin-bottom:14px">
       <i class="ti ti-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--txh);font-size:17px"></i>
@@ -4291,12 +4291,9 @@ function renderMisVentas(){
       <div class="mc mc-cyan"><i class="ti ti-businessplan mc-ico"></i><div class="mcl">En bolívares</div><div class="mcv" style="font-size:19px">${fmtBs(ventasHoyPorMoneda().bs)}</div><div class="mcs">pago móvil, PDV, efectivo Bs</div></div>
     </div>
 
-    <!-- BOTÓN NUEVA VENTA -->
-    <button class="abtn abtn-g" onclick="openVentaModal()" style="margin-top:0;margin-bottom:8px">
-      <i class="ti ti-plus"></i> Registrar nueva venta
-    </button>
-    <button class="abtn abtn-gray abtn-sm" onclick="abrirCarrito()" style="margin-top:0;margin-bottom:16px">
-      <i class="ti ti-shopping-cart"></i> Venta con varios productos
+    <!-- BOTÓN NUEVA VENTA (todo por carrito) -->
+    <button class="abtn abtn-g" onclick="abrirCarrito()" style="margin-top:0;margin-bottom:16px">
+      <i class="ti ti-plus"></i> Registrar venta
     </button>
 
     <!-- FÍSICAS -->
