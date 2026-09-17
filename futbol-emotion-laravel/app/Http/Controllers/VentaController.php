@@ -99,7 +99,8 @@ class VentaController extends Controller
 
             // Número de venta para TODAS las ventas (física y online, misma secuencia)
             $cliente     = $request->input('cliente');
-            $contador    = DB::table('configuracion')->where('clave', 'contador_ventas')->lockForUpdate()->first();
+            $claveMes    = 'contador_ventas_' . now()->format('Y-m');
+            $contador    = DB::table('configuracion')->where('clave', $claveMes)->lockForUpdate()->first();
             $num         = $contador ? (int)$contador->valor + 1 : 1;
             $numeroVenta = '#' . str_pad($num, 3, '0', STR_PAD_LEFT);
             // Física sin cliente → usa el número como nombre; online conserva el nombre real
@@ -107,7 +108,7 @@ class VentaController extends Controller
                 $cliente = $numeroVenta;
             }
             DB::table('configuracion')->updateOrInsert(
-                ['clave' => 'contador_ventas'],
+                ['clave' => $claveMes],
                 ['valor' => $num, 'updated_at' => now()]
             );
 
@@ -195,7 +196,8 @@ class VentaController extends Controller
         try {
             // Un solo número de venta para toda la compra (TODAS las ventas, misma secuencia)
             $clienteBase = $request->input('cliente');
-            $contador    = DB::table('configuracion')->where('clave', 'contador_ventas')->lockForUpdate()->first();
+            $claveMes    = 'contador_ventas_' . now()->format('Y-m');
+            $contador    = DB::table('configuracion')->where('clave', $claveMes)->lockForUpdate()->first();
             $num         = $contador ? (int) $contador->valor + 1 : 1;
             $numeroVenta = '#' . str_pad($num, 3, '0', STR_PAD_LEFT);
             // Física sin cliente → usa el número como nombre; online conserva el nombre real
@@ -203,7 +205,7 @@ class VentaController extends Controller
                 $clienteBase = $numeroVenta;
             }
             DB::table('configuracion')->updateOrInsert(
-                ['clave' => 'contador_ventas'],
+                ['clave' => $claveMes],
                 ['valor' => $num, 'updated_at' => now()]
             );
 
