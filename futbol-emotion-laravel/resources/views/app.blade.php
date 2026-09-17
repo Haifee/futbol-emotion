@@ -557,6 +557,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <select class="fi" id="cart-canal"><option>Instagram</option><option>WhatsApp</option><option>Web</option></select>
     </div>
     <div class="stitle">Agregar producto</div>
+    <button class="abtn abtn-g abtn-sm" onclick="escanearParaCarrito()" style="margin-top:0;margin-bottom:8px"><i class="ti ti-scan"></i> Escanear código</button>
     <select class="fi" id="cart-cam" onchange="carritoAutoPrecio()"></select>
     <select class="fi" id="cart-talla" style="margin-top:8px"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option>10</option><option>12</option><option>14</option><option>16</option><option>U</option></select>
     <div style="display:flex;gap:8px;margin-top:8px">
@@ -1356,6 +1357,25 @@ function escanearParaVenta(){
     }catch(e){ openM('m-venta'); }
   });
 }
+function escanearParaCarrito(){
+  if(!MODO_SERVIDOR){toast('El escáner requiere conexión con el servidor');return}
+  abrirScanner(async codigo=>{
+    try{
+      const r=await buscarCodigo(codigo);
+      openM('m-carrito');
+      if(!r.encontrado){ toast('Código no registrado — asócialo primero desde Inventario'); return; }
+      const cam=camisetas.find(c=>c.id===r.camiseta.id)||r.camiseta;
+      document.getElementById('cart-cam').value=String(cam.id);
+      carritoAutoPrecio();
+      document.getElementById('cart-talla').value=r.talla;
+      document.getElementById('cart-cant').value=1;
+      const stock=cam.tallas[r.talla]||0;
+      if(stock<=0){ toast(`⚠ ${cam.equipo} ${r.talla} está SIN STOCK`); return; }
+      carritoAgregarProducto();
+      toast(`✓ ${cam.equipo} ${r.talla} agregada al carrito`);
+    }catch(e){ openM('m-carrito'); }
+  });
+}
 // ── MÉTODOS DE PAGO (Venezuela) ───────────────────────────────────────────────
 const BANCOS_VE=['0102 Banco de Venezuela','0104 Venezolano de Crédito','0105 Mercantil','0108 BBVA Provincial','0114 Bancaribe','0115 Exterior','0128 Banco Caroní','0134 Banesco','0137 Sofitasa','0138 Banco Plaza','0146 Bangente','0151 BFC Fondo Común','0156 100% Banco','0157 DelSur','0163 Banco del Tesoro','0166 Banco Agrícola','0168 Bancrecer','0169 Mi Banco','0171 Banco Activo','0172 Bancamiga','0174 Banplus','0175 Bicentenario','0177 Banfanb','0191 BNC','Otro'];
 
@@ -1876,16 +1896,33 @@ function analiticaDatos(){
   for(let k=hoyK-7;k<=hoyK;k++) serie.push({rev:porSem[k]||0,label:_lunesSem(k)});
   return {totalRev,nV,ticket,margen,top,fisRev,fisN,onRev,onN,serie};
 }
+function analiticaResumen(a){
+  if(!a.nV) return '';
+  const canalFuerte = a.fisRev>=a.onRev ? 'tienda física' : 'online';
+  const pctFuerte = Math.round(Math.max(a.fisRev,a.onRev)/((a.fisRev+a.onRev)||1)*100);
+  const margenTxt = a.margen>=40?'saludable':(a.margen>=20?'aceptable':'ajustado');
+  const estrella = a.top.length? a.top[0].eq : '—';
+  return `<div class="card" style="background:var(--gl);border:1.5px solid var(--gm);margin-bottom:14px">
+    <div style="font-size:12px;font-weight:800;color:var(--gd);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px"><i class="ti ti-bulb"></i> En resumen</div>
+    <div style="font-size:14px;color:var(--tx);line-height:1.7">
+      Vendiste <b>${fmt(a.totalRev)}</b> en <b>${a.nV}</b> venta${a.nV!==1?'s':''}.<br>
+      Lo que más se vende: <b>${estrella}</b>.<br>
+      Vendes más por <b>${canalFuerte}</b> (${pctFuerte}%).<br>
+      De cada $100 que entra, te quedan <b>$${a.margen}</b>.
+    </div>
+  </div>`;
+}
 function renderAnaliticaModal(){
   const cont=document.getElementById('analitica-body'); if(!cont) return;
   const a=analiticaDatos();
   const maxRev=Math.max(1,...a.serie.map(s=>s.rev));
   const totCanal=(a.fisRev+a.onRev)||1;
   cont.innerHTML=`
+    ${analiticaResumen(a)}
     <div class="mgrid" style="margin-bottom:14px">
-      <div class="mc mc-g"><div class="mcl">Total vendido</div><div class="mcv">${fmt(a.totalRev)}</div></div>
-      <div class="mc mc-b"><div class="mcl">Ticket promedio</div><div class="mcv">${fmt(a.ticket)}</div></div>
-      <div class="mc mc-p"><div class="mcl">Margen del negocio</div><div class="mcv">${a.margen}%</div></div>
+      <div class="mc mc-g"><div class="mcl">Total vendido</div><div class="mcv">${fmt(a.totalRev)}</div><div class="mcs">Lo que entró en total</div></div>
+      <div class="mc mc-b"><div class="mcl">Ticket promedio</div><div class="mcv">${fmt(a.ticket)}</div><div class="mcs">Lo que gasta cada cliente</div></div>
+      <div class="mc mc-p"><div class="mcl">Margen del negocio</div><div class="mcv">${a.margen}%</div><div class="mcs">Lo que te queda de ganancia</div></div>
       <div class="mc"><div class="mcl">N.º de ventas</div><div class="mcv">${a.nV}</div></div>
     </div>
     <div class="stitle">Tendencia semanal</div>
