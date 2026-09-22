@@ -587,8 +587,8 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <div style="font-weight:700;font-size:13px;color:var(--txm);margin-bottom:8px"><i class="ti ti-cash"></i> Vuelto (cambio)</div>
       <label class="fl" style="margin-top:0">¿Con cuánto paga el cliente?</label>
       <div style="display:flex;gap:8px">
-        <input class="fi" id="vuelto-recibido" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" oninput="calcularVuelto()" style="flex:1">
-        <select class="fi" id="vuelto-moneda" onchange="calcularVuelto()" style="width:88px"><option value="usd">$</option><option value="bs">Bs</option></select>
+        <input class="fi" id="vuelto-recibido" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" oninput="vueltoInput()" style="flex:1">
+        <select class="fi" id="vuelto-moneda" onchange="vueltoCambiarMoneda()" style="width:88px"><option value="usd">$</option><option value="bs">Bs</option></select>
       </div>
       <div id="vuelto-out" style="margin-top:10px"></div>
     </div>
@@ -2584,7 +2584,7 @@ function abrirCarrito(){
   carritoAutoPrecio();
   carritoRenderItems();
   carritoRenderPagos();
-  const _vr=document.getElementById('vuelto-recibido'); if(_vr) _vr.value='';
+  vueltoAuto=true; vueltoMonedaPrev='usd';
   const _vm=document.getElementById('vuelto-moneda'); if(_vm) _vm.value='usd';
   calcularVuelto();
   openM('m-carrito');
@@ -2677,19 +2677,36 @@ function carritoRenderResumen(){
   document.getElementById('cart-resumen-pago').innerHTML=`<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:12.5px;padding:8px 2px"><span style="color:var(--txm)">Total ${fmt(total)} · Pagado ${fmt(pagado)}</span><b style="color:${color}">${msg}</b></div>`;
   calcularVuelto();
 }
+let vueltoAuto=true;        // mientras true, la casilla refleja el total (autollenado)
+let vueltoMonedaPrev='usd';
+function vueltoInput(){ vueltoAuto=false; calcularVuelto(); }
+function vueltoCambiarMoneda(){
+  const inp=document.getElementById('vuelto-recibido');
+  const sel=document.getElementById('vuelto-moneda');
+  const tasa=tasaActual();
+  if(!vueltoAuto && inp && inp.value && tasa>0){
+    const usd = vueltoMonedaPrev==='bs' ? (+inp.value/tasa) : +inp.value;
+    inp.value = sel.value==='bs' ? +(usd*tasa).toFixed(2) : +usd.toFixed(2);
+  }
+  vueltoMonedaPrev = sel ? sel.value : 'usd';
+  calcularVuelto();
+}
 function calcularVuelto(){
   const out=document.getElementById('vuelto-out'); if(!out) return;
-  const total=carritoTotal();
   const inp=document.getElementById('vuelto-recibido');
-  const moneda=document.getElementById('vuelto-moneda').value;
-  const recibidoRaw=+(inp&&inp.value)||0;
+  const sel=document.getElementById('vuelto-moneda');
+  const moneda = sel ? sel.value : 'usd';
+  const total=carritoTotal();
   const tasa=tasaActual();
-  const totalBs = tasa>0 ? ` · ${fmtBs(total*tasa)}` : '';
-  if(recibidoRaw<=0){ out.innerHTML=`<div style="font-size:12px;color:var(--txm);text-align:center">Total a cobrar: <b>${fmt(total)}</b>${totalBs}</div>`; return; }
+  // Autollenado: si no se ha editado a mano, la casilla muestra el total a cobrar
+  if(vueltoAuto && inp){ inp.value = (moneda==='bs' && tasa>0) ? +(total*tasa).toFixed(2) : +total.toFixed(2); }
+  const recibidoRaw=+(inp&&inp.value)||0;
   const recibidoUsd = moneda==='bs' ? (tasa>0?recibidoRaw/tasa:0) : recibidoRaw;
   const vueltoUsd=+(recibidoUsd-total).toFixed(2);
   if(vueltoUsd < -0.001){
     out.innerHTML=`<div style="background:var(--al);border:2px solid var(--ad);border-radius:12px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:800;color:var(--ad)">Aún falta por cobrar</div><div style="font-size:22px;font-weight:800;color:var(--ad)">${fmt(-vueltoUsd)}${tasa>0?` · ${fmtBs(-vueltoUsd*tasa)}`:''}</div></div>`;
+  } else if(vueltoUsd <= 0.001){
+    out.innerHTML=`<div style="background:var(--gray);border:1px solid var(--grayb);border-radius:12px;padding:10px;text-align:center;font-size:13px;font-weight:700;color:var(--txm)"><i class="ti ti-check" style="color:var(--gd)"></i> Pago justo · sin vuelto</div>`;
   } else {
     out.innerHTML=`<div style="background:var(--gl);border:2px solid var(--gm);border-radius:12px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:800;color:var(--gd)">Vuelto a entregar</div><div style="font-size:26px;font-weight:800;color:var(--gd)">${fmt(vueltoUsd)}</div>${tasa>0?`<div style="font-size:13px;color:var(--gd);opacity:.8;margin-top:2px">o ${fmtBs(vueltoUsd*tasa)}</div>`:''}</div>`;
   }
