@@ -583,6 +583,17 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <div id="cart-pagos"></div>
     <button class="abtn abtn-gray abtn-sm" onclick="carritoAgregarPago()" style="margin-top:6px"><i class="ti ti-plus"></i> Agregar método de pago</button>
     <div id="cart-resumen-pago"></div>
+    <details id="cart-vuelto" style="margin-top:10px;border:1px solid var(--grayb);border-radius:12px;padding:0 12px">
+      <summary style="cursor:pointer;padding:12px 0;font-weight:700;font-size:13px;color:var(--txm)"><i class="ti ti-cash"></i> Calcular vuelto (cambio)</summary>
+      <div style="padding-bottom:12px">
+        <label class="fl" style="margin-top:0">¿Con cuánto paga el cliente?</label>
+        <div style="display:flex;gap:8px">
+          <input class="fi" id="vuelto-recibido" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" oninput="calcularVuelto()" style="flex:1">
+          <select class="fi" id="vuelto-moneda" onchange="calcularVuelto()" style="width:88px"><option value="usd">$</option><option value="bs">Bs</option></select>
+        </div>
+        <div id="vuelto-out" style="margin-top:10px"></div>
+      </div>
+    </details>
     <button class="abtn abtn-g" id="cart-confirm" onclick="confirmarCarrito()" style="margin-top:14px;opacity:.4;pointer-events:none"><i class="ti ti-check"></i> Registrar venta</button>
   </div>
 </div>
@@ -2575,6 +2586,10 @@ function abrirCarrito(){
   carritoAutoPrecio();
   carritoRenderItems();
   carritoRenderPagos();
+  const _ve=document.getElementById('cart-vuelto'); if(_ve) _ve.open=false;
+  const _vr=document.getElementById('vuelto-recibido'); if(_vr) _vr.value='';
+  const _vm=document.getElementById('vuelto-moneda'); if(_vm) _vm.value='usd';
+  calcularVuelto();
   openM('m-carrito');
 }
 function carritoTipoBotones(){
@@ -2663,6 +2678,24 @@ function carritoRenderResumen(){
   else if(dif>0){ msg=`Faltan ${fmt(dif)}`; color='var(--ad)'; }
   else { msg=`Sobran ${fmt(-dif)}`; color='var(--r)'; }
   document.getElementById('cart-resumen-pago').innerHTML=`<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:12.5px;padding:8px 2px"><span style="color:var(--txm)">Total ${fmt(total)} · Pagado ${fmt(pagado)}</span><b style="color:${color}">${msg}</b></div>`;
+  calcularVuelto();
+}
+function calcularVuelto(){
+  const out=document.getElementById('vuelto-out'); if(!out) return;
+  const total=carritoTotal();
+  const inp=document.getElementById('vuelto-recibido');
+  const moneda=document.getElementById('vuelto-moneda').value;
+  const recibidoRaw=+(inp&&inp.value)||0;
+  const tasa=tasaActual();
+  const totalBs = tasa>0 ? ` · ${fmtBs(total*tasa)}` : '';
+  if(recibidoRaw<=0){ out.innerHTML=`<div style="font-size:12px;color:var(--txm);text-align:center">Total a cobrar: <b>${fmt(total)}</b>${totalBs}</div>`; return; }
+  const recibidoUsd = moneda==='bs' ? (tasa>0?recibidoRaw/tasa:0) : recibidoRaw;
+  const vueltoUsd=+(recibidoUsd-total).toFixed(2);
+  if(vueltoUsd < -0.001){
+    out.innerHTML=`<div style="background:var(--al);border:2px solid var(--ad);border-radius:12px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:800;color:var(--ad)">Aún falta por cobrar</div><div style="font-size:22px;font-weight:800;color:var(--ad)">${fmt(-vueltoUsd)}${tasa>0?` · ${fmtBs(-vueltoUsd*tasa)}`:''}</div></div>`;
+  } else {
+    out.innerHTML=`<div style="background:var(--gl);border:2px solid var(--gm);border-radius:12px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:800;color:var(--gd)">Vuelto a entregar</div><div style="font-size:26px;font-weight:800;color:var(--gd)">${fmt(vueltoUsd)}</div>${tasa>0?`<div style="font-size:13px;color:var(--gd);opacity:.8;margin-top:2px">o ${fmtBs(vueltoUsd*tasa)}</div>`:''}</div>`;
+  }
 }
 function carritoActualizarConfirm(){
   const btn=document.getElementById('cart-confirm'); if(!btn) return;
