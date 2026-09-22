@@ -960,6 +960,35 @@ async function apiCall(method, endpoint, data=null){
 
 // ── DATOS ────────────────────────────────────────────────────────────────────
 // Los PINs viven en el servidor (variables de entorno). Nunca en el código.
+// ── MARCA (white-label) ────────────────────────────────
+// Para entregar la app a un cliente nuevo, cambia SOLO estas dos líneas:
+const MARCA = {
+  nombre: 'Fútbol Emotion',   // nombre visible (título de la app y al instalar)
+  color:  '#16a34a',          // color principal de la marca (hex). Déjalo así = verde actual.
+};
+// (El logo se cambia aparte: la imagen del encabezado + los archivos icon-192.png / icon-512.png)
+function _mHex(h){h=h.replace('#','');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+function _mRgb(a){return '#'+a.map(x=>Math.max(0,Math.min(255,Math.round(x))).toString(16).padStart(2,'0')).join('');}
+function _mMix(hex,t,amt){const a=_mHex(hex),b=_mHex(t);return _mRgb(a.map((x,i)=>x+(b[i]-x)*amt));}
+function aplicarMarca(){
+  try{
+    document.title = MARCA.nombre;
+    const logo=document.querySelector('.tbrand img'); if(logo) logo.alt=MARCA.nombre;
+    // Solo recolorea si el color cambió (así el verde original queda idéntico por defecto)
+    if(MARCA.color && MARCA.color.toLowerCase()!=='#16a34a'){
+      const c=MARCA.color, r=document.documentElement.style;
+      r.setProperty('--g',  c);
+      r.setProperty('--gd', _mMix(c,'#000000',0.16));
+      r.setProperty('--gm', _mMix(c,'#ffffff',0.10));
+      r.setProperty('--gl', _mMix(c,'#ffffff',0.86));
+      r.setProperty('--gx', _mMix(c,'#ffffff',0.70));
+      const tc=document.querySelector('meta[name="theme-color"]'); if(tc) tc.content=c;
+      const dot=document.querySelector('.tbrand-dot'); if(dot) dot.style.background=c;
+    }
+  }catch(e){}
+}
+aplicarMarca();
+
 let CONFIG={proveedor_1:'',proveedor_2:'',proveedor_3:'',proveedor_4:'',manager_bloqueado:'0'};
 function nombreRol(r=role){
   const nom=(r==='owner'?CONFIG.nombre_owner:CONFIG.nombre_manager)||'';
