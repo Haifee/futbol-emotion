@@ -2691,6 +2691,7 @@ function carritoQuitarPago(i){ carritoPagos.splice(i,1); carritoRenderPagos(); }
 function carritoSetPagoMetodo(i,m){ carritoPagos[i].metodo=m; const otros=carritoPagos.reduce((a,p,idx)=>idx===i?a:a+pagoEnUsd(p),0); const restUsd=Math.max(0,+(carritoTotal()-otros).toFixed(2)); const met=METODOS_PAGO[m]; carritoPagos[i].monto=(met&&met.bs)? +(restUsd*tasaActual()).toFixed(2) : restUsd; carritoRenderPagos(); }
 function carritoSetTasa(k){ if(tasaValor(k)<=0){toast('Esa tasa no está configurada (Ajustes)');return} tasaElegida=k; carritoRenderPagos(); }
 function carritoSetPagoMonto(i,v){ carritoPagos[i].monto=+v||0; carritoRenderResumen(); carritoActualizarConfirm(); }
+function carritoSetPagoRef(i,v){ carritoPagos[i].referencia=v; }
 function carritoRenderPagos(){
   const cont=document.getElementById('cart-pagos');
   const hayBs=carritoPagos.some(p=>METODOS_PAGO[p.metodo]&&METODOS_PAGO[p.metodo].bs);
@@ -2706,12 +2707,14 @@ function carritoRenderPagos(){
     const m=METODOS_PAGO[p.metodo]; const esBs=m&&m.bs;
     const opts=Object.entries(METODOS_PAGO).map(([k,mm])=>`<option value="${k}" ${k===p.metodo?'selected':''}>${mm.label}</option>`).join('');
     const equiv=esBs?`<div style="font-size:10.5px;color:var(--txm);margin-top:2px;text-align:right">≈ ${fmt(pagoEnUsd(p))}</div>`:'';
+    const usaRef = p.metodo!=='efectivo_usd' && p.metodo!=='efectivo_bs';
+    const refHtml = usaRef ? `<input class="fi" style="width:100%;margin-top:6px;font-size:13px;padding:9px 10px" placeholder="Referencia (opcional)" value="${(p.referencia||'').replace(/"/g,'&quot;')}" oninput="carritoSetPagoRef(${i},this.value)">` : '';
     return `<div style="margin-bottom:8px">
       <div style="display:flex;gap:8px;align-items:center">
         <select class="fi" style="flex:1" onchange="carritoSetPagoMetodo(${i},this.value)">${opts}</select>
         <input class="fi" style="width:104px" type="number" min="0" step="0.01" value="${p.monto}" placeholder="${esBs?'Bs':'$'}" oninput="carritoSetPagoMonto(${i},this.value)">
         <button onclick="carritoQuitarPago(${i})" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:18px"><i class="ti ti-x"></i></button>
-      </div>${equiv}
+      </div>${equiv}${refHtml}
     </div>`;
   }).join('');
   carritoRenderResumen(); carritoActualizarConfirm();
@@ -2777,7 +2780,7 @@ async function confirmarCarrito(){
     const payload={
       lineas: carrito.map(it=>({camiseta_id:it.camId, equipo:it.equipo, talla:it.talla, cantidad:it.cant, importe:+(it.precioUnit*it.cant).toFixed(2)})),
       canal, cliente,
-      pagos: carritoPagos.map(p=>{ const met=METODOS_PAGO[p.metodo]; const o={metodo:p.metodo, monto:+(+p.monto).toFixed(2)}; if(met&&met.bs){ o.tasa=tasaActual(); o.tasa_tipo=tasaElegida; } return o; })
+      pagos: carritoPagos.map(p=>{ const met=METODOS_PAGO[p.metodo]; const o={metodo:p.metodo, monto:+(+p.monto).toFixed(2)}; if(met&&met.bs){ o.tasa=tasaActual(); o.tasa_tipo=tasaElegida; } if(p.referencia && String(p.referencia).trim()) o.referencia=String(p.referencia).trim(); return o; })
     };
     const resp = await apiCall('POST','/ventas/carrito',payload);
     if(resp && resp.ventas){
