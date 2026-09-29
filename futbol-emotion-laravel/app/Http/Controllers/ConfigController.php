@@ -26,6 +26,7 @@ class ConfigController extends Controller
         'clave_cierre'      => '',
         'nombre_owner'      => '',
         'nombre_manager'    => '',
+        'tasas_extra'       => '[]',
     ];
 
     public function index(Request $request)
@@ -40,6 +41,7 @@ class ConfigController extends Controller
                 'tasa_bcv'          => $config['tasa_bcv'],
                 'tasa_euro'         => $config['tasa_euro'],
                 'tasa_binance'      => $config['tasa_binance'],
+                'tasas_extra'       => $config['tasas_extra'],
                 'tasa_fecha'        => $config['tasa_fecha'],
                 'tasa_origen'       => $config['tasa_origen'],
                 'banco_receptor'    => $config['banco_receptor'],
@@ -82,6 +84,8 @@ class ConfigController extends Controller
                 $valor = number_format($num, 4, '.', '');
             } elseif ($clave === 'manager_bloqueado') {
                 $valor = in_array($valor, ['1', 'true', 'on'], true) ? '1' : '0';
+            } elseif ($clave === 'tasas_extra') {
+                $valor = mb_substr(trim($valor), 0, 240);
             } else {
                 $valor = mb_substr(trim($valor), 0, 60);
             }
