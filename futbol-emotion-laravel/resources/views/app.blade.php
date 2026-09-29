@@ -2689,9 +2689,23 @@ function carritoAgregarPago(){
 }
 function carritoQuitarPago(i){ carritoPagos.splice(i,1); carritoRenderPagos(); }
 function carritoSetPagoMetodo(i,m){ carritoPagos[i].metodo=m; const otros=carritoPagos.reduce((a,p,idx)=>idx===i?a:a+pagoEnUsd(p),0); const restUsd=Math.max(0,+(carritoTotal()-otros).toFixed(2)); const met=METODOS_PAGO[m]; carritoPagos[i].monto=(met&&met.bs)? +(restUsd*tasaActual()).toFixed(2) : restUsd; carritoRenderPagos(); }
-function carritoSetTasa(k){ if(tasaValor(k)<=0){toast('Esa tasa no está configurada (Ajustes)');return} tasaElegida=k; carritoRenderPagos(); }
+function carritoSetTasa(k){
+  if(tasaValor(k)<=0){toast('Esa tasa no está configurada (Ajustes)');return}
+  const usds = carritoPagos.map(q=>pagoEnUsd(q));   // valor en $ con la tasa anterior
+  tasaElegida=k;
+  const tNew=tasaActual();
+  carritoPagos.forEach((q,idx)=>{ const m=METODOS_PAGO[q.metodo]; if(m&&m.bs && tNew>0){ q.monto=+(usds[idx]*tNew).toFixed(2); } });
+  carritoRenderPagos();
+}
 function carritoSetPagoMonto(i,v){ carritoPagos[i].monto=+v||0; carritoRenderResumen(); carritoActualizarConfirm(); }
 function carritoSetPagoRef(i,v){ carritoPagos[i].referencia=v; }
+function carritoMontoExacto(i){
+  const otros=carritoPagos.reduce((a,q,idx)=>idx===i?a:a+pagoEnUsd(q),0);
+  const restUsd=Math.max(0,+(carritoTotal()-otros).toFixed(2));
+  const m=METODOS_PAGO[carritoPagos[i].metodo];
+  carritoPagos[i].monto = (m&&m.bs)? +(restUsd*tasaActual()).toFixed(2) : restUsd;
+  carritoRenderPagos();
+}
 function carritoRenderPagos(){
   const cont=document.getElementById('cart-pagos');
   const hayBs=carritoPagos.some(p=>METODOS_PAGO[p.metodo]&&METODOS_PAGO[p.metodo].bs);
@@ -2706,7 +2720,7 @@ function carritoRenderPagos(){
   cont.innerHTML=tasaHtml+carritoPagos.map((p,i)=>{
     const m=METODOS_PAGO[p.metodo]; const esBs=m&&m.bs;
     const opts=Object.entries(METODOS_PAGO).map(([k,mm])=>`<option value="${k}" ${k===p.metodo?'selected':''}>${mm.label}</option>`).join('');
-    const equiv=esBs?`<div style="font-size:10.5px;color:var(--txm);margin-top:2px;text-align:right">≈ ${fmt(pagoEnUsd(p))}</div>`:'';
+    const equiv=esBs?`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px"><button type="button" onclick="carritoMontoExacto(${i})" style="background:var(--gl);border:1px solid var(--gm);color:var(--gd);border-radius:7px;padding:4px 9px;font-size:11px;font-weight:800;cursor:pointer"><i class="ti ti-calculator" style="font-size:12px"></i> Poner Bs exactos</button><span style="font-size:10.5px;color:var(--txm)">≈ ${fmt(pagoEnUsd(p))}</span></div>`:'';
     const usaRef = p.metodo!=='efectivo_usd' && p.metodo!=='efectivo_bs';
     const refHtml = usaRef ? `<input class="fi" style="width:100%;margin-top:6px;font-size:13px;padding:9px 10px" placeholder="Referencia (opcional)" value="${(p.referencia||'').replace(/"/g,'&quot;')}" oninput="carritoSetPagoRef(${i},this.value)">` : '';
     return `<div style="margin-bottom:8px">
