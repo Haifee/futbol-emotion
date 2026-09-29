@@ -4059,11 +4059,19 @@ function urlB64ToUint8Array(base64){
   return arr;
 }
 
+function swReady(timeout=5000){
+  // Espera al service worker pero nunca se cuelga: si no responde, rechaza
+  if(!('serviceWorker' in navigator)) return Promise.reject(new Error('sin-sw'));
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error('sw-timeout')), timeout))
+  ]);
+}
 async function estadoPush(){
   if(!('serviceWorker' in navigator) || !('PushManager' in window)) return 'no-soportado';
   if(Notification.permission==='denied') return 'bloqueado';
   try{
-    const reg=await navigator.serviceWorker.ready;
+    const reg=await swReady();
     const sub=await reg.pushManager.getSubscription();
     return sub ? 'activo' : 'inactivo';
   }catch(e){ return 'inactivo'; }
@@ -4081,7 +4089,7 @@ async function activarPush(){
     const {clave}=await apiCall('GET','/push/clave');
     if(!clave){ toast('El servidor aún no tiene configuradas las notificaciones'); return; }
 
-    const reg=await navigator.serviceWorker.ready;
+    const reg=await swReady();
     let sub=await reg.pushManager.getSubscription();
     if(!sub){
       sub=await reg.pushManager.subscribe({
@@ -4099,7 +4107,7 @@ async function activarPush(){
 
 async function desactivarPush(){
   try{
-    const reg=await navigator.serviceWorker.ready;
+    const reg=await swReady();
     const sub=await reg.pushManager.getSubscription();
     if(sub){
       const ep=sub.toJSON().endpoint;
