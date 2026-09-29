@@ -2317,17 +2317,17 @@ function normalizarTxt(s){ return (s==null?'':String(s)).toLowerCase().normalize
 function filtrarCamisetas(q){
   if(!q||!q.trim()) return camisetas;
   const tokens = normalizarTxt(q).split(/\s+/).filter(Boolean);
-  const res = camisetas.filter(c=>{
-    const campos = normalizarTxt([c.equipo,c.tipo,c.temp,c.categoria,nombreProv(c.prov)].filter(Boolean).join(' '));
-    return tokens.every(tk=>campos.includes(tk));   // todas las palabras, en cualquier orden
-  });
   const pref = normalizarTxt(q).trim();
-  return res.slice().sort((a,b)=>{                   // los que empiezan por lo buscado, primero
-    const ea=normalizarTxt(a.equipo), eb=normalizarTxt(b.equipo);
-    const sa=ea.startsWith(pref)?0:1, sb=eb.startsWith(pref)?0:1;
-    if(sa!==sb) return sa-sb;
-    return ea.localeCompare(eb);
-  });
+  const scored = camisetas.map(c=>{
+    const campos = normalizarTxt([c.equipo,c.tipo,c.temp,c.categoria,nombreProv(c.prov)].filter(Boolean).join(' '));
+    const eq = normalizarTxt(c.equipo);
+    let hits=0; for(const tk of tokens){ if(campos.includes(tk)) hits++; }
+    return {c, hits, eq, starts:(eq.startsWith(pref)||campos.includes(pref))?1:0};
+  }).filter(x=>x.hits>0);                              // coincide al menos una palabra
+  scored.sort((a,b)=>(b.hits-a.hits)                   // más palabras coincididas, primero
+    || (b.starts-a.starts)                             // luego los que empiezan por lo buscado
+    || a.eq.localeCompare(b.eq));
+  return scored.map(x=>x.c);
 }
 function filtrarStock(){
   stkQuery=document.getElementById('stk-search').value;
