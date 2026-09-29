@@ -299,6 +299,10 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
   .acc-grid .bigbtn{margin-bottom:0}
   .ventas-lista{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:10px;padding:10px}
   .ventas-lista .li{border-bottom:none;background:var(--gray);border-radius:12px;padding:12px}
+  /* Modales como diálogo centrado en PC (no hoja pegada abajo) */
+  .mbg{align-items:center}
+  .modal{border-radius:20px;max-width:560px;padding:24px 24px 26px;max-height:88vh}
+  .modal-handle{display:none}
 }
 </style>
 </head>
@@ -988,6 +992,13 @@ function aplicarMarca(){
   }catch(e){}
 }
 aplicarMarca();
+
+// ── Registrar service worker (necesario para instalar la app y para push) ──
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
+}
 
 let CONFIG={proveedor_1:'',proveedor_2:'',proveedor_3:'',proveedor_4:'',manager_bloqueado:'0'};
 function nombreRol(r=role){
@@ -2302,12 +2313,20 @@ async function enviarPedido(){
 
 // ── STOCK (encargado) ─────────────────────────────────────────────────────────
 let stkQuery='';
+function normalizarTxt(s){ return (s==null?'':String(s)).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
 function filtrarCamisetas(q){
   if(!q||!q.trim()) return camisetas;
-  const t=q.toLowerCase().trim();
-  return camisetas.filter(c=>{
-    const campos=[c.equipo,c.tipo,c.temp,c.categoria].filter(Boolean).join(' ').toLowerCase();
-    return campos.includes(t);
+  const tokens = normalizarTxt(q).split(/\s+/).filter(Boolean);
+  const res = camisetas.filter(c=>{
+    const campos = normalizarTxt([c.equipo,c.tipo,c.temp,c.categoria,nombreProv(c.prov)].filter(Boolean).join(' '));
+    return tokens.every(tk=>campos.includes(tk));   // todas las palabras, en cualquier orden
+  });
+  const pref = normalizarTxt(q).trim();
+  return res.slice().sort((a,b)=>{                   // los que empiezan por lo buscado, primero
+    const ea=normalizarTxt(a.equipo), eb=normalizarTxt(b.equipo);
+    const sa=ea.startsWith(pref)?0:1, sb=eb.startsWith(pref)?0:1;
+    if(sa!==sb) return sa-sb;
+    return ea.localeCompare(eb);
   });
 }
 function filtrarStock(){
@@ -2342,11 +2361,11 @@ function renderStock(){
     </div>
     <div style="position:relative;margin-bottom:14px">
       <i class="ti ti-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--txh);font-size:17px"></i>
-      <input class="fi" id="stk-search" placeholder="Buscar por equipo, tipo, temporada…" oninput="filtrarStock()" style="padding-left:38px;margin:0" value="${stkQuery.replace(/"/g,'&quot;')}">
+      <input class="fi" id="stk-search" placeholder="Buscar: equipo, tipo, temporada, proveedor…" oninput="filtrarStock()" style="padding-left:38px;margin:0" value="${stkQuery.replace(/"/g,'&quot;')}">
       ${stkQuery?`<button onclick="limpiarBusquedaStock()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--txh);font-size:18px"><i class="ti ti-x"></i></button>`:''}
     </div>
     ${camisetas.length===0?`<div class="empty"><i class="ti ti-shirt"></i><p>Sin camisetas en inventario.<br>Pulsa "Nueva camiseta" para empezar.</p></div>`:''}
-    ${(()=>{const lista=filtrarCamisetas(stkQuery);return lista.length===0&&camisetas.length>0?`<div class="empty"><i class="ti ti-search-off"></i><p>Nada coincide con "${stkQuery}"</p></div>`:'<div class="stock-grid">'+lista.map(c=>{
+    ${(()=>{const lista=filtrarCamisetas(stkQuery);return lista.length===0&&camisetas.length>0?`<div class="empty"><i class="ti ti-search-off"></i><p>Nada coincide con "${stkQuery}"</p></div>`:(stkQuery.trim()?`<div style="font-size:12px;color:var(--txm);font-weight:700;margin-bottom:8px">${lista.length} resultado${lista.length!==1?'s':''}</div>`:'')+'<div class="stock-grid">'+lista.map(c=>{
       const s=stockStatus(c);
       const clr=s==='ok'?'var(--g)':s==='bajo'?'var(--a)':'var(--r)';
       const lbl=s==='ok'?'OK':s==='bajo'?'Stock bajo':'Crítico';
@@ -3552,12 +3571,12 @@ function calcRenderKeys(){
   const keys=[
     {t:'C',a:"calcClear()",c:'var(--rd)',bg:'var(--rl)'},
     {t:'⌫',a:"calcBack()",c:'var(--ad)',bg:'var(--al)'},
+    {t:'%',a:"calcPct()",c:'var(--pd)',bg:'var(--pl)'},
     {t:'÷',a:"calcOp('÷')",...op},
-    {t:'×',a:"calcOp('×')",...op},
-    {t:'7',a:"calcNum('7')"},{t:'8',a:"calcNum('8')"},{t:'9',a:"calcNum('9')"},{t:'−',a:"calcOp('-')",...op},
-    {t:'4',a:"calcNum('4')"},{t:'5',a:"calcNum('5')"},{t:'6',a:"calcNum('6')"},{t:'+',a:"calcOp('+')",...op},
-    {t:'1',a:"calcNum('1')"},{t:'2',a:"calcNum('2')"},{t:'3',a:"calcNum('3')"},{t:'=',a:"calcEval()",c:'#fff',bg:'var(--g)',span:'row'},
-    {t:'0',a:"calcNum('0')",span:'col'},{t:'.',a:"calcNum('.')"}
+    {t:'7',a:"calcNum('7')"},{t:'8',a:"calcNum('8')"},{t:'9',a:"calcNum('9')"},{t:'×',a:"calcOp('×')",...op},
+    {t:'4',a:"calcNum('4')"},{t:'5',a:"calcNum('5')"},{t:'6',a:"calcNum('6')"},{t:'−',a:"calcOp('-')",...op},
+    {t:'1',a:"calcNum('1')"},{t:'2',a:"calcNum('2')"},{t:'3',a:"calcNum('3')"},{t:'+',a:"calcOp('+')",...op},
+    {t:'0',a:"calcNum('0')",span:'col'},{t:'.',a:"calcNum('.')"},{t:'=',a:"calcEval()",c:'#fff',bg:'var(--g)'}
   ];
   document.getElementById('calc-keys').innerHTML=keys.map(k=>{
     const sp = k.span==='row' ? 'grid-row:span 2;' : (k.span==='col' ? 'grid-column:span 2;' : '');
@@ -3582,16 +3601,34 @@ function calcOp(ch){
 }
 function calcClear(){ calcExpr=''; calcRender(); }
 function calcBack(){ calcExpr=calcExpr.slice(0,-1); calcRender(); }
+function calcSafeEval(str){
+  const limpio=(str==null?'':String(str)).replace(/×/g,'*').replace(/÷/g,'/');
+  if(!limpio || !/^[-0-9+*/. ]+$/.test(limpio)) return null;
+  try{ const r=Function('"use strict";return ('+limpio+')')(); return isFinite(r)?r:null; }catch(e){ return null; }
+}
+function calcPct(){
+  // Porcentaje contextual (tipo calculadora de teléfono). Ej: 22 - 15% = 18.70
+  const m = calcExpr.match(/^(.*?)([+\-−×÷])([0-9.]+)$/);
+  if(m){
+    const base=m[1], op=m[2], num=parseFloat(m[3]);
+    if(!isNaN(num)){
+      let val;
+      if(op==='+'||op==='-'||op==='−'){ const bv=calcSafeEval(base); if(bv==null) return; val=bv*num/100; }
+      else { val=num/100; }
+      val=Math.round((val+Number.EPSILON)*100)/100;
+      calcExpr=base+op+val; calcRender(); return;
+    }
+  }
+  if(/^[0-9.]+$/.test(calcExpr)){
+    const n=parseFloat(calcExpr);
+    if(!isNaN(n)){ calcExpr=String(Math.round((n/100+Number.EPSILON)*100)/100); calcRender(); }
+  }
+}
 function calcEval(){
   if(!calcExpr) return;
-  const limpio=calcExpr.replace(/×/g,'*').replace(/÷/g,'/');
-  if(!/^[-0-9+*/. ]+$/.test(limpio)){ document.getElementById('calc-display').textContent='Error'; calcExpr=''; return; }
-  try{
-    let r=Function('"use strict";return ('+limpio+')')();
-    if(!isFinite(r)) throw 0;
-    r=Math.round((r+Number.EPSILON)*100)/100;
-    calcExpr=String(r); calcRender();
-  }catch(e){ document.getElementById('calc-display').textContent='Error'; calcExpr=''; }
+  const r=calcSafeEval(calcExpr);
+  if(r==null){ document.getElementById('calc-display').textContent='Error'; calcExpr=''; return; }
+  calcExpr=String(Math.round((r+Number.EPSILON)*100)/100); calcRender();
 }
 
 // ── CERRAR CAJA ───────────────────────────────────────────────────────────────
