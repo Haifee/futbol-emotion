@@ -1455,15 +1455,20 @@ const METODOS_PAGO={
 let metodoPago=null;
 
 let tasaElegida='bcv'; // bcv | euro | binance
+function tasasExtra(){ try{ const a=JSON.parse(CONFIG.tasas_extra||'[]'); return (Array.isArray(a)?a:[]).map(t=>({id:t.i||t.id, nombre:t.n||t.nombre, valor:t.v||t.valor})).filter(t=>t.id&&t.nombre); }catch(e){ return []; } }
+function tasasDisponibles(){ return [{k:'bcv',label:'Dólar BCV'},{k:'euro',label:'Euro BCV'},{k:'binance',label:'Binance'}].concat(tasasExtra().map(t=>({k:t.id,label:t.nombre}))); }
+function tasaNombre(k){ const o=tasasDisponibles().find(x=>x.k===k); return o?o.label:k; }
 function tasaValor(cual){
   const mapa={bcv:CONFIG.tasa_bcv,euro:CONFIG.tasa_euro,binance:CONFIG.tasa_binance};
-  return parseFloat(mapa[cual])||0;
+  if(cual in mapa) return parseFloat(mapa[cual])||0;
+  const ex=tasasExtra().find(t=>t.id===cual);
+  return ex?(parseFloat(String(ex.valor).replace(',','.'))||0):0;
 }
 function tasaActual(){ return tasaValor(tasaElegida); }
 function renderSelectorTasa(){
   const cont=document.getElementById('v-tasa-selector');
   if(!cont) return;
-  const opciones=[{k:'bcv',label:'Dólar BCV'},{k:'euro',label:'Euro BCV'},{k:'binance',label:'Binance'}];
+  const opciones=tasasDisponibles();
   cont.innerHTML=opciones.map(o=>{
     const val=tasaValor(o.k);
     const act=tasaElegida===o.k;
@@ -1475,9 +1480,8 @@ function setTasaElegida(k){
   if(tasaValor(k)<=0){toast('Esa tasa no está configurada (Ajustes)');return}
   tasaElegida=k;
   renderSelectorTasa();
-  const nombres={bcv:'Dólar BCV',euro:'Euro BCV',binance:'Binance'};
   const info=document.getElementById('v-tasa-info');
-  if(info) info.textContent=`${nombres[k]}: ${tasaActual().toLocaleString('es-VE',{minimumFractionDigits:2})} Bs/$`;
+  if(info) info.textContent=`${tasaNombre(k)}: ${tasaActual().toLocaleString('es-VE',{minimumFractionDigits:2})} Bs/$`;
   recalcularBs();
 }
 function fmtBs(n){ return 'Bs ' + (n||0).toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -1532,9 +1536,8 @@ function setMetodoPago(k){
       tasaElegida=['bcv','euro','binance'].find(k=>tasaValor(k)>0)||'bcv';
     }
     renderSelectorTasa();
-    const nombres={bcv:'Dólar BCV',euro:'Euro BCV',binance:'Binance'};
     document.getElementById('v-tasa-info').textContent=tasaActual()>0
-      ? `${nombres[tasaElegida]}: ${tasaActual().toLocaleString('es-VE',{minimumFractionDigits:2})} Bs/$`
+      ? `${tasaNombre(tasaElegida)}: ${tasaActual().toLocaleString('es-VE',{minimumFractionDigits:2})} Bs/$`
       : '⚠️ Sin tasa configurada (Ajustes)';
     recalcularBs();
   }
@@ -2711,7 +2714,7 @@ function carritoRenderPagos(){
   const hayBs=carritoPagos.some(p=>METODOS_PAGO[p.metodo]&&METODOS_PAGO[p.metodo].bs);
   let tasaHtml='';
   if(hayBs){
-    const ops=[{k:'bcv',l:'BCV'},{k:'euro',l:'Euro'},{k:'binance',l:'Binance'}];
+    const ops=tasasDisponibles().map(o=>({k:o.k,l:o.label.replace('Dólar ','').replace(' BCV','')}));
     tasaHtml='<div style="font-size:11px;color:var(--txm);margin-bottom:4px">Tasa para los pagos en Bs:</div><div style="display:flex;gap:6px;margin-bottom:10px">'+ops.map(o=>{
       const val=tasaValor(o.k), act=tasaElegida===o.k, dis=val<=0;
       return `<button type="button" ${dis?'disabled':''} onclick="carritoSetTasa('${o.k}')" style="flex:1;padding:5px 3px;border-radius:8px;cursor:${dis?'not-allowed':'pointer'};font-size:11px;font-weight:800;border:2px solid ${act?'var(--gd)':'var(--gm)'};background:${act?'var(--gd)':'#fff'};color:${act?'#fff':'var(--gd)'};opacity:${dis?.5:1}">${o.l}<br><span style="font-size:9px;font-weight:600">${val>0?val.toLocaleString('es-VE'):'—'}</span></button>`;
@@ -3558,7 +3561,7 @@ function abrirCalcBs(){
 }
 function renderCalcTasas(){
   const cont=document.getElementById('calc-tasas');
-  const ops=[{k:'bcv',label:'Dólar BCV'},{k:'euro',label:'Euro BCV'},{k:'binance',label:'Binance'}];
+  const ops=tasasDisponibles();
   cont.innerHTML=ops.map(o=>{
     const val=tasaValor(o.k), act=calcTasa===o.k, dis=val<=0;
     return `<button type="button" ${dis?'disabled':''} onclick="setCalcTasa('${o.k}')" style="flex:1;padding:8px 4px;border-radius:9px;cursor:${dis?'not-allowed':'pointer'};font-size:11px;font-weight:800;border:2px solid ${act?'var(--gd)':'var(--gm)'};background:${act?'var(--gd)':'#fff'};color:${act?'#fff':(dis?'var(--txh)':'var(--gd)')};opacity:${dis?.5:1}">${o.label}<br><span style="font-size:9px;font-weight:600">${val>0?val.toLocaleString('es-VE',{minimumFractionDigits:2}):'—'}</span></button>`;
@@ -3573,9 +3576,8 @@ function calcularBs(){
   const tasa=tasaValor(calcTasa);
   const bs=usd*tasa;
   document.getElementById('calc-bs').textContent=fmtBs(bs);
-  const nombres={bcv:'Dólar BCV',euro:'Euro BCV',binance:'Binance'};
   document.getElementById('calc-tasa-info').textContent=tasa>0
-    ? `${nombres[calcTasa]}: ${tasa.toLocaleString('es-VE',{minimumFractionDigits:2})} Bs/$`
+    ? `${tasaNombre(calcTasa)}: ${tasa.toLocaleString('es-VE',{minimumFractionDigits:2})} Bs/$`
     : 'Sin tasa configurada (Ajustes)';
 }
 
@@ -3947,6 +3949,17 @@ function renderAjustes(){
       <div style="font-size:12px;color:var(--txm);margin-top:10px">Los precios siguen en dólares. Al cobrar en bolívares se usa la tasa del <b>dólar BCV</b>. Euro y Binance son de referencia.</div>
     </div>
 
+    <div class="stitle">Tasas personalizadas</div>
+    <div class="card">
+      <div style="font-size:12.5px;color:var(--txm);margin-bottom:12px">Agrega tus propias tasas (ej. "Paralelo", "Efectivo"). Aparecen al cobrar en Bs y en la calculadora.</div>
+      <div id="cfg-tasas-extra"></div>
+      <div class="frow" style="margin-top:6px">
+        <div style="flex:2"><label class="fl" style="margin-top:0">Nombre</label><input class="fi" id="cfg-nueva-tasa-nombre" maxlength="14" placeholder="Ej: Paralelo"></div>
+        <div style="flex:1"><label class="fl" style="margin-top:0">Bs por $</label><input class="fi" id="cfg-nueva-tasa-valor" type="number" min="0" step="0.0001" placeholder="Ej: 900"></div>
+      </div>
+      <button class="abtn abtn-gray" onclick="agregarTasaExtra()" style="margin-top:8px"><i class="ti ti-plus"></i> Agregar tasa</button>
+    </div>
+
     <div class="stitle">Datos para cobrar (pago móvil)</div>
     <div class="card">
       <div style="font-size:13px;color:var(--txm);margin-bottom:12px">Estos datos quedan puestos automáticamente al registrar un pago móvil o transferencia. El encargado solo agrega la referencia y el banco del cliente.</div>
@@ -4051,8 +4064,46 @@ function renderAjustes(){
     </div>
   `;
   pintarEstadoPush();
+  renderTasasExtra();
 }
 
+function renderTasasExtra(){
+  const cont=document.getElementById('cfg-tasas-extra'); if(!cont) return;
+  const lista=tasasExtra();
+  cont.innerHTML = lista.length ? lista.map(t=>`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;background:var(--gray);border-radius:10px;padding:8px 12px">
+      <div style="flex:1"><div style="font-size:13px;font-weight:800">${t.nombre}</div><div style="font-size:11px;color:var(--txm)">${(parseFloat(String(t.valor).replace(',','.'))||0).toLocaleString('es-VE',{minimumFractionDigits:2})} Bs/$</div></div>
+      <button onclick="borrarTasaExtra('${t.id}')" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:18px"><i class="ti ti-trash"></i></button>
+    </div>`).join('') : '<div style="font-size:12px;color:var(--txm);margin-bottom:6px">No tienes tasas personalizadas todav\u00eda.</div>';
+}
+async function agregarTasaExtra(){
+  const nombre=(document.getElementById('cfg-nueva-tasa-nombre').value||'').trim();
+  const valor=parseFloat((document.getElementById('cfg-nueva-tasa-valor').value||'').replace(',','.'))||0;
+  if(!nombre){ toast('Ponle un nombre a la tasa'); return; }
+  if(valor<=0){ toast('Pon un valor v\u00e1lido (Bs por $)'); return; }
+  const lista=tasasExtra();
+  if(lista.length>=4){ toast('M\u00e1ximo 4 tasas personalizadas'); return; }
+  lista.push({id:'x'+Math.random().toString(36).slice(2,6), nombre:nombre.slice(0,14), valor:valor.toFixed(4)});
+  await guardarTasasExtra(lista);
+  document.getElementById('cfg-nueva-tasa-nombre').value='';
+  document.getElementById('cfg-nueva-tasa-valor').value='';
+}
+async function borrarTasaExtra(id){
+  const lista=tasasExtra().filter(t=>t.id!==id);
+  if(tasaElegida===id) tasaElegida='bcv';
+  if(typeof calcTasa!=='undefined' && calcTasa===id) calcTasa='bcv';
+  await guardarTasasExtra(lista);
+}
+async function guardarTasasExtra(lista){
+  const compact=lista.map(t=>({i:t.id, n:String(t.nombre).slice(0,14), v:t.valor}));
+  const json=JSON.stringify(compact);
+  try{
+    if(MODO_SERVIDOR) await apiCall('POST','/config',{tasas_extra:json});
+    CONFIG.tasas_extra=json;
+    toast('Tasas actualizadas \u2713');
+    renderTasasExtra();
+    registrarActividad('ajuste','Tasas personalizadas actualizadas','');
+  }catch(e){ toast('No se pudo guardar'); }
+}
 function exportarTodo(){
   const datos={
     version:'1.0', fecha:hoy(),
