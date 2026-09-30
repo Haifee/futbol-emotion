@@ -27,6 +27,7 @@ class ConfigController extends Controller
         'nombre_owner'      => '',
         'nombre_manager'    => '',
         'tasas_extra'       => '[]',
+        'personal'          => '[]',
     ];
 
     public function index(Request $request)
@@ -86,6 +87,8 @@ class ConfigController extends Controller
                 $valor = in_array($valor, ['1', 'true', 'on'], true) ? '1' : '0';
             } elseif ($clave === 'tasas_extra') {
                 $valor = mb_substr(trim($valor), 0, 240);
+            } elseif ($clave === 'personal') {
+                $valor = mb_substr(trim($valor), 0, 2000);
             } else {
                 $valor = mb_substr(trim($valor), 0, 60);
             }
