@@ -802,10 +802,19 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <label class="fl">Descripción</label><input class="fi" id="tx-desc" placeholder="Ej: Bolsas para la tienda, pago de luz…">
     <div class="frow">
       <div><label class="fl">Importe ($)</label><input class="fi" id="tx-imp" type="number" min="0" step="0.01" placeholder="0.00"></div>
-      <div id="tx-cat-wrap"><label class="fl">Categoría</label><select class="fi" id="tx-cat"><option>Sueldos</option><option>Servicios</option><option>Transporte</option><option>Local</option><option>Retiros</option><option>Otros</option></select></div>
+      <div id="tx-cat-wrap"><label class="fl">Categoría</label><select class="fi" id="tx-cat"><option>Servicios</option><option>Transporte</option><option>Local</option><option>Retiros</option><option>Otros</option></select></div>
       <div id="tx-canal-wrap" style="display:none"><label class="fl">Canal</label><select class="fi" id="tx-canal"><option>Tienda física</option><option>Instagram</option><option>WhatsApp</option><option>Web</option><option>Otro</option></select></div>
     </div>
     <button class="abtn abtn-g" onclick="saveTx()" id="tx-save-btn"><i class="ti ti-check"></i> Guardar</button>
+  </div>
+</div>
+
+<!-- MODAL: NÓMINA -->
+<div class="mbg" id="m-nomina">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle"><span>Pagar al personal</span> <button class="mclose" onclick="closeM('m-nomina')"><i class="ti ti-x"></i></button></div>
+    <div id="nomina-body"></div>
   </div>
 </div>
 
@@ -1465,6 +1474,8 @@ const METODOS_PAGO={
 let metodoPago=null;
 
 let tasaElegida='bcv'; // bcv | euro | binance
+function personalLista(){ try{ const a=JSON.parse(CONFIG.personal||'[]'); return (Array.isArray(a)?a:[]).map(p=>({id:p.i||p.id, nombre:p.n||p.nombre, cargo:p.c||p.cargo||'', sueldo:parseFloat(p.s!=null?p.s:p.sueldo)||0})).filter(p=>p.id&&p.nombre); }catch(e){ return []; } }
+function nominaPagadoMes(nombre){ const m=hoy().slice(0,7); return transacciones.filter(t=>t.tipo==='gasto'&&t.canal==='Sueldos'&&String(t.desc||'').startsWith('Nómina: '+nombre)&&String(t.fecha||'').slice(0,7)===m).reduce((x,t)=>x+(t.imp||0),0); }
 function tasasExtra(){ try{ const a=JSON.parse(CONFIG.tasas_extra||'[]'); return (Array.isArray(a)?a:[]).map(t=>({id:t.i||t.id, nombre:t.n||t.nombre, valor:t.v||t.valor})).filter(t=>t.id&&t.nombre); }catch(e){ return []; } }
 function tasasDisponibles(){ return [{k:'bcv',label:'Dólar BCV'},{k:'euro',label:'Euro BCV'},{k:'binance',label:'Binance'}].concat(tasasExtra().map(t=>({k:t.id,label:t.nombre}))); }
 function tasaNombre(k){ const o=tasasDisponibles().find(x=>x.k===k); return o?o.label:k; }
@@ -3511,12 +3522,13 @@ function renderCaja(){
         <span style="font-size:15px;font-weight:800;color:var(--rd)">Gastos de la empresa</span>
         <span style="font-size:11px;font-weight:600;color:var(--rd);opacity:.75">Sueldos, servicios, transporte…</span>
       </button>
-      ${role==='owner'?`<button onclick="abrirTx('inversion')" style="padding:18px 12px;border-radius:14px;border:2px solid var(--ad);background:var(--al);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;box-shadow:var(--shadow)">
-        <i class="ti ti-building-store" style="font-size:30px;color:var(--ad)"></i>
-        <span style="font-size:15px;font-weight:800;color:var(--ad)">Inversión de la empresa</span>
-        <span style="font-size:11px;font-weight:600;color:var(--ad);opacity:.75">Compra de mercancía / stock</span>
+      ${role==='owner'?`<button onclick="abrirTx('inversion')" style="padding:18px 12px;border-radius:14px;border:2px solid var(--gd);background:var(--gl);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;box-shadow:var(--shadow)">
+        <i class="ti ti-building-store" style="font-size:30px;color:var(--gd)"></i>
+        <span style="font-size:15px;font-weight:800;color:var(--gd)">Inversión de la empresa</span>
+        <span style="font-size:11px;font-weight:600;color:var(--gd);opacity:.75">Compra de mercancía / stock</span>
       </button>`:''}
     </div>
+    ${role==='owner'?`<button class="abtn abtn-gray" onclick="abrirNomina()" style="margin-bottom:10px"><i class="ti ti-users"></i> Pagar al personal</button>`:''}
     <button class="abtn abtn-gray" onclick="abrirCalcBs()" style="margin-bottom:18px"><i class="ti ti-calculator"></i> Calculadora de bolívares</button>
     ${(role==='owner'&&!historialCompleto)?`<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;background:var(--gl)"><div style="font-size:12.5px;color:var(--txm);line-height:1.4"><i class="ti ti-clock-hour-4"></i> Mostrando los últimos ${MESES_CARGA_INICIAL} meses. Los reportes de meses viejos se cargan solos al exportar.</div><button onclick="cargarHistorialCompletoUI()" style="flex:none;background:var(--tx);color:#fff;border:none;border-radius:9px;padding:8px 12px;cursor:pointer;font-size:12px;font-weight:700;white-space:nowrap">Cargar todo</button></div>`:''}
     ${bloqueResumen('Cierre del día','ti-sun','var(--g)',dia,hoyStr,'dia')}
@@ -4047,6 +4059,18 @@ function renderAjustes(){
       <button class="abtn abtn-gray" onclick="agregarTasaExtra()" style="margin-top:8px"><i class="ti ti-plus"></i> Agregar tasa</button>
     </div>
 
+    <div class="stitle">Personal / Nómina</div>
+    <div class="card">
+      <div style="font-size:12.5px;color:var(--txm);margin-bottom:12px">Registra a tu personal. Luego, desde Caja, podrás pagarles y el sueldo entra solo como gasto operativo.</div>
+      <div id="cfg-personal"></div>
+      <div class="frow" style="margin-top:6px">
+        <div style="flex:2"><label class="fl" style="margin-top:0">Nombre</label><input class="fi" id="cfg-nuevo-emp-nombre" maxlength="30" placeholder="Ej: Juan"></div>
+        <div style="flex:1"><label class="fl" style="margin-top:0">Sueldo ($)</label><input class="fi" id="cfg-nuevo-emp-sueldo" type="number" min="0" step="0.01" placeholder="Opcional"></div>
+      </div>
+      <label class="fl">Cargo (opcional)</label><input class="fi" id="cfg-nuevo-emp-cargo" maxlength="24" placeholder="Ej: Vendedor">
+      <button class="abtn abtn-gray" onclick="agregarPersonal()" style="margin-top:8px"><i class="ti ti-user-plus"></i> Agregar empleado</button>
+    </div>
+
     <div class="stitle">Datos para cobrar (pago móvil)</div>
     <div class="card">
       <div style="font-size:13px;color:var(--txm);margin-bottom:12px">Estos datos quedan puestos automáticamente al registrar un pago móvil o transferencia. El encargado solo agrega la referencia y el banco del cliente.</div>
@@ -4152,6 +4176,7 @@ function renderAjustes(){
   `;
   pintarEstadoPush();
   renderTasasExtra();
+  renderPersonal();
 }
 
 function renderTasasExtra(){
@@ -4189,6 +4214,102 @@ async function guardarTasasExtra(lista){
     toast('Tasas actualizadas \u2713');
     renderTasasExtra();
     registrarActividad('ajuste','Tasas personalizadas actualizadas','');
+  }catch(e){ toast('No se pudo guardar'); }
+}
+let nominaEmpleadoSel='';
+function abrirNomina(){
+  const lista=personalLista();
+  const cont=document.getElementById('nomina-body');
+  if(!lista.length){
+    cont.innerHTML=`<div style="text-align:center;padding:12px 4px">
+      <i class="ti ti-users" style="font-size:40px;color:var(--txh)"></i>
+      <p style="font-size:13.5px;color:var(--txm);margin:10px 0 14px">Todavía no tienes personal registrado. Agrégalo en Ajustes para poder pagarle.</p>
+      <button class="abtn abtn-g" onclick="closeM('m-nomina');goTo('ajustes')"><i class="ti ti-settings"></i> Ir a Ajustes</button>
+    </div>`;
+    openM('m-nomina'); return;
+  }
+  nominaEmpleadoSel=lista[0].id;
+  cont.innerHTML=`
+    <label class="fl" style="margin-top:0">Empleado</label>
+    <select class="fi" id="nom-emp" onchange="nominaSelEmpleado()">${lista.map(p=>`<option value="${p.id}">${p.nombre}${p.cargo?' · '+p.cargo:''}</option>`).join('')}</select>
+    <div id="nom-info" style="font-size:12px;color:var(--txm);margin:9px 0 2px"></div>
+    <label class="fl">Monto a pagar ($)</label>
+    <input class="fi" id="nom-monto" type="number" min="0" step="0.01" placeholder="0.00">
+    <div style="font-size:11.5px;color:var(--txh);margin-top:4px">Puedes cambiar el monto si es un adelanto o pago parcial.</div>
+    <button class="abtn abtn-g" onclick="pagarNomina()" id="nom-save-btn" style="margin-top:14px"><i class="ti ti-cash"></i> Registrar pago</button>`;
+  nominaSelEmpleado();
+  openM('m-nomina');
+}
+function nominaSelEmpleado(){
+  const lista=personalLista();
+  const id=document.getElementById('nom-emp').value;
+  nominaEmpleadoSel=id;
+  const p=lista.find(x=>x.id===id); if(!p) return;
+  document.getElementById('nom-monto').value=p.sueldo>0?p.sueldo:'';
+  const pagado=nominaPagadoMes(p.nombre);
+  document.getElementById('nom-info').innerHTML=`Sueldo base: <b>${p.sueldo>0?fmt(p.sueldo):'—'}</b>${pagado>0?` · Este mes le has pagado <b>${fmt(pagado)}</b>`:''}`;
+}
+let nominaGuardando=false;
+async function pagarNomina(){
+  if(nominaGuardando) return;
+  const lista=personalLista();
+  const p=lista.find(x=>x.id===nominaEmpleadoSel);
+  if(!p){ toast('Elige un empleado'); return; }
+  const imp=+document.getElementById('nom-monto').value;
+  if(!(imp>0)){ toast('⚠️ El monto debe ser mayor que 0'); return; }
+  const desc='Nómina: '+p.nombre+(p.cargo?' · '+p.cargo:'');
+  const canal='Sueldos';
+  nominaGuardando=true;
+  try{
+    if(MODO_SERVIDOR){
+      const r=await apiCall('POST','/transacciones',{tipo:'gasto',descripcion:desc,importe:imp,canal});
+      transacciones.push({id:r.id,tipo:'gasto',desc,imp,canal,fecha:r.fecha,venta_id:null});
+    }else{
+      transacciones.push({id:ids.tx++,tipo:'gasto',desc,imp,canal,fecha:hoy(),venta_id:null});
+      sd('transacciones',transacciones);
+    }
+    registrarActividad('caja',`Pago de nómina: ${p.nombre}`,`-$${imp.toFixed(2)}`);
+    closeM('m-nomina'); toast('Pago registrado ✓');
+    if(curPage==='caja') renderCaja();
+  }catch(e){/* apiCall ya mostró el error */}
+  nominaGuardando=false;
+}
+function renderPersonal(){
+  const cont=document.getElementById('cfg-personal'); if(!cont) return;
+  const lista=personalLista();
+  cont.innerHTML = lista.length ? lista.map(p=>`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;background:var(--gray);border-radius:10px;padding:8px 12px">
+      <div style="flex:1"><div style="font-size:13px;font-weight:800">${p.nombre}${p.cargo?` <span style="font-weight:600;color:var(--txm)">· ${p.cargo}</span>`:''}</div><div style="font-size:11px;color:var(--txm)">${p.sueldo>0?'Sueldo: '+fmt(p.sueldo):'Sin sueldo fijo'}</div></div>
+      <button onclick="borrarPersonal('${p.id}')" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:18px"><i class="ti ti-trash"></i></button>
+    </div>`).join('') : '<div style="font-size:12px;color:var(--txm);margin-bottom:6px">Todavía no tienes personal registrado.</div>';
+}
+async function agregarPersonal(){
+  const nombre=(document.getElementById('cfg-nuevo-emp-nombre').value||'').trim();
+  const cargo=(document.getElementById('cfg-nuevo-emp-cargo').value||'').trim();
+  const sueldo=parseFloat((document.getElementById('cfg-nuevo-emp-sueldo').value||'').replace(',','.'))||0;
+  if(!nombre){ toast('Ponle el nombre del empleado'); return; }
+  const lista=personalLista();
+  if(lista.length>=20){ toast('Máximo 20 empleados'); return; }
+  lista.push({id:'e'+Math.random().toString(36).slice(2,6), nombre:nombre.slice(0,30), cargo:cargo.slice(0,24), sueldo:sueldo.toFixed(2)});
+  await guardarPersonal(lista);
+  document.getElementById('cfg-nuevo-emp-nombre').value='';
+  document.getElementById('cfg-nuevo-emp-cargo').value='';
+  document.getElementById('cfg-nuevo-emp-sueldo').value='';
+}
+async function borrarPersonal(id){
+  const p=personalLista().find(x=>x.id===id);
+  if(p && !confirm(`¿Eliminar a ${p.nombre} del personal? (no borra los pagos ya registrados)`)) return;
+  const lista=personalLista().filter(x=>x.id!==id);
+  await guardarPersonal(lista);
+}
+async function guardarPersonal(lista){
+  const compact=lista.map(p=>({i:p.id, n:String(p.nombre).slice(0,30), c:String(p.cargo||'').slice(0,24), s:p.sueldo}));
+  const json=JSON.stringify(compact);
+  try{
+    if(MODO_SERVIDOR) await apiCall('POST','/config',{personal:json});
+    CONFIG.personal=json;
+    toast('Personal actualizado ✓');
+    renderPersonal();
+    registrarActividad('ajuste','Personal / nómina actualizado','');
   }catch(e){ toast('No se pudo guardar'); }
 }
 function exportarTodo(){
