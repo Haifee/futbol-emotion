@@ -802,7 +802,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <label class="fl">Descripción</label><input class="fi" id="tx-desc" placeholder="Ej: Bolsas para la tienda, pago de luz…">
     <div class="frow">
       <div><label class="fl">Importe ($)</label><input class="fi" id="tx-imp" type="number" min="0" step="0.01" placeholder="0.00"></div>
-      <div id="tx-cat-wrap"><label class="fl">Categoría</label><select class="fi" id="tx-cat"><option>Inversión (mercancía)</option><option>Sueldos</option><option>Servicios</option><option>Transporte</option><option>Local</option><option>Retiros</option><option>Otros</option></select></div>
+      <div id="tx-cat-wrap"><label class="fl">Categoría</label><select class="fi" id="tx-cat"><option>Sueldos</option><option>Servicios</option><option>Transporte</option><option>Local</option><option>Retiros</option><option>Otros</option></select></div>
       <div id="tx-canal-wrap" style="display:none"><label class="fl">Canal</label><select class="fi" id="tx-canal"><option>Tienda física</option><option>Instagram</option><option>WhatsApp</option><option>Web</option><option>Otro</option></select></div>
     </div>
     <button class="abtn abtn-g" onclick="saveTx()" id="tx-save-btn"><i class="ti ti-check"></i> Guardar</button>
@@ -3352,15 +3352,18 @@ function renderFin(){
           <div class="liright" style="font-weight:800;color:${t.tipo==='ingreso'?'var(--g)':'var(--r)'}">${t.tipo==='ingreso'?'+':'-'}${fmt(t.imp)}</div>
         </div>`).join('')}
     </div>
-    <button class="abtn abtn-g" onclick="openM('m-tx')"><i class="ti ti-plus"></i> Registrar movimiento</button>`;
+    <button class="abtn abtn-g" onclick="abrirTx('gasto')"><i class="ti ti-plus"></i> Registrar movimiento</button>`;
 }
-function abrirTx(tipo='gasto'){
+function abrirTx(modo='gasto'){
   document.getElementById('tx-desc').value='';
   document.getElementById('tx-imp').value='';
-  document.getElementById('tx-tipo').value=(role==='owner'&&tipo==='ingreso')?'ingreso':'gasto';
-  // El encargado solo registra gastos; el dueño puede elegir tipo
-  document.getElementById('tx-tipo-wrap').style.display=role==='owner'?'block':'none';
-  toggleTxTipo();
+  document.getElementById('tx-tipo').value='gasto';
+  document.getElementById('tx-tipo-wrap').style.display='none';
+  txModoInversion=(modo==='inversion');
+  document.getElementById('tx-title').textContent=txModoInversion?'Registrar inversión':'Registrar gasto';
+  document.getElementById('tx-canal-wrap').style.display='none';
+  document.getElementById('tx-cat-wrap').style.display=txModoInversion?'none':'block';
+  document.getElementById('tx-desc').placeholder=txModoInversion?'Ej: Compra de camisetas, mercancía nueva…':'Ej: Pago de luz, sueldo del personal…';
   openM('m-tx');
 }
 function toggleTxTipo(){
@@ -3369,6 +3372,7 @@ function toggleTxTipo(){
   document.getElementById('tx-cat-wrap').style.display=tipo==='gasto'?'block':'none';
   document.getElementById('tx-canal-wrap').style.display=tipo==='gasto'?'none':'block';
 }
+let txModoInversion=false;
 let txGuardando=false;
 async function saveTx(){
   if(txGuardando) return;
@@ -3377,7 +3381,7 @@ async function saveTx(){
   const tipo=document.getElementById('tx-tipo').value;
   if(!desc){toast('Escribe una descripción');return}
   if(!(imp>0)){toast('⚠️ El importe debe ser mayor que 0');return}
-  const canal=tipo==='gasto'?document.getElementById('tx-cat').value:document.getElementById('tx-canal').value;
+  const canal=txModoInversion?'Inversión (mercancía)':document.getElementById('tx-cat').value;
   txGuardando=true;
   try{
     if(MODO_SERVIDOR){
@@ -3504,13 +3508,13 @@ function renderCaja(){
     <div style="display:grid;grid-template-columns:${role==='owner'?'1fr 1fr':'1fr'};gap:10px;margin-bottom:18px">
       <button onclick="abrirTx('gasto')" style="padding:18px 12px;border-radius:14px;border:2px solid var(--rd);background:var(--rl);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;box-shadow:var(--shadow)">
         <i class="ti ti-receipt-2" style="font-size:30px;color:var(--rd)"></i>
-        <span style="font-size:15px;font-weight:800;color:var(--rd)">Registrar gasto</span>
-        <span style="font-size:11px;font-weight:600;color:var(--rd);opacity:.75">Compras, servicios, envíos…</span>
+        <span style="font-size:15px;font-weight:800;color:var(--rd)">Gastos de la empresa</span>
+        <span style="font-size:11px;font-weight:600;color:var(--rd);opacity:.75">Sueldos, servicios, transporte…</span>
       </button>
-      ${role==='owner'?`<button onclick="abrirTx('ingreso')" style="padding:18px 12px;border-radius:14px;border:2px solid var(--gd);background:var(--gl);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;box-shadow:var(--shadow)">
-        <i class="ti ti-cash-banknote" style="font-size:30px;color:var(--gd)"></i>
-        <span style="font-size:15px;font-weight:800;color:var(--gd)">Registrar ingreso</span>
-        <span style="font-size:11px;font-weight:600;color:var(--gd);opacity:.75">Dinero que entra aparte de ventas</span>
+      ${role==='owner'?`<button onclick="abrirTx('inversion')" style="padding:18px 12px;border-radius:14px;border:2px solid var(--ad);background:var(--al);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;box-shadow:var(--shadow)">
+        <i class="ti ti-building-store" style="font-size:30px;color:var(--ad)"></i>
+        <span style="font-size:15px;font-weight:800;color:var(--ad)">Inversión de la empresa</span>
+        <span style="font-size:11px;font-weight:600;color:var(--ad);opacity:.75">Compra de mercancía / stock</span>
       </button>`:''}
     </div>
     <button class="abtn abtn-gray" onclick="abrirCalcBs()" style="margin-bottom:18px"><i class="ti ti-calculator"></i> Calculadora de bolívares</button>
