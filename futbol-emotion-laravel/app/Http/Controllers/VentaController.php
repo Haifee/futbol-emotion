@@ -405,21 +405,28 @@ class VentaController extends Controller
         $metodosValidos = [
             'efectivo_usd', 'efectivo_bs', 'pago_movil', 'punto_venta',
             'transferencia', 'zelle', 'binance', 'zinli', 'cashea',
+            'efectivo_otra',
         ];
 
         if (!is_array($pago) || empty($pago['metodo']) || !in_array($pago['metodo'], $metodosValidos, true)) {
             return;
         }
 
-        $enBolivares = in_array($pago['metodo'], ['efectivo_bs', 'pago_movil', 'punto_venta', 'transferencia'], true);
-        $moneda = $enBolivares ? 'VES' : 'USD';
+        $enBolivares  = in_array($pago['metodo'], ['efectivo_bs', 'pago_movil', 'punto_venta', 'transferencia'], true);
+        $esOtraMoneda = ($pago['metodo'] === 'efectivo_otra');
         $tasa   = isset($pago['tasa']) ? (float) $pago['tasa'] : null;
         $monto  = isset($pago['monto']) ? (float) $pago['monto'] : null;
 
         if ($enBolivares) {
+            $moneda = 'VES';
             if (!$monto && $tasa > 0) $monto = round($importeUsd * $tasa, 2);
             $montoUsd = ($tasa > 0 && $monto) ? round($monto / $tasa, 2) : $importeUsd;
+        } elseif ($esOtraMoneda) {
+            // Pago en otra moneda (pesos, euros...): el monto viene en esa moneda y la tasa es "unidades por $"
+            $moneda   = mb_substr(trim((string) ($pago['moneda'] ?? 'OTRA')), 0, 20) ?: 'OTRA';
+            $montoUsd = ($tasa > 0 && $monto) ? round($monto / $tasa, 2) : ($monto ?: $importeUsd);
         } else {
+            $moneda   = 'USD';
             $monto    = $monto ?: $importeUsd;
             $montoUsd = $monto;
             $tasa     = null;
