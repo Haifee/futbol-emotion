@@ -1459,6 +1459,7 @@ const METODOS_PAGO={
   binance:       {label:'Binance',      icono:'ti-currency-bitcoin',bs:false},
   zinli:         {label:'Zinli',        icono:'ti-wallet',          bs:false},
   cashea:        {label:'Cashea',       icono:'ti-shopping-bag',    bs:false},
+  efectivo_otra: {label:'Otra moneda',   icono:'ti-cash',            bs:false, otra:true},
 };
 
 let metodoPago=null;
@@ -2689,7 +2690,7 @@ function carritoDescMonto(){ const sub=carritoTotal(); if(sub<=0) return 0; if(c
 function carritoTotalCobrar(){ return +Math.max(0, carritoTotal()-carritoDescMonto()).toFixed(2); }
 function carritoSetDescVal(v){ carritoDescVal=parseFloat(String(v).replace(',','.'))||0; carritoRenderItems(); carritoRenderPagos(); }
 function carritoSetDescTipo(t){ carritoDescTipo=(t==='monto')?'monto':'pct'; carritoRenderItems(); carritoRenderPagos(); }
-function pagoEnUsd(p){ const m=METODOS_PAGO[p.metodo]; const val=+p.monto||0; if(m&&m.bs){ const t=tasaActual(); return t>0? val/t : 0; } return val; }
+function pagoEnUsd(p){ const m=METODOS_PAGO[p.metodo]; const val=+p.monto||0; if(m&&m.otra){ const t=+p.tasa||0; return t>0? val/t : 0; } if(m&&m.bs){ const t=tasaActual(); return t>0? val/t : 0; } return val; }
 function carritoPagado(){ return carritoPagos.reduce((a,p)=>a+pagoEnUsd(p),0); }
 function carritoRenderItems(){
   const cont=document.getElementById('cart-items');
@@ -2711,7 +2712,23 @@ function carritoAgregarPago(){
   carritoRenderPagos();
 }
 function carritoQuitarPago(i){ carritoPagos.splice(i,1); carritoRenderPagos(); }
-function carritoSetPagoMetodo(i,m){ carritoPagos[i].metodo=m; const otros=carritoPagos.reduce((a,p,idx)=>idx===i?a:a+pagoEnUsd(p),0); const restUsd=Math.max(0,+(carritoTotalCobrar()-otros).toFixed(2)); const met=METODOS_PAGO[m]; carritoPagos[i].monto=(met&&met.bs)? +(restUsd*tasaActual()).toFixed(2) : restUsd; carritoRenderPagos(); }
+function carritoSetPagoMetodo(i,m){
+  const p=carritoPagos[i]; p.metodo=m;
+  const otros=carritoPagos.reduce((a,q,idx)=>idx===i?a:a+pagoEnUsd(q),0);
+  const restUsd=Math.max(0,+(carritoTotalCobrar()-otros).toFixed(2));
+  const met=METODOS_PAGO[m];
+  if(met&&met.otra){
+    if(!p.tasaKey){ const ex=tasasExtra(); p.tasaKey = ex.length?ex[0].id:''; }
+    p.tasa = p.tasaKey ? tasaValor(p.tasaKey) : 0;
+    p.moneda = p.tasaKey ? tasaNombre(p.tasaKey) : 'Otra';
+    p.monto = p.tasa>0 ? +(restUsd*p.tasa).toFixed(2) : 0;
+  } else {
+    p.monto = (met&&met.bs)? +(restUsd*tasaActual()).toFixed(2) : restUsd;
+  }
+  carritoRenderPagos();
+}
+function carritoSetPagoMonedaOtra(i,key){ const p=carritoPagos[i]; p.tasaKey=key; p.tasa=tasaValor(key); p.moneda=tasaNombre(key); carritoMontoExacto(i); }
+function carritoSetPagoTasaOtra(i,v){ carritoPagos[i].tasa=parseFloat(String(v).replace(',','.'))||0; carritoRenderResumen(); carritoActualizarConfirm(); }
 function carritoSetTasa(k){
   if(tasaValor(k)<=0){toast('Esa tasa no está configurada (Ajustes)');return}
   const usds = carritoPagos.map(q=>pagoEnUsd(q));   // valor en $ con la tasa anterior
@@ -2726,7 +2743,7 @@ function carritoMontoExacto(i){
   const otros=carritoPagos.reduce((a,q,idx)=>idx===i?a:a+pagoEnUsd(q),0);
   const restUsd=Math.max(0,+(carritoTotalCobrar()-otros).toFixed(2));
   const m=METODOS_PAGO[carritoPagos[i].metodo];
-  carritoPagos[i].monto = (m&&m.bs)? +(restUsd*tasaActual()).toFixed(2) : restUsd;
+  carritoPagos[i].monto = (m&&m.otra)? ((+carritoPagos[i].tasa>0)? +(restUsd*(+carritoPagos[i].tasa)).toFixed(2) : 0) : ((m&&m.bs)? +(restUsd*tasaActual()).toFixed(2) : restUsd);
   carritoRenderPagos();
 }
 function carritoRenderPagos(){
@@ -2741,17 +2758,22 @@ function carritoRenderPagos(){
     }).join('')+'</div>';
   }
   cont.innerHTML=tasaHtml+carritoPagos.map((p,i)=>{
-    const m=METODOS_PAGO[p.metodo]; const esBs=m&&m.bs;
+    const m=METODOS_PAGO[p.metodo]; const esBs=m&&m.bs; const esOtra=m&&m.otra;
     const opts=Object.entries(METODOS_PAGO).map(([k,mm])=>`<option value="${k}" ${k===p.metodo?'selected':''}>${mm.label}</option>`).join('');
     const equiv=esBs?`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px"><button type="button" onclick="carritoMontoExacto(${i})" style="background:var(--gl);border:1px solid var(--gm);color:var(--gd);border-radius:7px;padding:4px 9px;font-size:11px;font-weight:800;cursor:pointer"><i class="ti ti-calculator" style="font-size:12px"></i> Poner Bs exactos</button><span style="font-size:10.5px;color:var(--txm)">≈ ${fmt(pagoEnUsd(p))}</span></div>`:'';
-    const usaRef = p.metodo!=='efectivo_usd' && p.metodo!=='efectivo_bs';
+    const otraCtrl = esOtra ? `<div style="display:flex;gap:8px;margin-top:6px">
+        <select class="fi" style="flex:1;font-size:12.5px" onchange="carritoSetPagoMonedaOtra(${i},this.value)">${tasasExtra().map(t=>`<option value="${t.id}" ${t.id===p.tasaKey?'selected':''}>${t.nombre}</option>`).join('')||'<option value="">— crea una tasa personalizada —</option>'}</select>
+        <input class="fi" style="width:104px;font-size:12.5px" type="number" min="0" step="0.0001" value="${p.tasa||''}" placeholder="Tasa por $" oninput="carritoSetPagoTasaOtra(${i},this.value)">
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px"><button type="button" onclick="carritoMontoExacto(${i})" style="background:var(--gl);border:1px solid var(--gm);color:var(--gd);border-radius:7px;padding:4px 9px;font-size:11px;font-weight:800;cursor:pointer"><i class="ti ti-calculator" style="font-size:12px"></i> Poner monto exacto</button><span style="font-size:10.5px;color:var(--txm)">≈ ${fmt(pagoEnUsd(p))}</span></div>` : '';
+    const usaRef = p.metodo!=='efectivo_usd' && p.metodo!=='efectivo_bs' && p.metodo!=='efectivo_otra';
     const refHtml = usaRef ? `<input class="fi" style="width:100%;margin-top:6px;font-size:13px;padding:9px 10px" placeholder="Referencia (opcional)" value="${(p.referencia||'').replace(/"/g,'&quot;')}" oninput="carritoSetPagoRef(${i},this.value)">` : '';
     return `<div style="margin-bottom:8px">
       <div style="display:flex;gap:8px;align-items:center">
         <select class="fi" style="flex:1" onchange="carritoSetPagoMetodo(${i},this.value)">${opts}</select>
-        <input class="fi" style="width:104px" type="number" min="0" step="0.01" value="${p.monto}" placeholder="${esBs?'Bs':'$'}" oninput="carritoSetPagoMonto(${i},this.value)">
+        <input class="fi" style="width:104px" type="number" min="0" step="0.01" value="${p.monto}" placeholder="${esOtra?(p.moneda||'Moneda'):(esBs?'Bs':'$')}" oninput="carritoSetPagoMonto(${i},this.value)">
         <button onclick="carritoQuitarPago(${i})" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:18px"><i class="ti ti-x"></i></button>
-      </div>${equiv}${refHtml}
+      </div>${equiv}${otraCtrl}${refHtml}
     </div>`;
   }).join('');
   carritoRenderResumen(); carritoActualizarConfirm();
@@ -2844,7 +2866,7 @@ async function confirmarCarrito(){
     const payload={
       lineas: carrito.map(it=>({camiseta_id:it.camId, equipo:it.equipo, talla:it.talla, cantidad:it.cant, importe:+(it.precioUnit*it.cant*_dr).toFixed(2)})),
       canal, cliente,
-      pagos: carritoPagos.map(p=>{ const met=METODOS_PAGO[p.metodo]; const o={metodo:p.metodo, monto:+(+p.monto).toFixed(2)}; if(met&&met.bs){ o.tasa=tasaActual(); o.tasa_tipo=tasaElegida; } if(p.referencia && String(p.referencia).trim()) o.referencia=String(p.referencia).trim(); return o; })
+      pagos: carritoPagos.map(p=>{ const met=METODOS_PAGO[p.metodo]; const o={metodo:p.metodo, monto:+(+p.monto).toFixed(2)}; if(met&&met.bs){ o.tasa=tasaActual(); o.tasa_tipo=tasaElegida; } if(met&&met.otra){ o.tasa=+p.tasa||0; o.moneda=p.moneda||'Otra'; } if(p.referencia && String(p.referencia).trim()) o.referencia=String(p.referencia).trim(); return o; })
     };
     const resp = await apiCall('POST','/ventas/carrito',payload);
     if(resp && resp.ventas){
