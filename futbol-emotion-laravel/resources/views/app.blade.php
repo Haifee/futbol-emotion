@@ -802,7 +802,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <label class="fl">Descripción</label><input class="fi" id="tx-desc" placeholder="Ej: Bolsas para la tienda, pago de luz…">
     <div class="frow">
       <div><label class="fl">Importe ($)</label><input class="fi" id="tx-imp" type="number" min="0" step="0.01" placeholder="0.00"></div>
-      <div id="tx-cat-wrap"><label class="fl">Categoría</label><select class="fi" id="tx-cat"><option>Mercancía</option><option>Servicios</option><option>Transporte</option><option>Local</option><option>Otros</option></select></div>
+      <div id="tx-cat-wrap"><label class="fl">Categoría</label><select class="fi" id="tx-cat"><option>Inversión (mercancía)</option><option>Sueldos</option><option>Servicios</option><option>Transporte</option><option>Local</option><option>Retiros</option><option>Otros</option></select></div>
       <div id="tx-canal-wrap" style="display:none"><label class="fl">Canal</label><select class="fi" id="tx-canal"><option>Tienda física</option><option>Instagram</option><option>WhatsApp</option><option>Web</option><option>Otro</option></select></div>
     </div>
     <button class="abtn abtn-g" onclick="saveTx()" id="tx-save-btn"><i class="ti ti-check"></i> Guardar</button>
@@ -2034,9 +2034,9 @@ function abrirAnalitica(){
 function datosPeriodoLibre(filtroFn){
   const vts = ventas.filter(v=>v.fecha && filtroFn(v.fecha));
   const txs = transacciones.filter(t=>t.fecha && filtroFn(t.fecha));
-  let ing=0,gas=0;
-  txs.forEach(t=>{ if(t.tipo==='ingreso') ing+=(t.imp||0); else if(t.tipo==='gasto') gas+=(t.imp||0); });
-  return {vts, ing, gas, neto:ing-gas};
+  let ing=0,gas=0,inv=0;
+  txs.forEach(t=>{ if(t.tipo==='ingreso') ing+=(t.imp||0); else if(t.tipo==='gasto'){ gas+=(t.imp||0); if(esInversion(t)) inv+=(t.imp||0); } });
+  return {vts, ing, gas, inv, neto:ing-gas};
 }
 let bfModoActual='dia';
 function bfSetTabs(){
@@ -2075,7 +2075,7 @@ async function bfBuscar(){
   cont.innerHTML=`
     <div class="mgrid" style="margin-bottom:12px">
       <div class="mc mc-g"><div class="mcl">Ingresos</div><div class="mcv">${fmt(d.ing)}</div></div>
-      <div class="mc mc-r"><div class="mcl">Gastos</div><div class="mcv">${fmt(d.gas)}</div></div>
+      <div class="mc mc-r"><div class="mcl">${d.inv>0?'Gastos oper.':'Gastos'}</div><div class="mcv">${fmt(d.inv>0?d.gas-d.inv:d.gas)}</div></div>${d.inv>0?`<div class="mc"><div class="mcl">Inversión</div><div class="mcv">${fmt(d.inv)}</div></div>`:''}
       <div class="mc mc-p"><div class="mcl">Beneficio</div><div class="mcv">${fmt(d.neto)}</div></div>
       <div class="mc"><div class="mcl">Ventas</div><div class="mcv">${d.vts.length}</div></div>
     </div>
@@ -2712,16 +2712,21 @@ function carritoAgregarPago(){
   carritoRenderPagos();
 }
 function carritoQuitarPago(i){ carritoPagos.splice(i,1); carritoRenderPagos(); }
+function montoOtraExacto(usd, tasa){ if(!(tasa>0)) return 0; const raw=usd*tasa; return tasa>=50 ? Math.round(raw) : Math.round(raw*100)/100; }
 function carritoSetPagoMetodo(i,m){
-  const p=carritoPagos[i]; p.metodo=m;
+  const p=carritoPagos[i];
+  let tasaKey=null;
+  if(m.indexOf('otra:')===0){ tasaKey=m.slice(5); m='efectivo_otra'; }
+  p.metodo=m;
   const otros=carritoPagos.reduce((a,q,idx)=>idx===i?a:a+pagoEnUsd(q),0);
   const restUsd=Math.max(0,+(carritoTotalCobrar()-otros).toFixed(2));
   const met=METODOS_PAGO[m];
   if(met&&met.otra){
+    if(tasaKey) p.tasaKey=tasaKey;
     if(!p.tasaKey){ const ex=tasasExtra(); p.tasaKey = ex.length?ex[0].id:''; }
     p.tasa = p.tasaKey ? tasaValor(p.tasaKey) : 0;
     p.moneda = p.tasaKey ? tasaNombre(p.tasaKey) : 'Otra';
-    p.monto = p.tasa>0 ? +(restUsd*p.tasa).toFixed(2) : 0;
+    p.monto = montoOtraExacto(restUsd, p.tasa);
   } else {
     p.monto = (met&&met.bs)? +(restUsd*tasaActual()).toFixed(2) : restUsd;
   }
@@ -2743,7 +2748,7 @@ function carritoMontoExacto(i){
   const otros=carritoPagos.reduce((a,q,idx)=>idx===i?a:a+pagoEnUsd(q),0);
   const restUsd=Math.max(0,+(carritoTotalCobrar()-otros).toFixed(2));
   const m=METODOS_PAGO[carritoPagos[i].metodo];
-  carritoPagos[i].monto = (m&&m.otra)? ((+carritoPagos[i].tasa>0)? +(restUsd*(+carritoPagos[i].tasa)).toFixed(2) : 0) : ((m&&m.bs)? +(restUsd*tasaActual()).toFixed(2) : restUsd);
+  carritoPagos[i].monto = (m&&m.otra)? montoOtraExacto(restUsd, +carritoPagos[i].tasa) : ((m&&m.bs)? +(restUsd*tasaActual()).toFixed(2) : restUsd);
   carritoRenderPagos();
 }
 function carritoRenderPagos(){
@@ -2759,13 +2764,14 @@ function carritoRenderPagos(){
   }
   cont.innerHTML=tasaHtml+carritoPagos.map((p,i)=>{
     const m=METODOS_PAGO[p.metodo]; const esBs=m&&m.bs; const esOtra=m&&m.otra;
-    const opts=Object.entries(METODOS_PAGO).map(([k,mm])=>`<option value="${k}" ${k===p.metodo?'selected':''}>${mm.label}</option>`).join('');
+    const opts=Object.entries(METODOS_PAGO).filter(([k])=>k!=='efectivo_otra').map(([k,mm])=>`<option value="${k}" ${k===p.metodo?'selected':''}>${mm.label}</option>`).join('')+tasasExtra().map(t=>`<option value="otra:${t.id}" ${(p.metodo==='efectivo_otra'&&p.tasaKey===t.id)?'selected':''}>Efectivo ${t.nombre}</option>`).join('');
     const equiv=esBs?`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px"><button type="button" onclick="carritoMontoExacto(${i})" style="background:var(--gl);border:1px solid var(--gm);color:var(--gd);border-radius:7px;padding:4px 9px;font-size:11px;font-weight:800;cursor:pointer"><i class="ti ti-calculator" style="font-size:12px"></i> Poner Bs exactos</button><span style="font-size:10.5px;color:var(--txm)">≈ ${fmt(pagoEnUsd(p))}</span></div>`:'';
-    const otraCtrl = esOtra ? `<div style="display:flex;gap:8px;margin-top:6px">
-        <select class="fi" style="flex:1;font-size:12.5px" onchange="carritoSetPagoMonedaOtra(${i},this.value)">${tasasExtra().map(t=>`<option value="${t.id}" ${t.id===p.tasaKey?'selected':''}>${t.nombre}</option>`).join('')||'<option value="">— crea una tasa personalizada —</option>'}</select>
-        <input class="fi" style="width:104px;font-size:12.5px" type="number" min="0" step="0.0001" value="${p.tasa||''}" placeholder="Tasa por $" oninput="carritoSetPagoTasaOtra(${i},this.value)">
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px"><button type="button" onclick="carritoMontoExacto(${i})" style="background:var(--gl);border:1px solid var(--gm);color:var(--gd);border-radius:7px;padding:4px 9px;font-size:11px;font-weight:800;cursor:pointer"><i class="ti ti-calculator" style="font-size:12px"></i> Poner monto exacto</button><span style="font-size:10.5px;color:var(--txm)">≈ ${fmt(pagoEnUsd(p))}</span></div>` : '';
+    const otraCtrl = esOtra ? `<div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+        <span style="font-size:11px;color:var(--txm);white-space:nowrap">Tasa/$</span>
+        <input class="fi" style="width:92px;font-size:12.5px;padding:8px 9px" type="number" min="0" step="0.0001" value="${p.tasa||''}" oninput="carritoSetPagoTasaOtra(${i},this.value)">
+        <button type="button" onclick="carritoMontoExacto(${i})" style="background:var(--gl);border:1px solid var(--gm);color:var(--gd);border-radius:7px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap">Exacto</button>
+        <span style="flex:1;text-align:right;font-size:10.5px;color:var(--txm)">≈ ${fmt(pagoEnUsd(p))}</span>
+      </div>` : '';
     const usaRef = p.metodo!=='efectivo_usd' && p.metodo!=='efectivo_bs' && p.metodo!=='efectivo_otra';
     const refHtml = usaRef ? `<input class="fi" style="width:100%;margin-top:6px;font-size:13px;padding:9px 10px" placeholder="Referencia (opcional)" value="${(p.referencia||'').replace(/"/g,'&quot;')}" oninput="carritoSetPagoRef(${i},this.value)">` : '';
     return `<div style="margin-bottom:8px">
@@ -3445,9 +3451,13 @@ function renderCaja(){
             <div style="font-size:20px;font-weight:800;color:var(--g)">${fmt(data.ing)}</div>
           </div>
           <div style="background:var(--rl);border-radius:10px;padding:11px 13px">
-            <div style="font-size:11px;font-weight:700;color:var(--txm);text-transform:uppercase;margin-bottom:3px">Gastos</div>
-            <div style="font-size:20px;font-weight:800;color:var(--r)">${fmt(data.gas)}</div>
+            <div style="font-size:11px;font-weight:700;color:var(--txm);text-transform:uppercase;margin-bottom:3px">${data.inv>0?'Gastos oper.':'Gastos'}</div>
+            <div style="font-size:20px;font-weight:800;color:var(--r)">${fmt(data.inv>0?data.gas-data.inv:data.gas)}</div>
           </div>
+          ${data.inv>0?`<div style="background:var(--al);border-radius:10px;padding:11px 13px">
+            <div style="font-size:11px;font-weight:700;color:var(--txm);text-transform:uppercase;margin-bottom:3px">Inversión</div>
+            <div style="font-size:20px;font-weight:800;color:var(--ad)">${fmt(data.inv)}</div>
+          </div>`:''}
           <div style="background:var(--pl);border-radius:10px;padding:11px 13px">
             <div style="font-size:11px;font-weight:700;color:var(--txm);text-transform:uppercase;margin-bottom:3px">Beneficio</div>
             <div style="font-size:20px;font-weight:800;color:var(--p)">${fmt(data.neto)}</div>
@@ -3731,7 +3741,7 @@ function abrirCierreCaja(){
   document.getElementById('cierre-resumen').innerHTML=`
     <div style="font-size:13px;color:var(--txm);margin-bottom:8px">Resumen de hoy · ${hoy()}</div>
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Ingresos</span><b style="color:var(--gd)">${fmt(d.ing)}</b></div>
-    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Gastos</span><b style="color:var(--rd)">${fmt(d.gas)}</b></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>${d.inv>0?'Gastos oper.':'Gastos'}</span><b style="color:var(--rd)">${fmt(d.inv>0?d.gas-d.inv:d.gas)}</b></div>${d.inv>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Inversión</span><b style="color:var(--ad)">${fmt(d.inv)}</b></div>`:''}
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Beneficio</span><b>${fmt(d.neto)}</b></div>
     <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Ventas</span><b>${d.vts.length}</b></div>
     <hr style="border:none;border-top:1px solid var(--grayb);margin:8px 0">
@@ -3795,6 +3805,7 @@ let cierresMensuales=[];
 let cajaPendiente=null;
 
 // Calcula rango y datos del período (independiente de renderCaja)
+function esInversion(t){ return t && t.tipo==='gasto' && (t.canal==='Inversión (mercancía)' || t.canal==='Mercancía' || t.canal==='Inversión'); }
 function datosPeriodo(clave){
   const ahora=new Date(), hoyStr=hoy();
   const diasSemana=ahora.getDay()===0?6:ahora.getDay()-1;
@@ -3809,7 +3820,8 @@ function datosPeriodo(clave){
   const vts=ventas.filter(v=>v.fecha>=r.desde&&v.fecha<=hoyStr);
   const ing=txs.filter(t=>t.tipo==='ingreso').reduce((s,t)=>s+t.imp,0);
   const gas=txs.filter(t=>t.tipo==='gasto').reduce((s,t)=>s+t.imp,0);
-  return {...r,txs,vts,ing,gas,neto:ing-gas,margen:ing>0?Math.round((ing-gas)/ing*100):0};
+  const inv=txs.filter(esInversion).reduce((s,t)=>s+t.imp,0);
+  return {...r,txs,vts,ing,gas,inv,neto:ing-gas,margen:ing>0?Math.round((ing-gas)/ing*100):0};
 }
 
 function abrirExport(clave){
@@ -3856,7 +3868,8 @@ function generarPDF(d,nombre){
     head:[['Concepto','Valor']],
     body:[
       ['Ingresos','$'+d.ing.toFixed(2)],
-      ['Gastos','$'+d.gas.toFixed(2)],
+      ['Gastos operativos','$'+(d.gas-(d.inv||0)).toFixed(2)],
+      ['Inversión','$'+(d.inv||0).toFixed(2)],
       ['Beneficio neto','$'+d.neto.toFixed(2)],
       ['Margen',d.margen+'%'],
       ['Ventas del período',''+d.vts.length],
@@ -3922,7 +3935,8 @@ function generarExcel(d,nombre){
     [],
     ['Concepto','Valor'],
     ['Ingresos',d.ing],
-    ['Gastos',d.gas],
+    ['Gastos operativos',d.gas-(d.inv||0)],
+    ['Inversión',d.inv||0],
     ['Beneficio neto',d.neto],
     ['Margen (%)',d.margen],
     ['Ventas del período',d.vts.length],
