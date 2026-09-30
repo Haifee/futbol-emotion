@@ -592,7 +592,11 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <label class="fl" style="margin-top:0">¿Con cuánto paga el cliente?</label>
       <div style="display:flex;gap:8px">
         <input class="fi" id="vuelto-recibido" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" oninput="vueltoInput()" style="flex:1">
-        <select class="fi" id="vuelto-moneda" onchange="vueltoCambiarMoneda()" style="width:88px"><option value="usd">$</option><option value="bs">Bs</option></select>
+        <select class="fi" id="vuelto-moneda" onchange="vueltoCambiarMoneda()" style="width:118px"><option value="usd">$</option></select>
+      </div>
+      <div id="vuelto-tasa-row" style="display:none;align-items:center;gap:8px;margin-top:8px">
+        <span style="font-size:12px;color:var(--txm);white-space:nowrap">Tasa (por $)</span>
+        <input class="fi" id="vuelto-tasa" type="number" min="0" step="0.0001" inputmode="decimal" oninput="vueltoSetTasa(this.value)" style="flex:1">
       </div>
       <div id="vuelto-out" style="margin-top:10px"></div>
     </div>
@@ -2635,7 +2639,8 @@ function abrirCarrito(){
   carritoAutoPrecio();
   carritoRenderItems();
   carritoRenderPagos();
-  vueltoAuto=true; vueltoMonedaPrev='usd';
+  vueltoAuto=true; vueltoMonedaPrev='usd'; vueltoTasa=0;
+  poblarVueltoMonedas();
   const _vm=document.getElementById('vuelto-moneda'); if(_vm) _vm.value='usd';
   calcularVuelto();
   openM('m-carrito');
@@ -2747,16 +2752,37 @@ function carritoRenderResumen(){
 }
 let vueltoAuto=true;        // mientras true, la casilla refleja el total (autollenado)
 let vueltoMonedaPrev='usd';
+let vueltoTasa=0;   // tasa (por $) editable de la moneda no-$ del vuelto; 0 = usar la de Ajustes
+function vueltoMonedas(){
+  const arr=[{k:'usd',label:'$',factor:1}];
+  tasasDisponibles().forEach(t=>{ const f=tasaValor(t.k); if(f>0) arr.push({k:t.k,label:t.label,factor:f}); });
+  return arr;
+}
+function vueltoFactor(k){ const m=vueltoMonedas().find(x=>x.k===k); return m?m.factor:1; }
+function vueltoLabelMoneda(k){ const m=vueltoMonedas().find(x=>x.k===k); return m?m.label:k; }
+function fmtMoneda(k,val){ if(k==='usd') return fmt(val); return vueltoLabelMoneda(k)+' '+(val||0).toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function vueltoFactorEfectivo(moneda){ if(moneda==='usd') return 1; return vueltoTasa>0 ? vueltoTasa : vueltoFactor(moneda); }
+function vueltoSetTasa(v){ vueltoTasa=parseFloat(String(v).replace(',','.'))||0; calcularVuelto(); }
+function poblarVueltoMonedas(){
+  const sel=document.getElementById('vuelto-moneda'); if(!sel) return;
+  const actual=sel.value||'usd';
+  const ms=vueltoMonedas();
+  sel.innerHTML=ms.map(m=>`<option value="${m.k}">${m.label}</option>`).join('');
+  sel.value = ms.some(m=>m.k===actual)?actual:'usd';
+}
 function vueltoInput(){ vueltoAuto=false; calcularVuelto(); }
 function vueltoCambiarMoneda(){
   const inp=document.getElementById('vuelto-recibido');
   const sel=document.getElementById('vuelto-moneda');
-  const tasa=tasaActual();
-  if(!vueltoAuto && inp && inp.value && tasa>0){
-    const usd = vueltoMonedaPrev==='bs' ? (+inp.value/tasa) : +inp.value;
-    inp.value = sel.value==='bs' ? +(usd*tasa).toFixed(2) : +usd.toFixed(2);
+  const nueva = sel ? sel.value : 'usd';
+  const fOld=vueltoFactorEfectivo(vueltoMonedaPrev);
+  vueltoTasa = nueva==='usd' ? 0 : vueltoFactor(nueva);   // por defecto, la tasa de Ajustes
+  const fNew=vueltoFactorEfectivo(nueva);
+  if(!vueltoAuto && inp && inp.value && fOld>0){
+    const usd=(+inp.value)/fOld;
+    inp.value=+(usd*fNew).toFixed(2);
   }
-  vueltoMonedaPrev = sel ? sel.value : 'usd';
+  vueltoMonedaPrev = nueva;
   calcularVuelto();
 }
 function calcularVuelto(){
@@ -2764,19 +2790,24 @@ function calcularVuelto(){
   const inp=document.getElementById('vuelto-recibido');
   const sel=document.getElementById('vuelto-moneda');
   const moneda = sel ? sel.value : 'usd';
+  const factor = vueltoFactorEfectivo(moneda);
+  const row=document.getElementById('vuelto-tasa-row');
+  const tin=document.getElementById('vuelto-tasa');
+  if(row) row.style.display = moneda==='usd' ? 'none' : 'flex';
+  if(tin && moneda!=='usd' && document.activeElement!==tin){ tin.value = factor; }
   const total=carritoTotal();
-  const tasa=tasaActual();
-  // Autollenado: si no se ha editado a mano, la casilla muestra el total a cobrar
-  if(vueltoAuto && inp){ inp.value = (moneda==='bs' && tasa>0) ? +(total*tasa).toFixed(2) : +total.toFixed(2); }
+  if(vueltoAuto && inp){ inp.value = +(total*factor).toFixed(2); }
   const recibidoRaw=+(inp&&inp.value)||0;
-  const recibidoUsd = moneda==='bs' ? (tasa>0?recibidoRaw/tasa:0) : recibidoRaw;
+  const recibidoUsd = factor>0 ? recibidoRaw/factor : 0;
   const vueltoUsd=+(recibidoUsd-total).toFixed(2);
   if(vueltoUsd < -0.001){
-    out.innerHTML=`<div style="background:var(--al);border:2px solid var(--ad);border-radius:12px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:800;color:var(--ad)">Aún falta por cobrar</div><div style="font-size:22px;font-weight:800;color:var(--ad)">${fmt(-vueltoUsd)}${tasa>0?` · ${fmtBs(-vueltoUsd*tasa)}`:''}</div></div>`;
+    const ex = moneda!=='usd' ? ` \u00b7 ${fmtMoneda(moneda,(-vueltoUsd)*factor)}` : '';
+    out.innerHTML=`<div style="background:var(--al);border:2px solid var(--ad);border-radius:12px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:800;color:var(--ad)">A\u00fan falta por cobrar</div><div style="font-size:22px;font-weight:800;color:var(--ad)">${fmt(-vueltoUsd)}${ex}</div></div>`;
   } else if(vueltoUsd <= 0.001){
-    out.innerHTML=`<div style="background:var(--gray);border:1px solid var(--grayb);border-radius:12px;padding:10px;text-align:center;font-size:13px;font-weight:700;color:var(--txm)"><i class="ti ti-check" style="color:var(--gd)"></i> Pago justo · sin vuelto</div>`;
+    out.innerHTML=`<div style="background:var(--gray);border:1px solid var(--grayb);border-radius:12px;padding:10px;text-align:center;font-size:13px;font-weight:700;color:var(--txm)"><i class="ti ti-check" style="color:var(--gd)"></i> Pago justo \u00b7 sin vuelto</div>`;
   } else {
-    out.innerHTML=`<div style="background:var(--gl);border:2px solid var(--gm);border-radius:12px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:800;color:var(--gd)">Vuelto a entregar</div><div style="font-size:26px;font-weight:800;color:var(--gd)">${fmt(vueltoUsd)}</div>${tasa>0?`<div style="font-size:13px;color:var(--gd);opacity:.8;margin-top:2px">o ${fmtBs(vueltoUsd*tasa)}</div>`:''}</div>`;
+    const ex = moneda!=='usd' ? `<div style="font-size:13px;color:var(--gd);opacity:.8;margin-top:2px">o ${fmtMoneda(moneda,vueltoUsd*factor)}</div>` : '';
+    out.innerHTML=`<div style="background:var(--gl);border:2px solid var(--gm);border-radius:12px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:800;color:var(--gd)">Vuelto a entregar</div><div style="font-size:26px;font-weight:800;color:var(--gd)">${fmt(vueltoUsd)}</div>${ex}</div>`;
   }
 }
 function carritoActualizarConfirm(){
