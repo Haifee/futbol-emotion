@@ -598,19 +598,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <div id="cart-pagos"></div>
     <button class="abtn abtn-gray abtn-sm" onclick="carritoAgregarPago()" style="margin-top:6px"><i class="ti ti-plus"></i> Agregar método de pago</button>
     <div id="cart-resumen-pago"></div>
-    <div id="cart-vuelto" style="margin-top:10px;border:1px solid var(--grayb);border-radius:12px;padding:12px">
-      <div style="font-weight:700;font-size:13px;color:var(--txm);margin-bottom:8px"><i class="ti ti-cash"></i> Vuelto (cambio)</div>
-      <label class="fl" style="margin-top:0">¿Con cuánto paga el cliente?</label>
-      <div style="display:flex;gap:8px">
-        <input class="fi" id="vuelto-recibido" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" oninput="vueltoInput()" style="flex:1">
-        <select class="fi" id="vuelto-moneda" onchange="vueltoCambiarMoneda()" style="width:118px"><option value="usd">$</option></select>
-      </div>
-      <div id="vuelto-tasa-row" style="display:none;align-items:center;gap:8px;margin-top:8px">
-        <span style="font-size:12px;color:var(--txm);white-space:nowrap">Tasa (por $)</span>
-        <input class="fi" id="vuelto-tasa" type="number" min="0" step="0.0001" inputmode="decimal" oninput="vueltoSetTasa(this.value)" style="flex:1">
-      </div>
-      <div id="vuelto-out" style="margin-top:10px"></div>
-    </div>
+    <div style="font-size:11.5px;color:var(--txh);margin-top:8px;padding:0 2px"><i class="ti ti-info-circle"></i> En efectivo, escribe lo que te dio el cliente; el vuelto se calcula solo.</div>
     <button class="abtn abtn-g" id="cart-confirm" onclick="confirmarCarrito()" style="margin-top:14px;opacity:.4;pointer-events:none"><i class="ti ti-check"></i> Registrar venta</button>
   </div>
 </div>
@@ -2826,14 +2814,31 @@ function carritoRenderPagos(){
   }).join('');
   carritoRenderResumen(); carritoActualizarConfirm();
 }
+function esEfectivoMetodo(k){ return k==='efectivo_usd'||k==='efectivo_bs'||k==='efectivo_otra'; }
+function carritoEstadoPago(){
+  const total=carritoTotalCobrar();
+  let electUsd=0, cashRecUsd=0, hayBsEfec=false;
+  carritoPagos.forEach(p=>{ if(esEfectivoMetodo(p.metodo)){ cashRecUsd+=pagoEnUsd(p); if(p.metodo==='efectivo_bs') hayBsEfec=true; } else electUsd+=pagoEnUsd(p); });
+  const restanteTrasElect=Math.max(0,+(total-electUsd).toFixed(2));
+  const efectivoAplicado=Math.min(cashRecUsd,restanteTrasElect);
+  const pagado=+(electUsd+efectivoAplicado).toFixed(2);
+  const falta=+(total-pagado).toFixed(2);
+  const vuelto=+(cashRecUsd-restanteTrasElect).toFixed(2);
+  const electSobra=+(electUsd-total).toFixed(2);
+  return {total, electUsd, cashRecUsd, recibido:+(electUsd+cashRecUsd).toFixed(2), pagado, falta:falta>0.009?falta:0, vuelto:vuelto>0.009?vuelto:0, electSobra:electSobra>0.009?electSobra:0, cubierto:(falta<=0.009&&electSobra<=0.009), efectivoAplicado, hayBsEfec};
+}
 function carritoRenderResumen(){
-  const total=carritoTotalCobrar(), pagado=carritoPagado(), dif=+(total-pagado).toFixed(2);
+  const st=carritoEstadoPago();
   let msg,color;
-  if(Math.abs(dif)<0.01){ msg='✓ Pago completo'; color='var(--g)'; }
-  else if(dif>0){ msg=`Faltan ${fmt(dif)}`; color='var(--ad)'; }
-  else { msg=`Sobran ${fmt(-dif)}`; color='var(--r)'; }
-  document.getElementById('cart-resumen-pago').innerHTML=`<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:12.5px;padding:8px 2px"><span style="color:var(--txm)">Total ${fmt(total)} · Pagado ${fmt(pagado)}</span><b style="color:${color}">${msg}</b></div>`;
-  calcularVuelto();
+  if(st.electSobra>0){ msg=`Pago electrónico de más: ${fmt(st.electSobra)} — revísalo`; color='var(--r)'; }
+  else if(st.falta>0){ msg=`Faltan ${fmt(st.falta)}`; color='var(--ad)'; }
+  else { msg='✓ Pago completo'; color='var(--g)'; }
+  let html=`<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:12.5px;padding:8px 2px"><span style="color:var(--txm)">Total ${fmt(st.total)} · Recibido ${fmt(st.recibido)}</span><b style="color:${color}">${msg}</b></div>`;
+  if(st.vuelto>0){
+    const enBs = (st.hayBsEfec && tasaActual()>0) ? `<div style="font-size:13px;color:var(--gd);opacity:.85;margin-top:2px">o ${(st.vuelto*tasaActual()).toLocaleString('es-VE',{maximumFractionDigits:2})} Bs</div>` : '';
+    html+=`<div style="background:var(--gl);border:2px solid var(--gm);border-radius:12px;padding:10px 12px;text-align:center;margin-top:2px"><div style="font-size:12px;font-weight:800;color:var(--gd)">VUELTO A ENTREGAR</div><div style="font-size:24px;font-weight:800;color:var(--gd)">${fmt(st.vuelto)}</div>${enBs}</div>`;
+  }
+  const el=document.getElementById('cart-resumen-pago'); if(el) el.innerHTML=html;
 }
 let vueltoAuto=true;        // mientras true, la casilla refleja el total (autollenado)
 let vueltoMonedaPrev='usd';
@@ -2897,9 +2902,9 @@ function calcularVuelto(){
 }
 function carritoActualizarConfirm(){
   const btn=document.getElementById('cart-confirm'); if(!btn) return;
-  const total=carritoTotalCobrar();
+  const st=carritoEstadoPago();
   const clienteOk = carritoTipo==='tienda' || (carritoTipo==='online' && document.getElementById('cart-cliente').value.trim());
-  const ok = carrito.length>0 && total>0 && carritoPagos.length>0 && (carritoPagado() >= total-0.05) && !!carritoTipo && clienteOk;
+  const ok = carrito.length>0 && st.total>0 && carritoPagos.length>0 && st.cubierto && !!carritoTipo && clienteOk;
   btn.style.opacity=ok?'1':'.4';
   btn.style.pointerEvents=ok?'auto':'none';
 }
@@ -2913,10 +2918,12 @@ async function confirmarCarrito(){
     const cedula = carritoTipo==='tienda' ? '' : (document.getElementById('cart-cedula').value||'').trim();
     const telefono = carritoTipo==='tienda' ? '' : (document.getElementById('cart-telefono').value||'').trim();
     const _dr = carritoTotal()>0 ? carritoTotalCobrar()/carritoTotal() : 1;
+    const _st = carritoEstadoPago();
+    const _ratioCash = _st.cashRecUsd>0 ? (_st.efectivoAplicado/_st.cashRecUsd) : 1;
     const payload={
       lineas: carrito.map(it=>({camiseta_id:it.camId, equipo:it.equipo, talla:it.talla, cantidad:it.cant, importe:+(it.precioUnit*it.cant*_dr).toFixed(2)})),
       canal, cliente, cedula, telefono,
-      pagos: carritoPagos.map(p=>{ const met=METODOS_PAGO[p.metodo]; const o={metodo:p.metodo, monto:+(+p.monto).toFixed(2)}; if(met&&met.bs){ o.tasa=tasaActual(); o.tasa_tipo=tasaElegida; } if(met&&met.otra){ o.tasa=+p.tasa||0; o.moneda=p.moneda||'Otra'; } if(p.referencia && String(p.referencia).trim()) o.referencia=String(p.referencia).trim(); return o; })
+      pagos: carritoPagos.map(p=>{ const met=METODOS_PAGO[p.metodo]; const fac=esEfectivoMetodo(p.metodo)?_ratioCash:1; const o={metodo:p.metodo, monto:+(+p.monto*fac).toFixed(2)}; if(met&&met.bs){ o.tasa=tasaActual(); o.tasa_tipo=tasaElegida; } if(met&&met.otra){ o.tasa=+p.tasa||0; o.moneda=p.moneda||'Otra'; } if(p.referencia && String(p.referencia).trim()) o.referencia=String(p.referencia).trim(); return o; }).filter(o=>o.monto>0.005)
     };
     const resp = await apiCall('POST','/ventas/carrito',payload);
     if(resp && resp.ventas){
