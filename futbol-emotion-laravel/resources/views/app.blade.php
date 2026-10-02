@@ -364,6 +364,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <div class="page" id="page-clientes"><div id="cli-c"></div></div>
     <div class="page" id="page-nomina"><div id="nom-c"></div></div>
     <div class="page" id="page-mas"><div id="mas-c"></div></div>
+    <div class="page" id="page-dashboard"><div id="dash-c"></div></div>
 
   </div>
   <div class="bnav" id="bnav"></div>
@@ -1222,7 +1223,7 @@ function goTo(p){
   document.querySelectorAll('.ni').forEach(x=>x.classList.remove('active'));
   const pg=document.getElementById('page-'+p);if(pg)pg.classList.add('active');
   const ni=document.getElementById('ni-'+p);if(ni)ni.classList.add('active');
-  ({home:renderHome,pedido:renderPedido,stock:renderStock,envios:renderEnvios,dev:renderDev,ventas:renderVentas,misventas:renderMisVentas,aprobar:renderAprobar,fin:renderFin,verstock:renderVerStock,caja:renderCaja,ajustes:renderAjustes,historial:renderHistorial,clientes:renderClientes,nomina:renderNomina,mas:renderMas})[p]?.();
+  ({home:renderHome,pedido:renderPedido,stock:renderStock,envios:renderEnvios,dev:renderDev,ventas:renderVentas,misventas:renderMisVentas,aprobar:renderAprobar,fin:renderFin,verstock:renderVerStock,caja:renderCaja,ajustes:renderAjustes,historial:renderHistorial,clientes:renderClientes,nomina:renderNomina,mas:renderMas,dashboard:renderDashboard})[p]?.();
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -3325,6 +3326,81 @@ function waLink(tel){ let d=String(tel||'').replace(/\D/g,''); if(!d) return '';
 function abrirWhatsCliente(telEnc){ const u=waLink(decodeURIComponent(telEnc)); if(u) window.open(u,'_blank'); else toast('Este cliente no tiene teléfono guardado'); }
 function clienteEnvios(nombre){ const k=normalizarTxt(nombre); return (envios||[]).filter(e=>normalizarTxt(e.cliente||'')===k); }
 function clienteDevoluciones(nombre){ const k=normalizarTxt(nombre); return (devoluciones||[]).filter(d=>normalizarTxt(d.cliente||'')===k); }
+function _fechaKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _dashDias(n){ const arr=[]; const base=new Date(hoy()+'T00:00:00'); for(let i=n-1;i>=0;i--){ const d=new Date(base); d.setDate(d.getDate()-i); arr.push(d); } return arr; }
+function _dashBarH(label,val,max,color,rightTxt){
+  const w=Math.max(2,Math.round((val/(max||1))*100));
+  return `<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:3px"><span style="color:var(--txm);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span><b style="white-space:nowrap">${rightTxt||fmt(val)}</b></div><div style="background:var(--gray);border-radius:6px;height:10px;overflow:hidden"><div style="height:100%;width:${w}%;background:${color};border-radius:6px"></div></div></div>`;
+}
+function renderDashboard(){
+  const cont=document.getElementById('dash-c'); if(!cont) return;
+  const a=analiticaDatos();
+  const mesAct=hoy().slice(0,7);
+  const dPrev=new Date(hoy()+'T00:00:00'); dPrev.setMonth(dPrev.getMonth()-1);
+  const mesAnt=dPrev.getFullYear()+'-'+String(dPrev.getMonth()+1).padStart(2,'0');
+  const vMes=ventas.filter(v=>String(v.fecha||'').slice(0,7)===mesAct);
+  const revMes=vMes.reduce((s,v)=>s+(v.imp||0),0);
+  const nMes=vMes.length; const ticketMes=nMes?revMes/nMes:0;
+  const revAnt=ventas.filter(v=>String(v.fecha||'').slice(0,7)===mesAnt).reduce((s,v)=>s+(v.imp||0),0);
+  const pct = revAnt>0 ? Math.round((revMes-revAnt)/revAnt*100) : (revMes>0?100:0);
+  let ingMes=0,gasMes=0; transacciones.forEach(t=>{ if(String(t.fecha||'').slice(0,7)===mesAct){ if(t.tipo==='ingreso') ingMes+=(t.imp||0); else if(t.tipo==='gasto') gasMes+=(t.imp||0);} });
+  const benMes=+(ingMes-gasMes).toFixed(2);
+  const dias=_dashDias(14);
+  const revPorDia={}; ventas.forEach(v=>{ const k=String(v.fecha||''); if(k) revPorDia[k]=(revPorDia[k]||0)+(v.imp||0); });
+  const serieDia=dias.map(d=>({rev:revPorDia[_fechaKey(d)]||0, dia:d.getDate()}));
+  const maxDia=Math.max(1,...serieDia.map(s=>s.rev));
+  const payAgg={}; ventas.forEach(v=>(v.pagos||[]).forEach(pg=>{ const k=pg.metodo||'otro'; payAgg[k]=(payAgg[k]||0)+(+pg.monto_usd||0); }));
+  const payArr=Object.entries(payAgg).map(([k,val])=>({k,val,label:(METODOS_PAGO[k]&&METODOS_PAGO[k].label)||k})).filter(x=>x.val>0.01).sort((x,y)=>y.val-x.val);
+  const payTot=payArr.reduce((sm,x)=>sm+x.val,0)||1;
+  const maxTop=Math.max(1,...a.top.map(t=>t.rev));
+  const totCanal=(a.fisRev+a.onRev)||1;
+  const maxMes=Math.max(revMes,revAnt,1);
+  cont.innerHTML=`
+    <button onclick="goTo('home')" style="background:var(--gray);border:none;border-radius:9px;padding:7px 12px;cursor:pointer;font-size:13px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:5px;margin-bottom:12px"><i class="ti ti-arrow-left"></i> Volver</button>
+    <div style="font-size:19px;font-weight:800;margin-bottom:3px">Dashboard</div>
+    <div style="font-size:13px;color:var(--txm);margin-bottom:14px">Resumen del mes</div>
+    <div class="mgrid" style="margin-bottom:14px">
+      <div class="mc mc-g"><div class="mcl">Ventas del mes</div><div class="mcv">${fmt(revMes)}</div></div>
+      <div class="mc mc-p"><div class="mcl">Beneficio del mes</div><div class="mcv">${fmt(benMes)}</div></div>
+      <div class="mc mc-b"><div class="mcl">N.º de ventas</div><div class="mcv">${nMes}</div></div>
+      <div class="mc"><div class="mcl">Ticket promedio</div><div class="mcv">${fmt(ticketMes)}</div></div>
+    </div>
+    <div class="stitle">Este mes vs mes pasado</div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div><div style="font-size:12px;color:var(--txm)">Ventas este mes</div><div style="font-size:22px;font-weight:800">${fmt(revMes)}</div></div>
+        <div style="background:${pct>=0?'var(--gl)':'var(--rl)'};color:${pct>=0?'var(--gd)':'var(--rd)'};border-radius:10px;padding:6px 12px;font-weight:800;font-size:14px"><i class="ti ti-${pct>=0?'trending-up':'trending-down'}"></i> ${pct>=0?'+':''}${pct}%</div>
+      </div>
+      ${_dashBarH('Este mes', revMes, maxMes, 'var(--g)')}
+      ${_dashBarH('Mes pasado', revAnt, maxMes, 'var(--txh)')}
+    </div>
+    <div class="stitle">Ventas por día (últimos 14)</div>
+    <div class="card">
+      <div style="display:flex;align-items:flex-end;gap:4px;height:110px">
+        ${serieDia.map(s=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">
+          <div style="width:100%;background:${s.rev>0?'var(--g)':'var(--grayb)'};border-radius:4px 4px 0 0;height:${Math.max(2,Math.round(s.rev/maxDia*82))}px"></div>
+          <div style="font-size:8.5px;color:var(--txh);margin-top:3px">${s.dia}</div>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="stitle">Ingresos vs gastos (mes)</div>
+    <div class="card">
+      ${_dashBarH('Ingresos', ingMes, Math.max(ingMes,gasMes,1), 'var(--g)')}
+      ${_dashBarH('Gastos', gasMes, Math.max(ingMes,gasMes,1), 'var(--r)')}
+      <div style="display:flex;justify-content:space-between;border-top:1px solid var(--grayb);margin-top:8px;padding-top:8px;font-weight:800"><span>Beneficio</span><span style="color:${benMes>=0?'var(--gd)':'var(--rd)'}">${fmt(benMes)}</span></div>
+    </div>
+    ${payArr.length?`<div class="stitle">Cómo te pagan</div><div class="card">${payArr.slice(0,6).map(x=>_dashBarH(x.label, x.val, payTot, 'var(--b)', Math.round(x.val/payTot*100)+'%')).join('')}</div>`:''}
+    <div class="stitle">Más vendidos</div>
+    <div class="card">
+      ${a.top.length?a.top.map((t,i)=>_dashBarH(t.eq, t.rev, maxTop, i===0?'var(--g)':'var(--gm)')).join(''):'<div style="text-align:center;color:var(--txm);padding:12px">Sin ventas aún</div>'}
+    </div>
+    <div class="stitle">Por canal</div>
+    <div class="card">
+      <div class="li"><div class="liico ig"><i class="ti ti-building-store"></i></div><div class="libody"><div class="liname">Tienda física</div><div class="lisub">${a.fisN} venta${a.fisN!==1?'s':''} · ${Math.round(a.fisRev/totCanal*100)}%</div></div><div class="liright"><b>${fmt(a.fisRev)}</b></div></div>
+      <div class="li"><div class="liico ip"><i class="ti ti-device-mobile"></i></div><div class="libody"><div class="liname">Online (IG · WhatsApp · Web)</div><div class="lisub">${a.onN} venta${a.onN!==1?'s':''} · ${Math.round(a.onRev/totCanal*100)}%</div></div><div class="liright"><b>${fmt(a.onRev)}</b></div></div>
+    </div>
+    <div style="font-size:11px;color:var(--txh);text-align:center;margin-top:12px">Basado en los últimos meses cargados. Para todo el historial usa "Cargar todo" en Inicio.</div>`;
+}
 function renderMas(){
   const cont=document.getElementById('mas-c'); if(!cont) return;
   const pendPed=pedidos.filter(p=>p.estado==='pendiente').length;
@@ -3334,7 +3410,7 @@ function renderMas(){
     <div style="font-size:19px;font-weight:800;margin-bottom:3px">Más opciones</div>
     <div style="font-size:13px;color:var(--txm);margin-bottom:14px">Gestión y reportes</div>
     <div class="acc-grid">
-      ${item("abrirAnalitica()",'ti-chart-line','var(--pl)','var(--p)','Analítica de ventas','Más vendidos, tendencia y canales')}
+      ${item("goTo('dashboard')",'ti-chart-bar','var(--pl)','var(--p)','Dashboard','Ventas, tendencias y comparativas')}
       ${item("goTo('clientes')",'ti-users','var(--bl)','var(--b)','Clientes','Historial y mejores clientes')}
       ${item("goTo('nomina')",'ti-wallet','var(--gl)','var(--g)','Personal y nómina','Tu equipo y sus pagos')}
       ${item("abrirBuscarFecha()",'ti-calendar-search','var(--bl)','var(--b)','Ventas por fecha','Revisa cualquier día o mes')}
