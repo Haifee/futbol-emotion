@@ -3453,13 +3453,27 @@ function renderNomina(){
     </div>`;
   renderPersonal();
 }
+function exportarClientes(){
+  const lista=clientesAgregados();
+  if(!lista.length){ toast('No hay clientes para exportar'); return; }
+  try{
+    const filas=[['Nombre','Cédula','Teléfono','Compras','Total gastado ($)','Última compra','Lo que compra']]
+      .concat(lista.map(c=>[c.nombre, c.cedula||'', c.telefono||'', c.compras, +(+c.total).toFixed(2), c.ultima||'', c.prendas.slice(0,5).join(' · ')]));
+    const ws=XLSX.utils.aoa_to_sheet(filas);
+    ws['!cols']=[{wch:22},{wch:14},{wch:16},{wch:9},{wch:16},{wch:13},{wch:42}];
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Clientes');
+    XLSX.writeFile(wb,`clientes_futbol-emotion_${hoy()}.xlsx`);
+    toast('Clientes exportados ✓');
+  }catch(e){ toast('No se pudo exportar'); }
+}
 function renderClientes(){
   const cont=document.getElementById('cli-c'); if(!cont) return;
   const todos=clientesAgregados();
   const facturado=todos.reduce((s,c)=>s+c.total,0);
   cont.innerHTML=`
     <button onclick="goTo('home')" style="background:var(--gray);border:none;border-radius:9px;padding:7px 12px;cursor:pointer;font-size:13px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:5px;margin-bottom:12px"><i class="ti ti-arrow-left"></i> Volver</button>
-    <div style="font-size:19px;font-weight:800;margin-bottom:12px">Clientes</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="font-size:19px;font-weight:800">Clientes</div><button onclick="exportarClientes()" style="background:none;border:none;cursor:pointer;color:var(--g);font-size:13px;font-weight:700"><i class="ti ti-download"></i> Exportar</button></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
       <div class="mc mc-b"><div class="mcl">Clientes</div><div class="mcv">${todos.length}</div></div>
       <div class="mc mc-g"><div class="mcl">Facturado</div><div class="mcv">${fmt(facturado)}</div></div>
