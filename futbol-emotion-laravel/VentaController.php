@@ -60,12 +60,19 @@ class VentaController extends Controller
                 return response()->json(['error' => 'Camiseta no encontrada'], 404);
             }
 
-            $col = 'talla_' . strtolower($request->talla);
+            // Talla válida: evita construir una columna inexistente (y cierra un hueco de validación)
+            $tallasValidas = ['S', 'M', 'L', 'XL', 'XXL', '10', '12', '14', '16', 'U'];
+            $tallaNorm = strtoupper($request->talla);
+            if (!in_array($tallaNorm, $tallasValidas)) {
+                return response()->json(['error' => 'Talla inválida'], 422);
+            }
+            $col = 'talla_' . strtolower($tallaNorm);
             $stockActual = $camiseta->$col ?? 0;
 
+            // Pre-chequeo amable para el caso común; el descuento atómico de abajo es la garantía real
             if ($stockActual < $request->cantidad) {
                 return response()->json([
-                    'error' => "Solo hay {$stockActual} UND en talla {$request->talla}"
+                    'error' => "Solo hay {$stockActual} UND en talla {$tallaNorm}"
                 ], 422);
             }
 
@@ -76,28 +83,36 @@ class VentaController extends Controller
         DB::beginTransaction();
         try {
             if ($camiseta) {
-                DB::table('camisetas')
+                // Descuento atómico y condicional: solo resta si AÚN queda suficiente.
+                // Si dos ventas compiten por la última unidad, la BD sólo deja pasar una.
+                $afectadas = DB::table('camisetas')
                     ->where('id', $request->camiseta_id)
+                    ->where($col, '>=', $request->cantidad)
                     ->decrement($col, $request->cantidad);
+                if ($afectadas === 0) {
+                    DB::rollBack();
+                    return response()->json([
+                        'error' => "Stock insuficiente en talla {$tallaNorm} — otra venta se adelantó"
+                    ], 409);
+                }
             }
 
-                      // Número de venta para tienda física
-            $numeroVenta = null;
+            // Número de venta para TODAS las ventas (física y online, misma secuencia)
             $cliente     = $request->input('cliente');
-            
-            if ($request->canal === 'Tienda física') {
-                // Contador por mes: la numeración reinicia en #001 cada mes.
-                // Usa un contador propio por mes (atómico y a prueba de borrados).
-                $claveMes = 'contador_ventas_' . now()->format('Y-m');
-                $contador = DB::table('configuracion')->where('clave', $claveMes)->lockForUpdate()->first();
-                $num      = $contador ? (int) $contador->valor + 1 : 1;
-                $numeroVenta = '#' . str_pad($num, 3, '0', STR_PAD_LEFT);
-                $cliente     = $numeroVenta;
-                DB::table('configuracion')->updateOrInsert(
-                    ['clave' => $claveMes],
-                    ['valor' => $num, 'updated_at' => now()]
-                );
+            $cedula      = $request->input('cedula')   ? mb_substr(trim((string) $request->input('cedula')), 0, 20)   : null;
+            $telefono    = $request->input('telefono') ? mb_substr(trim((string) $request->input('telefono')), 0, 30) : null;
+            $claveMes    = 'contador_ventas_' . now()->format('Y-m');
+            $contador    = DB::table('configuracion')->where('clave', $claveMes)->lockForUpdate()->first();
+            $num         = $contador ? (int)$contador->valor + 1 : 1;
+            $numeroVenta = '#' . str_pad($num, 3, '0', STR_PAD_LEFT);
+            // Física sin cliente → usa el número como nombre; online conserva el nombre real
+            if ($request->canal === 'Tienda física' && !$cliente) {
+                $cliente = $numeroVenta;
             }
+            DB::table('configuracion')->updateOrInsert(
+                ['clave' => $claveMes],
+                ['valor' => $num, 'updated_at' => now()]
+            );
 
             // Registrar venta
             $id = DB::table('ventas')->insertGetId([
@@ -107,6 +122,8 @@ class VentaController extends Controller
                 'cantidad'      => $request->cantidad,
                 'canal'         => $request->canal,
                 'cliente'       => $cliente,
+                'cliente_cedula'   => $cedula,
+                'cliente_telefono' => $telefono,
                 'numero_venta'  => $numeroVenta,
                 'importe'       => $request->importe,
                 'fecha'         => now()->toDateString(),
@@ -138,7 +155,7 @@ class VentaController extends Controller
 
             // ── Notificaciones push ──
             $actor = $request->input('_rol') === 'owner' ? 'owner' : 'manager';
-            $nombreProd = $request->input('equipo', 'Producto');
+            $nombreProd = $equipoNombre ?: 'Producto';
             $tallaTxt = ($request->talla && $request->talla !== '—') ? (' talla ' . $request->talla) : '';
             PushService::evento('venta', $actor, 'Nueva venta 💰',
                 "{$nombreProd}{$tallaTxt} · \${$request->importe}");
@@ -163,6 +180,138 @@ class VentaController extends Controller
     }
 
     // Editar una venta existente (corrige también stock y transacción vinculada)
+    // Venta multi-producto (carrito) con pago dividido, TODO en una sola transacción.
+    // Si cualquier línea falla (p.ej. stock insuficiente), se revierte la venta completa.
+    public function storeCarrito(Request $request)
+    {
+        $request->validate([
+            'lineas'            => 'required|array|min:1',
+            'lineas.*.cantidad' => 'required|integer|min:1',
+            'lineas.*.importe'  => 'required|numeric|min:0',
+            'canal'             => 'required|string|max:40',
+        ]);
+
+        $lineas = $request->input('lineas');
+        $canal  = $request->input('canal');
+        $pagos  = $request->input('pagos', []);
+        $tallasValidas = ['S', 'M', 'L', 'XL', 'XXL', '10', '12', '14', '16', 'U'];
+
+        DB::beginTransaction();
+        try {
+            // Un solo número de venta para toda la compra (TODAS las ventas, misma secuencia)
+            $clienteBase = $request->input('cliente');
+            $cedula      = $request->input('cedula')   ? mb_substr(trim((string) $request->input('cedula')), 0, 20)   : null;
+            $telefono    = $request->input('telefono') ? mb_substr(trim((string) $request->input('telefono')), 0, 30) : null;
+            $claveMes    = 'contador_ventas_' . now()->format('Y-m');
+            $contador    = DB::table('configuracion')->where('clave', $claveMes)->lockForUpdate()->first();
+            $num         = $contador ? (int) $contador->valor + 1 : 1;
+            $numeroVenta = '#' . str_pad($num, 3, '0', STR_PAD_LEFT);
+            // Física sin cliente → usa el número como nombre; online conserva el nombre real
+            if ($canal === 'Tienda física' && !$clienteBase) {
+                $clienteBase = $numeroVenta;
+            }
+            DB::table('configuracion')->updateOrInsert(
+                ['clave' => $claveMes],
+                ['valor' => $num, 'updated_at' => now()]
+            );
+
+            $idsVentas = [];
+            $total     = 0;
+            $descItems = [];
+
+            foreach ($lineas as $ln) {
+                $camId   = $ln['camiseta_id'] ?? null;
+                $talla   = $ln['talla'] ?? '';
+                $cant    = (int) ($ln['cantidad'] ?? 1);
+                $importe = (float) ($ln['importe'] ?? 0);
+                $equipoNombre = $ln['equipo'] ?? 'Producto';
+
+                if ($camId) {
+                    $camiseta = DB::table('camisetas')->find($camId);
+                    if (!$camiseta) {
+                        DB::rollBack();
+                        return response()->json(['error' => "Un producto del carrito ya no existe"], 404);
+                    }
+                    $tallaNorm = strtoupper($talla);
+                    if (!in_array($tallaNorm, $tallasValidas)) {
+                        DB::rollBack();
+                        return response()->json(['error' => 'Talla inválida'], 422);
+                    }
+                    $col = 'talla_' . strtolower($tallaNorm);
+                    // Descuento atómico y condicional (a prueba de carreras)
+                    $afectadas = DB::table('camisetas')
+                        ->where('id', $camId)
+                        ->where($col, '>=', $cant)
+                        ->decrement($col, $cant);
+                    if ($afectadas === 0) {
+                        DB::rollBack();
+                        return response()->json([
+                            'error' => "Stock insuficiente en {$camiseta->equipo} talla {$tallaNorm}"
+                        ], 409);
+                    }
+                    $equipoNombre = $camiseta->equipo . ' ' . $camiseta->tipo . ' ' . $camiseta->temporada;
+                }
+
+                $id = DB::table('ventas')->insertGetId([
+                    'camiseta_id'  => $camId,
+                    'equipo'       => $equipoNombre,
+                    'talla'        => $talla,
+                    'cantidad'     => $cant,
+                    'canal'        => $canal,
+                    'cliente'      => $clienteBase,
+                    'cliente_cedula'   => $cedula,
+                    'cliente_telefono' => $telefono,
+                    'numero_venta' => $numeroVenta,
+                    'importe'      => $importe,
+                    'fecha'        => now()->toDateString(),
+                    'created_at'   => now(),
+                    'updated_at'   => now(),
+                ]);
+                $idsVentas[] = $id;
+                $total      += $importe;
+                $descItems[] = ($ln['equipo'] ?? $equipoNombre) . ($talla ? " {$talla}" : '') . " x{$cant}";
+            }
+
+            $ventaPrincipal = $idsVentas[0];
+
+            // Una sola transacción de ingreso por el TOTAL de la compra
+            $descTx = count($lineas) > 1
+                ? ('Venta de ' . count($lineas) . ' productos: ' . implode(', ', array_slice($descItems, 0, 3)) . (count($descItems) > 3 ? '…' : ''))
+                : ('Venta ' . $descItems[0]);
+            DB::table('transacciones')->insert([
+                'venta_id'    => $ventaPrincipal,
+                'tipo'        => 'ingreso',
+                'descripcion' => mb_substr($descTx, 0, 190),
+                'importe'     => $total,
+                'canal'       => $canal,
+                'fecha'       => now()->toDateString(),
+                'created_at'  => now(),
+                'updated_at'  => now(),
+            ]);
+
+            // Pagos mixtos (uno o varios métodos), atados a la venta principal del grupo
+            if (is_array($pagos)) {
+                foreach ($pagos as $pg) {
+                    if (is_array($pg) && !empty($pg['metodo'])) {
+                        $this->guardarPago($pg, $ventaPrincipal, (float) ($pg['monto'] ?? 0));
+                    }
+                }
+            }
+
+            DB::commit();
+
+            $ventas = DB::table('ventas')->whereIn('id', $idsVentas)->orderBy('id')->get();
+            return response()->json([
+                'ventas'       => $ventas,
+                'numero_venta' => $numeroVenta,
+                'total'        => $total,
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'No se pudo registrar la venta: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function update(Request $request, $id)
     {
         $venta = DB::table('ventas')->find($id);
@@ -175,6 +324,8 @@ class VentaController extends Controller
             'importe'  => 'nullable|numeric|min:0',
             'canal'    => 'nullable|string',
             'cliente'  => 'nullable|string',
+            'cedula'   => 'nullable|string|max:20',
+            'telefono' => 'nullable|string|max:30',
         ]);
 
         $nuevaTalla    = $request->input('talla', $venta->talla);
@@ -182,6 +333,8 @@ class VentaController extends Controller
         $nuevoImporte  = $request->input('importe', $venta->importe);
         $nuevoCanal    = $request->input('canal', $venta->canal);
         $nuevoCliente  = $request->input('cliente', $venta->cliente);
+        $nuevaCedula   = $request->input('cedula', $venta->cliente_cedula ?? null);
+        $nuevoTelefono = $request->input('telefono', $venta->cliente_telefono ?? null);
         $nuevoEquipo   = $request->input('equipo', $venta->equipo);
 
         DB::beginTransaction();
@@ -232,6 +385,8 @@ class VentaController extends Controller
                 'importe'    => $nuevoImporte,
                 'canal'      => $nuevoCanal,
                 'cliente'    => $nuevoCliente,
+                'cliente_cedula'   => $nuevaCedula,
+                'cliente_telefono' => $nuevoTelefono,
                 'updated_at' => now(),
             ]);
 
@@ -264,21 +419,28 @@ class VentaController extends Controller
         $metodosValidos = [
             'efectivo_usd', 'efectivo_bs', 'pago_movil', 'punto_venta',
             'transferencia', 'zelle', 'binance', 'zinli', 'cashea',
+            'efectivo_otra',
         ];
 
         if (!is_array($pago) || empty($pago['metodo']) || !in_array($pago['metodo'], $metodosValidos, true)) {
             return;
         }
 
-        $enBolivares = in_array($pago['metodo'], ['efectivo_bs', 'pago_movil', 'punto_venta', 'transferencia'], true);
-        $moneda = $enBolivares ? 'VES' : 'USD';
+        $enBolivares  = in_array($pago['metodo'], ['efectivo_bs', 'pago_movil', 'punto_venta', 'transferencia'], true);
+        $esOtraMoneda = ($pago['metodo'] === 'efectivo_otra');
         $tasa   = isset($pago['tasa']) ? (float) $pago['tasa'] : null;
         $monto  = isset($pago['monto']) ? (float) $pago['monto'] : null;
 
         if ($enBolivares) {
+            $moneda = 'VES';
             if (!$monto && $tasa > 0) $monto = round($importeUsd * $tasa, 2);
             $montoUsd = ($tasa > 0 && $monto) ? round($monto / $tasa, 2) : $importeUsd;
+        } elseif ($esOtraMoneda) {
+            // Pago en otra moneda (pesos, euros...): el monto viene en esa moneda y la tasa es "unidades por $"
+            $moneda   = mb_substr(trim((string) ($pago['moneda'] ?? 'OTRA')), 0, 20) ?: 'OTRA';
+            $montoUsd = ($tasa > 0 && $monto) ? round($monto / $tasa, 2) : ($monto ?: $importeUsd);
         } else {
+            $moneda   = 'USD';
             $monto    = $monto ?: $importeUsd;
             $montoUsd = $monto;
             $tasa     = null;
@@ -344,47 +506,26 @@ class VentaController extends Controller
         }
     }
 
-  public function resumen(Request $request)
+    public function resumen(Request $request)
     {
-        $hoy       = now()->toDateString();
+        $hoy      = now()->toDateString();
         $inicioSem = now()->startOfWeek()->toDateString();
         $inicioMes = now()->startOfMonth()->toDateString();
 
         $calcular = function ($desde) {
-            try {
-                // Hacemos las sumas y conteos directamente en SQL
-                $ingresos = DB::table('transacciones')
-                    ->where('fecha', '>=', $desde)->where('tipo', 'ingreso')->sum('importe');
-                
-                $gastos = DB::table('transacciones')
-                    ->where('fecha', '>=', $desde)->where('tipo', 'gasto')->sum('importe');
-                
-                $ventasFisicasQuery = DB::table('ventas')
-                    ->where('fecha', '>=', $desde)->where('canal', 'Tienda física');
-                
-                $ventasOnlineQuery = DB::table('ventas')
-                    ->where('fecha', '>=', $desde)->where('canal', '!=', 'Tienda física');
+            $txs = DB::table('transacciones')->where('fecha', '>=', $desde)->get();
+            $vtas = DB::table('ventas')->where('fecha', '>=', $desde)->get();
+            $envs = DB::table('envios')->where('fecha', '>=', $desde)->get();
 
-                $envios = DB::table('envios')->where('fecha', '>=', $desde)->count();
-
-                return [
-                    'ingresos'             => $ingresos,
-                    'gastos'               => $gastos,
-                    'neto'                 => $ingresos - $gastos, // AQUÍ ESTÁ LA SOLUCIÓN
-                    'ventas_fisicas'       => $ventasFisicasQuery->count(),
-                    'ventas_online'        => $ventasOnlineQuery->count(),
-                    'total_ventas_fisicas' => $ventasFisicasQuery->sum('importe'),
-                    'total_ventas_online'  => $ventasOnlineQuery->sum('importe'),
-                    'envios'               => $envios,
-                ];
-            } catch (\Exception $e) {
-                // Si falta alguna tabla, devolvemos valores en 0
-                return [
-                    'ingresos' => 0, 'gastos' => 0, 'neto' => 0, // TAMBIÉN AQUÍ
-                    'ventas_fisicas' => 0, 'ventas_online' => 0, 
-                    'total_ventas_fisicas' => 0, 'total_ventas_online' => 0, 'envios' => 0
-                ];
-            }
+            return [
+                'ingresos' => $txs->where('tipo', 'ingreso')->sum('importe'),
+                'gastos'   => $txs->where('tipo', 'gasto')->sum('importe'),
+                'ventas_fisicas' => $vtas->where('canal', 'Tienda física')->count(),
+                'ventas_online'  => $vtas->where('canal', '!=', 'Tienda física')->count(),
+                'total_ventas_fisicas' => $vtas->where('canal', 'Tienda física')->sum('importe'),
+                'total_ventas_online'  => $vtas->where('canal', '!=', 'Tienda física')->sum('importe'),
+                'envios' => $envs->count(),
+            ];
         };
 
         return response()->json([
@@ -393,3 +534,4 @@ class VentaController extends Controller
             'mes'    => $calcular($inicioMes),
         ]);
     }
+}
