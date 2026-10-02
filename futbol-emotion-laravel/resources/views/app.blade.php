@@ -361,6 +361,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <div class="page" id="page-caja"><div id="caja-c"></div></div>
     <div class="page" id="page-ajustes"><div id="aj2-c"></div></div>
     <div class="page" id="page-historial"><div id="hist-c"></div></div>
+    <div class="page" id="page-clientes"><div id="cli-c"></div></div>
 
   </div>
   <div class="bnav" id="bnav"></div>
@@ -569,6 +570,10 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <div id="cart-cliente-wrap" style="display:none;margin-bottom:6px">
       <label class="fl">Cliente</label>
       <input class="fi" id="cart-cliente" placeholder="Nombre del cliente" oninput="carritoActualizarConfirm()">
+      <div class="frow" style="margin-top:8px">
+        <div><label class="fl" style="margin-top:0">Cédula (opcional)</label><input class="fi" id="cart-cedula" placeholder="Ej: V-12345678" maxlength="20"></div>
+        <div><label class="fl" style="margin-top:0">Teléfono (opcional)</label><input class="fi" id="cart-telefono" inputmode="tel" placeholder="Ej: 0414 0000000" maxlength="20"></div>
+      </div>
       <label class="fl" style="margin-top:8px">Canal</label>
       <select class="fi" id="cart-canal"><option>Instagram</option><option>WhatsApp</option><option>Web</option></select>
     </div>
@@ -815,6 +820,15 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <div class="modal-handle"></div>
     <div class="mtitle"><span>Pagar al personal</span> <button class="mclose" onclick="closeM('m-nomina')"><i class="ti ti-x"></i></button></div>
     <div id="nomina-body"></div>
+  </div>
+</div>
+
+<!-- MODAL: FICHA CLIENTE -->
+<div class="mbg" id="m-cliente">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle"><span id="cli-ficha-nom">Cliente</span> <button class="mclose" onclick="closeM('m-cliente')"><i class="ti ti-x"></i></button></div>
+    <div id="cli-ficha-body"></div>
   </div>
 </div>
 
@@ -1140,7 +1154,7 @@ async function cargarDatosServidor(){
     pedidos = p.map(x=>({id:x.id,provId:x.proveedor_id,lineas:x.lineas,notas:x.notas,estado:x.estado,fecha:x.fecha}));
     envios = e.map(x=>({id:x.id,cliente:x.cliente,prods:x.productos,origen:x.origen,trans:x.transportista,dir:x.direccion,imp:parseFloat(x.importe),estado:x.estado,notas:x.notas,fecha:x.fecha}));
     devoluciones = d.map(x=>({id:x.id,cliente:x.cliente,motivo:x.motivo,dev:x.camiseta_devuelta,sol:x.camiseta_solicitada,devCamId:x.dev_camiseta_id,devTalla:x.dev_talla,solCamId:x.sol_camiseta_id,solTalla:x.sol_talla,imp:parseFloat(x.importe),estado:x.estado,fecha:x.fecha}));
-    ventas = v.map(x=>({id:x.id,camId:x.camiseta_id,equipo:x.equipo,talla:x.talla,cant:x.cantidad,canal:x.canal,cliente:x.cliente,numeroVenta:x.numero_venta,imp:parseFloat(x.importe),fecha:x.fecha,pagos:x.pagos||[]}));
+    ventas = v.map(x=>({id:x.id,camId:x.camiseta_id,equipo:x.equipo,talla:x.talla,cant:x.cantidad,canal:x.canal,cliente:x.cliente,cedula:x.cliente_cedula||'',telefono:x.cliente_telefono||'',numeroVenta:x.numero_venta,imp:parseFloat(x.importe),fecha:x.fecha,pagos:x.pagos||[]}));
     transacciones = t.map(x=>({id:x.id,tipo:x.tipo,desc:x.descripcion,imp:parseFloat(x.importe),canal:x.canal,fecha:x.fecha,venta_id:x.venta_id||null}));
     actividad = act.actividad;
     notifsVistas = act.vistas;
@@ -1165,7 +1179,7 @@ async function cargarHistorialCompleto(){
       apiCall('GET','/ventas?desde=all'),
       apiCall('GET','/transacciones?desde=all'),
     ]);
-    ventas = v.map(x=>({id:x.id,camId:x.camiseta_id,equipo:x.equipo,talla:x.talla,cant:x.cantidad,canal:x.canal,cliente:x.cliente,numeroVenta:x.numero_venta,imp:parseFloat(x.importe),fecha:x.fecha,pagos:x.pagos||[]}));
+    ventas = v.map(x=>({id:x.id,camId:x.camiseta_id,equipo:x.equipo,talla:x.talla,cant:x.cantidad,canal:x.canal,cliente:x.cliente,cedula:x.cliente_cedula||'',telefono:x.cliente_telefono||'',numeroVenta:x.numero_venta,imp:parseFloat(x.importe),fecha:x.fecha,pagos:x.pagos||[]}));
     transacciones = t.map(x=>({id:x.id,tipo:x.tipo,desc:x.descripcion,imp:parseFloat(x.importe),canal:x.canal,fecha:x.fecha,venta_id:x.venta_id||null}));
     historialCompleto=true;
     cutoffCarga='2000-01-01';
@@ -1218,7 +1232,7 @@ function goTo(p){
   document.querySelectorAll('.ni').forEach(x=>x.classList.remove('active'));
   const pg=document.getElementById('page-'+p);if(pg)pg.classList.add('active');
   const ni=document.getElementById('ni-'+p);if(ni)ni.classList.add('active');
-  ({home:renderHome,pedido:renderPedido,stock:renderStock,envios:renderEnvios,dev:renderDev,ventas:renderVentas,misventas:renderMisVentas,aprobar:renderAprobar,fin:renderFin,verstock:renderVerStock,caja:renderCaja,ajustes:renderAjustes,historial:renderHistorial})[p]?.();
+  ({home:renderHome,pedido:renderPedido,stock:renderStock,envios:renderEnvios,dev:renderDev,ventas:renderVentas,misventas:renderMisVentas,aprobar:renderAprobar,fin:renderFin,verstock:renderVerStock,caja:renderCaja,ajustes:renderAjustes,historial:renderHistorial,clientes:renderClientes})[p]?.();
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -2216,6 +2230,11 @@ function renderHome(){
         <div><div class="bbtitle">Analítica de ventas</div><div class="bbsub">Más vendidos, tendencia y canales</div></div>
         <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
       </button>
+      <button class="bigbtn" onclick="goTo('clientes')">
+        <div class="bbico" style="background:var(--bl);color:var(--b)"><i class="ti ti-users"></i></div>
+        <div><div class="bbtitle">Clientes</div><div class="bbsub">Historial y mejores clientes</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
+      </button>
       <button class="bigbtn" onclick="abrirBuscarFecha()">
         <div class="bbico" style="background:var(--bl);color:var(--b)"><i class="ti ti-calendar-search"></i></div>
         <div><div class="bbtitle">Ventas por fecha</div><div class="bbsub">Revisa cualquier día o mes</div></div>
@@ -2656,6 +2675,8 @@ function abrirCarrito(){
     : '<option value="">Sin camisetas en inventario</option>';
   document.getElementById('cart-cant').value=1;
   document.getElementById('cart-cliente').value='';
+  const _cc=document.getElementById('cart-cedula'); if(_cc)_cc.value='';
+  const _ct=document.getElementById('cart-telefono'); if(_ct)_ct.value='';
   document.getElementById('cart-cliente-wrap').style.display='none';
   carritoTipoBotones();
   carritoAutoPrecio();
@@ -2883,10 +2904,12 @@ async function confirmarCarrito(){
   try{
     const canal = carritoTipo==='tienda' ? 'Tienda física' : document.getElementById('cart-canal').value;
     const cliente = carritoTipo==='tienda' ? null : document.getElementById('cart-cliente').value.trim();
+    const cedula = carritoTipo==='tienda' ? '' : (document.getElementById('cart-cedula').value||'').trim();
+    const telefono = carritoTipo==='tienda' ? '' : (document.getElementById('cart-telefono').value||'').trim();
     const _dr = carritoTotal()>0 ? carritoTotalCobrar()/carritoTotal() : 1;
     const payload={
       lineas: carrito.map(it=>({camiseta_id:it.camId, equipo:it.equipo, talla:it.talla, cantidad:it.cant, importe:+(it.precioUnit*it.cant*_dr).toFixed(2)})),
-      canal, cliente,
+      canal, cliente, cedula, telefono,
       pagos: carritoPagos.map(p=>{ const met=METODOS_PAGO[p.metodo]; const o={metodo:p.metodo, monto:+(+p.monto).toFixed(2)}; if(met&&met.bs){ o.tasa=tasaActual(); o.tasa_tipo=tasaElegida; } if(met&&met.otra){ o.tasa=+p.tasa||0; o.moneda=p.moneda||'Otra'; } if(p.referencia && String(p.referencia).trim()) o.referencia=String(p.referencia).trim(); return o; })
     };
     const resp = await apiCall('POST','/ventas/carrito',payload);
@@ -3294,6 +3317,94 @@ async function marcarRecibido(id){
 }
 
 // ── STOCK DUEÑO ───────────────────────────────────────────────────────────────
+let cliQuery='';
+function clientesAgregados(){
+  const map={};
+  (ventas||[]).forEach(v=>{
+    let nom=(v.cliente||'').trim();
+    if(nom && v.numeroVenta && nom===v.numeroVenta) nom=''; // venta física anónima
+    const ced=(v.cedula||'').trim();
+    const tel=(v.telefono||'').trim();
+    const key = ced ? 'C:'+normalizarTxt(ced) : (tel ? 'T:'+tel.replace(/\D/g,'') : (nom?'N:'+normalizarTxt(nom):''));
+    if(!key) return;
+    if(!map[key]) map[key]={key, nombre:nom||'(sin nombre)', cedula:ced, telefono:tel, total:0, ventasIds:{}, ultima:'', prendas:{}, canales:{}, detalle:[]};
+    const c=map[key];
+    if(nom && c.nombre==='(sin nombre)') c.nombre=nom;
+    if(ced && !c.cedula) c.cedula=ced;
+    if(tel && !c.telefono) c.telefono=tel;
+    c.total += (v.imp||0);
+    const vid=v.numeroVenta||('L'+v.id);
+    c.ventasIds[vid]=1;
+    if(!c.ultima || (v.fecha||'')>c.ultima) c.ultima=v.fecha||'';
+    const prod=(v.equipo||'')+(v.talla&&v.talla!=='—'?' · '+v.talla:'');
+    if(prod.trim()) c.prendas[prod]=(c.prendas[prod]||0)+(v.cant||1);
+    if(v.canal) c.canales[v.canal]=1;
+    c.detalle.push({fecha:v.fecha||'', prod, imp:v.imp||0, canal:v.canal||''});
+  });
+  return Object.values(map).map(c=>({
+    key:c.key, nombre:c.nombre, cedula:c.cedula, telefono:c.telefono, total:c.total, compras:Object.keys(c.ventasIds).length, ultima:c.ultima,
+    prendas:Object.entries(c.prendas).sort((a,b)=>b[1]-a[1]).map(x=>x[0]),
+    canales:Object.keys(c.canales),
+    detalle:c.detalle.sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)))
+  })).sort((a,b)=>b.total-a.total);
+}
+function waLink(tel){ let d=String(tel||'').replace(/\D/g,''); if(!d) return ''; if(d.slice(0,2)==='58'){} else if(d[0]==='0') d='58'+d.slice(1); else if(d.length===10) d='58'+d; return 'https://wa.me/'+d; }
+function abrirWhatsCliente(telEnc){ const u=waLink(decodeURIComponent(telEnc)); if(u) window.open(u,'_blank'); else toast('Este cliente no tiene teléfono guardado'); }
+function clienteEnvios(nombre){ const k=normalizarTxt(nombre); return (envios||[]).filter(e=>normalizarTxt(e.cliente||'')===k); }
+function clienteDevoluciones(nombre){ const k=normalizarTxt(nombre); return (devoluciones||[]).filter(d=>normalizarTxt(d.cliente||'')===k); }
+function renderClientes(){
+  const cont=document.getElementById('cli-c'); if(!cont) return;
+  const todos=clientesAgregados();
+  const facturado=todos.reduce((s,c)=>s+c.total,0);
+  cont.innerHTML=`
+    <button onclick="goTo('home')" style="background:var(--gray);border:none;border-radius:9px;padding:7px 12px;cursor:pointer;font-size:13px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:5px;margin-bottom:12px"><i class="ti ti-arrow-left"></i> Volver</button>
+    <div style="font-size:19px;font-weight:800;margin-bottom:12px">Clientes</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="mc mc-b"><div class="mcl">Clientes</div><div class="mcv">${todos.length}</div></div>
+      <div class="mc mc-g"><div class="mcl">Facturado</div><div class="mcv">${fmt(facturado)}</div></div>
+    </div>
+    <div class="swrap" style="margin-bottom:12px"><i class="ti ti-search"></i><input class="sinput" id="cli-search" placeholder="Buscar cliente…" oninput="cliQuery=this.value;renderClientesList()" value="${(cliQuery||'').replace(/"/g,'&quot;')}"></div>
+    <div id="cli-list"></div>`;
+  renderClientesList();
+}
+function renderClientesList(){
+  const cont=document.getElementById('cli-list'); if(!cont) return;
+  const q=normalizarTxt(cliQuery);
+  let lista=clientesAgregados();
+  if(q) lista=lista.filter(c=>normalizarTxt(c.nombre).includes(q));
+  if(!lista.length){ cont.innerHTML=`<div class="empty"><i class="ti ti-users"></i><p>${cliQuery?'Sin resultados':'Aún no hay clientes con nombre registrado'}</p></div>`; return; }
+  cont.innerHTML=lista.map(c=>`
+    <div class="li" style="cursor:pointer" onclick="abrirCliente('${encodeURIComponent(c.key)}')">
+      <div class="liico ig"><i class="ti ti-user"></i></div>
+      <div class="libody"><div class="liname">${c.nombre}</div><div class="lisub">${c.compras} compra${c.compras!==1?'s':''} · últ. ${c.ultima||'—'}${c.telefono?' · '+c.telefono:''}</div></div>
+      <div class="liright" style="font-weight:800">${fmt(c.total)}</div>
+    </div>`).join('');
+}
+function abrirCliente(keyEnc){
+  const key=decodeURIComponent(keyEnc);
+  const c=clientesAgregados().find(x=>x.key===key);
+  if(!c) return;
+  const nombre=c.nombre;
+  const envs=clienteEnvios(nombre), devs=clienteDevoluciones(nombre);
+  document.getElementById('cli-ficha-nom').textContent=c.nombre;
+  const prendasTop=c.prendas.slice(0,6);
+  document.getElementById('cli-ficha-body').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+      <div class="mc mc-g"><div class="mcl">Total</div><div class="mcv" style="font-size:15px">${fmt(c.total)}</div></div>
+      <div class="mc mc-b"><div class="mcl">Compras</div><div class="mcv" style="font-size:15px">${c.compras}</div></div>
+      <div class="mc"><div class="mcl">Última</div><div class="mcv" style="font-size:12px">${c.ultima||'—'}</div></div>
+    </div>
+    ${(c.cedula||c.telefono)?`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">${c.cedula?`<span style="background:var(--gray);border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600"><i class="ti ti-id"></i> ${c.cedula}</span>`:''}${c.telefono?`<span style="background:var(--gray);border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600"><i class="ti ti-phone"></i> ${c.telefono}</span>`:''}</div>`:''}
+    ${c.telefono?`<button class="abtn abtn-g" onclick="abrirWhatsCliente('${encodeURIComponent(c.telefono)}')" style="margin-bottom:12px"><i class="ti ti-brand-whatsapp"></i> Escribir por WhatsApp</button>`:''}
+    ${prendasTop.length?`<label class="fl" style="margin-top:0">Lo que compra</label><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">${prendasTop.map(p=>`<span style="background:var(--gray);border-radius:8px;padding:4px 9px;font-size:12px;font-weight:600">${p}</span>`).join('')}</div>`:''}
+    <label class="fl">Historial de compras</label>
+    <div class="card" style="padding:4px 0;margin-bottom:${(envs.length||devs.length)?'12':'0'}px">
+      ${c.detalle.slice(0,40).map(d=>`<div class="li"><div class="libody"><div class="liname" style="font-size:13px">${d.prod||'Venta'}</div><div class="lisub">${d.canal||''}${d.fecha?' · '+d.fecha:''}</div></div><div class="liright" style="font-weight:800">${fmt(d.imp)}</div></div>`).join('')}
+    </div>
+    ${envs.length?`<label class="fl">Envíos (${envs.length})</label><div style="font-size:12.5px;color:var(--txm);line-height:1.7;margin-bottom:10px">${envs.map(e=>`${e.prods} · ${e.estado}`).join('<br>')}</div>`:''}
+    ${devs.length?`<label class="fl">Cambios / devoluciones (${devs.length})</label><div style="font-size:12.5px;color:var(--txm);line-height:1.7">${devs.map(d=>`${d.dev} → ${d.sol} · ${d.estado}`).join('<br>')}</div>`:''}`;
+  openM('m-cliente');
+}
 function renderVerStock(){
   const cont=document.getElementById('vs-c');
   const criticos=camisetas.filter(c=>stockStatus(c)!=='ok');
@@ -4075,7 +4186,8 @@ function renderAjustes(){
       <label class="fl">Cargo (opcional)</label><input class="fi" id="cfg-nuevo-emp-cargo" maxlength="24" placeholder="Ej: Vendedor">
       <label class="fl">Frecuencia de pago</label>
       <select class="fi" id="cfg-nuevo-emp-frec"><option value="semanal">Semanal</option><option value="quincenal" selected>Quincenal</option><option value="mensual">Mensual</option></select>
-      <button class="abtn abtn-gray" onclick="agregarPersonal()" style="margin-top:8px"><i class="ti ti-user-plus"></i> Agregar trabajador</button>
+      <button class="abtn abtn-gray" id="btn-guardar-emp" onclick="agregarPersonal()" style="margin-top:8px"><i class="ti ti-user-plus"></i> Agregar trabajador</button>
+      <button class="abtn abtn-gray" id="btn-cancelar-emp" onclick="cancelarEdicionPersonal()" style="margin-top:8px;display:none"><i class="ti ti-x"></i> Cancelar edición</button>
     </div>
 
     <div class="stitle">Datos para cobrar (pago móvil)</div>
@@ -4308,8 +4420,30 @@ function renderPersonal(){
   const lista=personalLista();
   cont.innerHTML = lista.length ? lista.map(p=>`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;background:var(--gray);border-radius:10px;padding:8px 12px">
       <div style="flex:1"><div style="font-size:13px;font-weight:800">${p.nombre}${p.cargo?` <span style="font-weight:600;color:var(--txm)">· ${p.cargo}</span>`:''}</div><div style="font-size:11px;color:var(--txm)">${p.sueldo>0?'Sueldo: '+fmt(p.sueldo):'Sin sueldo fijo'} · ${({semanal:'Semanal',quincenal:'Quincenal',mensual:'Mensual'}[p.frecuencia]||'Quincenal')}</div></div>
+      <button onclick="editarPersonal('${p.id}')" style="background:none;border:none;color:var(--bd);cursor:pointer;font-size:18px"><i class="ti ti-edit"></i></button>
       <button onclick="borrarPersonal('${p.id}')" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:18px"><i class="ti ti-trash"></i></button>
     </div>`).join('') : '<div style="font-size:12px;color:var(--txm);margin-bottom:6px">Todavía no tienes personal registrado.</div>';
+}
+let editandoPersonalId='';
+function editarPersonal(id){
+  const p=personalLista().find(x=>x.id===id); if(!p) return;
+  editandoPersonalId=id;
+  document.getElementById('cfg-nuevo-emp-nombre').value=p.nombre;
+  document.getElementById('cfg-nuevo-emp-cargo').value=p.cargo||'';
+  document.getElementById('cfg-nuevo-emp-sueldo').value=p.sueldo>0?p.sueldo:'';
+  const fs=document.getElementById('cfg-nuevo-emp-frec'); if(fs) fs.value=p.frecuencia||'quincenal';
+  const b=document.getElementById('btn-guardar-emp'); if(b) b.innerHTML='<i class="ti ti-check"></i> Guardar cambios';
+  const c=document.getElementById('btn-cancelar-emp'); if(c) c.style.display='';
+  const n=document.getElementById('cfg-nuevo-emp-nombre'); if(n){ n.focus(); n.scrollIntoView({behavior:'smooth',block:'center'}); }
+}
+function cancelarEdicionPersonal(){
+  editandoPersonalId='';
+  const n=document.getElementById('cfg-nuevo-emp-nombre'); if(n) n.value='';
+  const c1=document.getElementById('cfg-nuevo-emp-cargo'); if(c1) c1.value='';
+  const su=document.getElementById('cfg-nuevo-emp-sueldo'); if(su) su.value='';
+  const fs=document.getElementById('cfg-nuevo-emp-frec'); if(fs) fs.value='quincenal';
+  const b=document.getElementById('btn-guardar-emp'); if(b) b.innerHTML='<i class="ti ti-user-plus"></i> Agregar trabajador';
+  const c=document.getElementById('btn-cancelar-emp'); if(c) c.style.display='none';
 }
 async function agregarPersonal(){
   const nombre=(document.getElementById('cfg-nuevo-emp-nombre').value||'').trim();
@@ -4318,12 +4452,16 @@ async function agregarPersonal(){
   const frec=((document.getElementById('cfg-nuevo-emp-frec')||{}).value)||'quincenal';
   if(!nombre){ toast('Ponle el nombre del trabajador'); return; }
   const lista=personalLista();
-  if(lista.length>=20){ toast('Máximo 20 trabajadores'); return; }
-  lista.push({id:'e'+Math.random().toString(36).slice(2,6), nombre:nombre.slice(0,30), cargo:cargo.slice(0,24), sueldo:sueldo.toFixed(2), frecuencia:frec, desde:hoy()});
-  await guardarPersonal(lista);
-  document.getElementById('cfg-nuevo-emp-nombre').value='';
-  document.getElementById('cfg-nuevo-emp-cargo').value='';
-  document.getElementById('cfg-nuevo-emp-sueldo').value='';
+  if(editandoPersonalId){
+    const p=lista.find(x=>x.id===editandoPersonalId);
+    if(p){ p.nombre=nombre.slice(0,30); p.cargo=cargo.slice(0,24); p.sueldo=sueldo.toFixed(2); p.frecuencia=frec; }
+    await guardarPersonal(lista);
+  }else{
+    if(lista.length>=20){ toast('Máximo 20 trabajadores'); return; }
+    lista.push({id:'e'+Math.random().toString(36).slice(2,6), nombre:nombre.slice(0,30), cargo:cargo.slice(0,24), sueldo:sueldo.toFixed(2), frecuencia:frec, desde:hoy()});
+    await guardarPersonal(lista);
+  }
+  cancelarEdicionPersonal();
 }
 async function borrarPersonal(id){
   const p=personalLista().find(x=>x.id===id);
