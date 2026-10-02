@@ -109,16 +109,16 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 
 /* PILLS */
 .pill{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}
-.pok{background:#dcfce7;color:#15803d}.pwarn{background:#fef3c7;color:#d97706}
-.pbad{background:#fee2e2;color:#dc2626}.ppurp{background:#ede9fe;color:#7c3aed}
-.pgray{background:#f8fafc;color:#64748b}.pblue{background:#dbeafe;color:#2563eb}
+.pok{background:var(--gl);color:var(--gd)}.pwarn{background:var(--al);color:var(--ad)}
+.pbad{background:var(--rl);color:var(--rd)}.ppurp{background:var(--pl);color:var(--pd)}
+.pgray{background:var(--gray);color:var(--txm)}.pblue{background:var(--bl);color:var(--bd)}
 
 /* BUTTONS */
 .abtn{padding:15px;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px;letter-spacing:.1px;transition:all .2s}
 .abtn:active{opacity:.88;transform:scale(.98)}
 .abtn-g{background:#16a34a;color:#fff;box-shadow:0 4px 14px rgba(22,163,74,.35)}
-.abtn-r{background:#fee2e2;color:#dc2626}
-.abtn-a{background:#dcfce7;color:#15803d;border:1.5px solid #22c55e}
+.abtn-r{background:var(--rl);color:var(--rd)}
+.abtn-a{background:var(--gl);color:var(--gd);border:1.5px solid var(--gm)}
 .abtn-gray{background:var(--gray);color:var(--tx);border:1.5px solid var(--grayb)}
 .abtn-sm{padding:9px 14px;font-size:13px;margin-top:8px;border-radius:10px}
 .abtn-blue{background:#2563eb;color:#fff;box-shadow:0 4px 14px rgba(37,99,235,.35)}
@@ -135,37 +135,37 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 
 /* PROV GRID */
 .prov-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
-.prov-card{padding:22px 12px;border:2px solid #e2e8f0;border-radius:18px;cursor:pointer;text-align:center;background:#fff;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+.prov-card{padding:22px 12px;border:2px solid var(--grayb);border-radius:18px;cursor:pointer;text-align:center;background:var(--card);transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,.05)}
 .prov-card:active{transform:scale(.96)}
-.prov-card.sel{border-color:#22c55e;background:#f0fdf4;box-shadow:0 0 0 3px rgba(34,197,94,.12)}
-.prov-num{font-size:40px;font-weight:800;color:#16a34a;line-height:1}
-.prov-lbl{font-size:12px;color:#64748b;margin-top:4px;font-weight:600}
+.prov-card.sel{border-color:#22c55e;background:var(--gl);box-shadow:0 0 0 3px rgba(34,197,94,.12)}
+.prov-num{font-size:40px;font-weight:800;color:var(--g);line-height:1}
+.prov-lbl{font-size:12px;color:var(--txm);margin-top:4px;font-weight:600}
 
 /* TALLAS */
 .trow{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--gray)}
 .trow:last-child{border-bottom:none}
 .tlab{font-size:16px;font-weight:700;width:80px;flex-shrink:0}
-.tlab-und{font-size:11px;color:#64748b;font-weight:600}
+.tlab-und{font-size:11px;color:var(--txm);font-weight:600}
 .tcant{display:flex;align-items:center;gap:12px;flex-shrink:0;margin-left:auto}
-.cbtn{width:42px;height:42px;border-radius:12px;border:1.5px solid #e2e8f0;background:#f8fafc;font-size:24px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#0f172a;transition:all .15s}
+.cbtn{width:42px;height:42px;border-radius:12px;border:1.5px solid var(--grayb);background:var(--gray);font-size:24px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tx);transition:all .15s}
 .cbtn:active{background:#dcfce7;border-color:#22c55e;transform:scale(.92)}
 .cval{font-size:22px;font-weight:800;min-width:36px;text-align:center}
 .cval.pos{color:#16a34a}
 
 /* STOCK TALLAS */
 .tgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:10px}
-.tbox{background:#f8fafc;border-radius:12px;padding:9px 4px;text-align:center;border:1px solid #e2e8f0}
-.tbox-lab{font-size:11px;color:#64748b;font-weight:700;margin-bottom:2px}
-.tbox-und{font-size:9px;color:#94a3b8;font-weight:600;margin-top:1px}
+.tbox{background:var(--gray);border-radius:12px;padding:9px 4px;text-align:center;border:1px solid var(--grayb)}
+.tbox-lab{font-size:11px;color:var(--txm);font-weight:700;margin-bottom:2px}
+.tbox-und{font-size:9px;color:var(--txh);font-weight:600;margin-top:1px}
 .tbox-val{font-size:20px;font-weight:800}
 
 /* LIST ITEMS */
 .li{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--gray)}
 .li:last-child{border-bottom:none;padding-bottom:0}.li:first-child{padding-top:0}
 .liico{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
-.ig{background:#dcfce7;color:#16a34a}.ia{background:#fef3c7;color:#d97706}
-.ir{background:#fee2e2;color:#dc2626}.ip{background:#ede9fe;color:#7c3aed}
-.ib{background:#dbeafe;color:#2563eb}.igr{background:#f8fafc;color:#64748b}
+.ig{background:var(--gl);color:var(--gd)}.ia{background:var(--al);color:var(--ad)}
+.ir{background:var(--rl);color:var(--rd)}.ip{background:var(--pl);color:var(--pd)}
+.ib{background:var(--bl);color:var(--bd)}.igr{background:var(--gray);color:var(--txm)}
 .libody{flex:1;min-width:0}
 .liname{font-size:14px;font-weight:700;color:var(--tx)}
 .lisub{font-size:12px;color:var(--txm);margin-top:2px;line-height:1.4}
@@ -184,11 +184,11 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 
 /* ALERT BOX */
 .abox{border-radius:16px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:13px}
-.abox-r{background:#fee2e2}.abox-a{background:#fef3c7}.abox-g{background:#dcfce7}.abox-p{background:#ede9fe}
+.abox-r{background:var(--rl)}.abox-a{background:var(--al)}.abox-g{background:var(--gl)}.abox-p{background:var(--pl)}
 .abox i{font-size:24px;flex-shrink:0}
-.abox-r i{color:#dc2626}.abox-a i{color:#d97706}.abox-g i{color:#16a34a}.abox-p i{color:#7c3aed}
+.abox-r i{color:var(--rd)}.abox-a i{color:var(--ad)}.abox-g i{color:var(--gd)}.abox-p i{color:var(--pd)}
 .abox-title{font-size:14px;font-weight:700}
-.abox-r .abox-title{color:#dc2626}.abox-a .abox-title{color:#d97706}.abox-g .abox-title{color:#16a34a}.abox-p .abox-title{color:#7c3aed}
+.abox-r .abox-title{color:var(--rd)}.abox-a .abox-title{color:var(--ad)}.abox-g .abox-title{color:var(--gd)}.abox-p .abox-title{color:var(--pd)}
 .abox-sub{font-size:12px;opacity:.75;margin-top:2px}
 
 /* SEARCH */
@@ -3777,7 +3777,7 @@ function renderCaja(){
     </div>
     ${role==='owner'?`<button class="abtn abtn-gray" onclick="abrirNomina()" style="margin-bottom:10px"><i class="ti ti-users"></i> Pagar al personal</button>`:''}
     <button class="abtn abtn-gray" onclick="abrirCalcBs()" style="margin-bottom:18px"><i class="ti ti-calculator"></i> Calculadora de bolívares</button>
-    ${(role==='owner'&&!historialCompleto)?`<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;background:var(--gl)"><div style="font-size:12.5px;color:var(--txm);line-height:1.4"><i class="ti ti-clock-hour-4"></i> Mostrando los últimos ${MESES_CARGA_INICIAL} meses. Los reportes de meses viejos se cargan solos al exportar.</div><button onclick="cargarHistorialCompletoUI()" style="flex:none;background:var(--tx);color:#fff;border:none;border-radius:9px;padding:8px 12px;cursor:pointer;font-size:12px;font-weight:700;white-space:nowrap">Cargar todo</button></div>`:''}
+    ${(role==='owner'&&!historialCompleto)?`<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;background:var(--gl)"><div style="font-size:12.5px;color:var(--txm);line-height:1.4"><i class="ti ti-clock-hour-4"></i> Mostrando los últimos ${MESES_CARGA_INICIAL} meses. Los reportes de meses viejos se cargan solos al exportar.</div><button onclick="cargarHistorialCompletoUI()" style="flex:none;background:#334155;color:#fff;border:none;border-radius:9px;padding:8px 12px;cursor:pointer;font-size:12px;font-weight:700;white-space:nowrap">Cargar todo</button></div>`:''}
     ${bloqueResumen('Cierre del día','ti-sun','var(--g)',dia,hoyStr,'dia')}
     ${bloqueResumen('Cierre de la semana','ti-calendar-week','var(--b)',sem,`${inicioSemStr} → ${hoyStr}`,'sem')}
     ${bloqueResumen('Cierre del mes','ti-calendar-month','var(--p)',mes,inicioMesStr.slice(0,7),'mes')}
@@ -3794,7 +3794,7 @@ function renderCaja(){
         </div>`).join('')||'<div style="font-size:13px;color:var(--txm);text-align:center;padding:10px">Sin movimientos aún</div>'}
     </div>
 
-    <button class="abtn abtn-g" onclick="abrirCierreCaja()" style="margin-top:16px;background:var(--tx)"><i class="ti ti-lock-check"></i> Cerrar caja del día</button>
+    <button class="abtn abtn-g" onclick="abrirCierreCaja()" style="margin-top:16px;background:#334155"><i class="ti ti-lock-check"></i> Cerrar caja del día</button>
     ${cierresMensuales.length?`<div class="stitle">Meses cerrados</div><div class="card">${cierresMensuales.slice(0,12).map(m=>{
       const [a,me]=m.mes.split('-');
       const meses=['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
