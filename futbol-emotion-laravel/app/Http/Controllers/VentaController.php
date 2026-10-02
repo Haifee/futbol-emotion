@@ -99,6 +99,8 @@ class VentaController extends Controller
 
             // Número de venta para TODAS las ventas (física y online, misma secuencia)
             $cliente     = $request->input('cliente');
+            $cedula      = $request->input('cedula')   ? mb_substr(trim((string) $request->input('cedula')), 0, 20)   : null;
+            $telefono    = $request->input('telefono') ? mb_substr(trim((string) $request->input('telefono')), 0, 30) : null;
             $claveMes    = 'contador_ventas_' . now()->format('Y-m');
             $contador    = DB::table('configuracion')->where('clave', $claveMes)->lockForUpdate()->first();
             $num         = $contador ? (int)$contador->valor + 1 : 1;
@@ -120,6 +122,8 @@ class VentaController extends Controller
                 'cantidad'      => $request->cantidad,
                 'canal'         => $request->canal,
                 'cliente'       => $cliente,
+                'cliente_cedula'   => $cedula,
+                'cliente_telefono' => $telefono,
                 'numero_venta'  => $numeroVenta,
                 'importe'       => $request->importe,
                 'fecha'         => now()->toDateString(),
@@ -196,6 +200,8 @@ class VentaController extends Controller
         try {
             // Un solo número de venta para toda la compra (TODAS las ventas, misma secuencia)
             $clienteBase = $request->input('cliente');
+            $cedula      = $request->input('cedula')   ? mb_substr(trim((string) $request->input('cedula')), 0, 20)   : null;
+            $telefono    = $request->input('telefono') ? mb_substr(trim((string) $request->input('telefono')), 0, 30) : null;
             $claveMes    = 'contador_ventas_' . now()->format('Y-m');
             $contador    = DB::table('configuracion')->where('clave', $claveMes)->lockForUpdate()->first();
             $num         = $contador ? (int) $contador->valor + 1 : 1;
@@ -253,6 +259,8 @@ class VentaController extends Controller
                     'cantidad'     => $cant,
                     'canal'        => $canal,
                     'cliente'      => $clienteBase,
+                    'cliente_cedula'   => $cedula,
+                    'cliente_telefono' => $telefono,
                     'numero_venta' => $numeroVenta,
                     'importe'      => $importe,
                     'fecha'        => now()->toDateString(),
@@ -316,6 +324,8 @@ class VentaController extends Controller
             'importe'  => 'nullable|numeric|min:0',
             'canal'    => 'nullable|string',
             'cliente'  => 'nullable|string',
+            'cedula'   => 'nullable|string|max:20',
+            'telefono' => 'nullable|string|max:30',
         ]);
 
         $nuevaTalla    = $request->input('talla', $venta->talla);
@@ -323,6 +333,8 @@ class VentaController extends Controller
         $nuevoImporte  = $request->input('importe', $venta->importe);
         $nuevoCanal    = $request->input('canal', $venta->canal);
         $nuevoCliente  = $request->input('cliente', $venta->cliente);
+        $nuevaCedula   = $request->input('cedula', $venta->cliente_cedula ?? null);
+        $nuevoTelefono = $request->input('telefono', $venta->cliente_telefono ?? null);
         $nuevoEquipo   = $request->input('equipo', $venta->equipo);
 
         DB::beginTransaction();
@@ -373,6 +385,8 @@ class VentaController extends Controller
                 'importe'    => $nuevoImporte,
                 'canal'      => $nuevoCanal,
                 'cliente'    => $nuevoCliente,
+                'cliente_cedula'   => $nuevaCedula,
+                'cliente_telefono' => $nuevoTelefono,
                 'updated_at' => now(),
             ]);
 
