@@ -363,6 +363,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <div class="page" id="page-historial"><div id="hist-c"></div></div>
     <div class="page" id="page-clientes"><div id="cli-c"></div></div>
     <div class="page" id="page-nomina"><div id="nom-c"></div></div>
+    <div class="page" id="page-mas"><div id="mas-c"></div></div>
 
   </div>
   <div class="bnav" id="bnav"></div>
@@ -1198,7 +1199,7 @@ function buildNav(){
   const nav=document.getElementById('bnav');
   const tabs=role==='manager'
     ?[{id:'home',icon:'ti-home',label:'Inicio'},{id:'misventas',icon:'ti-cash',label:'Ventas'},{id:'pedido',icon:'ti-clipboard-list',label:'Pedir'},{id:'stock',icon:'ti-shirt',label:'Stock'},{id:'caja',icon:'ti-report-money',label:'Caja'}]
-    :[{id:'home',icon:'ti-home',label:'Inicio'},{id:'misventas',icon:'ti-cash',label:'Ventas'},{id:'stock',icon:'ti-shirt',label:'Stock'},{id:'pedido',icon:'ti-clipboard-list',label:'Pedir'},{id:'caja',icon:'ti-report-money',label:'Caja'}];
+    :[{id:'home',icon:'ti-home',label:'Inicio'},{id:'misventas',icon:'ti-cash',label:'Ventas'},{id:'stock',icon:'ti-shirt',label:'Stock'},{id:'pedido',icon:'ti-clipboard-list',label:'Pedir'},{id:'caja',icon:'ti-report-money',label:'Caja'},{id:'mas',icon:'ti-dots',label:'Más'}];
   nav.innerHTML=tabs.map(t=>`<button class="ni" id="ni-${t.id}" onclick="goTo('${t.id}')"><i class="ti ${t.icon}"></i><span>${t.label}</span></button>`).join('');
   // Historial y Ajustes pasan al encabezado (solo dueño)
   document.getElementById('hdr-hist').style.display=role==='owner'?'flex':'none';
@@ -1221,7 +1222,7 @@ function goTo(p){
   document.querySelectorAll('.ni').forEach(x=>x.classList.remove('active'));
   const pg=document.getElementById('page-'+p);if(pg)pg.classList.add('active');
   const ni=document.getElementById('ni-'+p);if(ni)ni.classList.add('active');
-  ({home:renderHome,pedido:renderPedido,stock:renderStock,envios:renderEnvios,dev:renderDev,ventas:renderVentas,misventas:renderMisVentas,aprobar:renderAprobar,fin:renderFin,verstock:renderVerStock,caja:renderCaja,ajustes:renderAjustes,historial:renderHistorial,clientes:renderClientes,nomina:renderNomina})[p]?.();
+  ({home:renderHome,pedido:renderPedido,stock:renderStock,envios:renderEnvios,dev:renderDev,ventas:renderVentas,misventas:renderMisVentas,aprobar:renderAprobar,fin:renderFin,verstock:renderVerStock,caja:renderCaja,ajustes:renderAjustes,historial:renderHistorial,clientes:renderClientes,nomina:renderNomina,mas:renderMas})[p]?.();
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -2212,48 +2213,7 @@ function renderHome(){
             <div class="liright" style="font-weight:800;color:${t.tipo==='ingreso'?'var(--g)':'var(--r)'}">${t.tipo==='ingreso'?'+':'-'}${fmt(t.imp)}</div>
           </div>`).join('')}
       </div>
-      <div class="stitle">Acciones rápidas</div>
-      <div class="acc-grid">
-      <button class="bigbtn" onclick="abrirAnalitica()">
-        <div class="bbico" style="background:var(--pl);color:var(--p)"><i class="ti ti-chart-line"></i></div>
-        <div><div class="bbtitle">Analítica de ventas</div><div class="bbsub">Más vendidos, tendencia y canales</div></div>
-        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
-      </button>
-      <button class="bigbtn" onclick="goTo('clientes')">
-        <div class="bbico" style="background:var(--bl);color:var(--b)"><i class="ti ti-users"></i></div>
-        <div><div class="bbtitle">Clientes</div><div class="bbsub">Historial y mejores clientes</div></div>
-        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
-      </button>
-      <button class="bigbtn" onclick="goTo('nomina')">
-        <div class="bbico" style="background:var(--gl);color:var(--g)"><i class="ti ti-wallet"></i></div>
-        <div><div class="bbtitle">Personal y nómina</div><div class="bbsub">Tu equipo y sus pagos</div></div>
-        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
-      </button>
-      <button class="bigbtn" onclick="abrirBuscarFecha()">
-        <div class="bbico" style="background:var(--bl);color:var(--b)"><i class="ti ti-calendar-search"></i></div>
-        <div><div class="bbtitle">Ventas por fecha</div><div class="bbsub">Revisa cualquier día o mes</div></div>
-        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
-      </button>
-      <button class="bigbtn" onclick="goTo('verstock')">
-        <div class="bbico" style="background:var(--gl);color:var(--g)"><i class="ti ti-shirt"></i></div>
-        <div><div class="bbtitle">Ver stock</div><div class="bbsub">Inventario completo por tallas</div></div>
-        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
-      </button>
-      <button class="bigbtn" onclick="goTo('aprobar')">
-        <div class="bbico" style="background:${pendPed>0?'var(--al)':'var(--gray)'};color:${pendPed>0?'var(--a)':'var(--txm)'}"><i class="ti ti-clipboard-check"></i></div>
-        <div><div class="bbtitle">Pedidos a proveedores</div><div class="bbsub">${pendPed>0?pendPed+' esperando tu aprobación':'Sin pedidos pendientes'}</div></div>
-        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
-      </button>
-      <button class="bigbtn" onclick="goTo('dev')">
-        <div class="bbico" style="background:${pendDev>0?'var(--al)':'var(--gray)'};color:${pendDev>0?'var(--a)':'var(--txm)'}"><i class="ti ti-refresh"></i></div>
-        <div><div class="bbtitle">Cambios y devoluciones</div><div class="bbsub">${pendDev>0?pendDev+' esperando tu aprobación':'Sin cambios pendientes'}</div></div>
-        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
-      </button>
-      <button class="bigbtn" onclick="goTo('historial')">
-        <div class="bbico" style="background:var(--bl);color:var(--b)"><i class="ti ti-timeline"></i></div>
-        <div><div class="bbtitle">Ver historial</div><div class="bbsub">Todo lo que hizo el encargado hoy</div></div>
-        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
-      </button></div>`;
+`;
   }
 }
 
@@ -3365,6 +3325,26 @@ function waLink(tel){ let d=String(tel||'').replace(/\D/g,''); if(!d) return '';
 function abrirWhatsCliente(telEnc){ const u=waLink(decodeURIComponent(telEnc)); if(u) window.open(u,'_blank'); else toast('Este cliente no tiene teléfono guardado'); }
 function clienteEnvios(nombre){ const k=normalizarTxt(nombre); return (envios||[]).filter(e=>normalizarTxt(e.cliente||'')===k); }
 function clienteDevoluciones(nombre){ const k=normalizarTxt(nombre); return (devoluciones||[]).filter(d=>normalizarTxt(d.cliente||'')===k); }
+function renderMas(){
+  const cont=document.getElementById('mas-c'); if(!cont) return;
+  const pendPed=pedidos.filter(p=>p.estado==='pendiente').length;
+  const pendDev=devoluciones.filter(d=>d.estado==='pendiente').length;
+  const item=(oc,icon,bg,color,title,sub)=>`<button class="bigbtn" onclick="${oc}"><div class="bbico" style="background:${bg};color:${color}"><i class="ti ${icon}"></i></div><div><div class="bbtitle">${title}</div><div class="bbsub">${sub}</div></div><i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i></button>`;
+  cont.innerHTML=`
+    <div style="font-size:19px;font-weight:800;margin-bottom:3px">Más opciones</div>
+    <div style="font-size:13px;color:var(--txm);margin-bottom:14px">Gestión y reportes</div>
+    <div class="acc-grid">
+      ${item("abrirAnalitica()",'ti-chart-line','var(--pl)','var(--p)','Analítica de ventas','Más vendidos, tendencia y canales')}
+      ${item("goTo('clientes')",'ti-users','var(--bl)','var(--b)','Clientes','Historial y mejores clientes')}
+      ${item("goTo('nomina')",'ti-wallet','var(--gl)','var(--g)','Personal y nómina','Tu equipo y sus pagos')}
+      ${item("abrirBuscarFecha()",'ti-calendar-search','var(--bl)','var(--b)','Ventas por fecha','Revisa cualquier día o mes')}
+      ${item("goTo('verstock')",'ti-shirt','var(--gl)','var(--g)','Ver stock','Inventario completo por tallas')}
+      ${item("goTo('aprobar')",'ti-clipboard-check',pendPed>0?'var(--al)':'var(--gray)',pendPed>0?'var(--a)':'var(--txm)','Pedidos a proveedores',pendPed>0?pendPed+' esperando tu aprobación':'Sin pedidos pendientes')}
+      ${item("goTo('dev')",'ti-refresh',pendDev>0?'var(--al)':'var(--gray)',pendDev>0?'var(--a)':'var(--txm)','Cambios y devoluciones',pendDev>0?pendDev+' esperando tu aprobación':'Sin cambios pendientes')}
+      ${item("goTo('historial')",'ti-timeline','var(--bl)','var(--b)','Ver historial','Todo lo que hizo el encargado hoy')}
+      ${item("goTo('ajustes')",'ti-settings','var(--gray)','var(--txm)','Ajustes','Tasas, datos de cobro, proveedores…')}
+    </div>`;
+}
 function renderNomina(){
   const cont=document.getElementById('nom-c'); if(!cont) return;
   const m=hoy().slice(0,7);
