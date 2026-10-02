@@ -362,6 +362,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <div class="page" id="page-ajustes"><div id="aj2-c"></div></div>
     <div class="page" id="page-historial"><div id="hist-c"></div></div>
     <div class="page" id="page-clientes"><div id="cli-c"></div></div>
+    <div class="page" id="page-nomina"><div id="nom-c"></div></div>
 
   </div>
   <div class="bnav" id="bnav"></div>
@@ -1232,7 +1233,7 @@ function goTo(p){
   document.querySelectorAll('.ni').forEach(x=>x.classList.remove('active'));
   const pg=document.getElementById('page-'+p);if(pg)pg.classList.add('active');
   const ni=document.getElementById('ni-'+p);if(ni)ni.classList.add('active');
-  ({home:renderHome,pedido:renderPedido,stock:renderStock,envios:renderEnvios,dev:renderDev,ventas:renderVentas,misventas:renderMisVentas,aprobar:renderAprobar,fin:renderFin,verstock:renderVerStock,caja:renderCaja,ajustes:renderAjustes,historial:renderHistorial,clientes:renderClientes})[p]?.();
+  ({home:renderHome,pedido:renderPedido,stock:renderStock,envios:renderEnvios,dev:renderDev,ventas:renderVentas,misventas:renderMisVentas,aprobar:renderAprobar,fin:renderFin,verstock:renderVerStock,caja:renderCaja,ajustes:renderAjustes,historial:renderHistorial,clientes:renderClientes,nomina:renderNomina})[p]?.();
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -2233,6 +2234,11 @@ function renderHome(){
       <button class="bigbtn" onclick="goTo('clientes')">
         <div class="bbico" style="background:var(--bl);color:var(--b)"><i class="ti ti-users"></i></div>
         <div><div class="bbtitle">Clientes</div><div class="bbsub">Historial y mejores clientes</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
+      </button>
+      <button class="bigbtn" onclick="goTo('nomina')">
+        <div class="bbico" style="background:var(--gl);color:var(--g)"><i class="ti ti-wallet"></i></div>
+        <div><div class="bbtitle">Personal y nómina</div><div class="bbsub">Tu equipo y sus pagos</div></div>
         <i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i>
       </button>
       <button class="bigbtn" onclick="abrirBuscarFecha()">
@@ -3352,6 +3358,38 @@ function waLink(tel){ let d=String(tel||'').replace(/\D/g,''); if(!d) return '';
 function abrirWhatsCliente(telEnc){ const u=waLink(decodeURIComponent(telEnc)); if(u) window.open(u,'_blank'); else toast('Este cliente no tiene teléfono guardado'); }
 function clienteEnvios(nombre){ const k=normalizarTxt(nombre); return (envios||[]).filter(e=>normalizarTxt(e.cliente||'')===k); }
 function clienteDevoluciones(nombre){ const k=normalizarTxt(nombre); return (devoluciones||[]).filter(d=>normalizarTxt(d.cliente||'')===k); }
+function renderNomina(){
+  const cont=document.getElementById('nom-c'); if(!cont) return;
+  const m=hoy().slice(0,7);
+  const pagosMes=(transacciones||[]).filter(t=>t.tipo==='gasto'&&t.canal==='Sueldos'&&String(t.fecha||'').slice(0,7)===m);
+  const totMes=pagosMes.reduce((s,t)=>s+(t.imp||0),0);
+  const pend=nominaPendientes();
+  cont.innerHTML=`
+    <button onclick="goTo('home')" style="background:var(--gray);border:none;border-radius:9px;padding:7px 12px;cursor:pointer;font-size:13px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:5px;margin-bottom:12px"><i class="ti ti-arrow-left"></i> Volver</button>
+    <div style="font-size:19px;font-weight:800;margin-bottom:3px">Personal y nómina</div>
+    <div style="font-size:13px;color:var(--txm);margin-bottom:14px">Tu equipo y sus pagos</div>
+    ${pend.length?`<div class="abox abox-a" style="cursor:pointer;margin-bottom:14px" onclick="abrirNomina()"><i class="ti ti-alarm"></i><div><div class="abox-title">Toca pagar a ${pend.length} trabajador${pend.length>1?'es':''}</div><div class="abox-sub">${pend.map(x=>`${x.p.nombre} · ${x.dias}d (${x.p.frecuencia})`).join(' · ')}</div></div><i class="ti ti-chevron-right" style="color:var(--a);margin-left:auto;font-size:20px"></i></div>`:''}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="mc mc-r"><div class="mcl">Pagado este mes</div><div class="mcv">${fmt(totMes)}</div></div>
+      <div class="mc mc-b"><div class="mcl">Pagos</div><div class="mcv">${pagosMes.length}</div></div>
+    </div>
+    <button class="abtn abtn-g" onclick="abrirNomina()" style="margin-bottom:18px"><i class="ti ti-cash"></i> Pagar al personal</button>
+    <div class="stitle">Personal</div>
+    <div class="card">
+      <div style="font-size:12.5px;color:var(--txm);margin-bottom:12px">Registra a tu equipo. Al pagarles, el sueldo entra solo como gasto operativo.</div>
+      <div id="cfg-personal"></div>
+      <div class="frow" style="margin-top:6px">
+        <div style="flex:2"><label class="fl" style="margin-top:0">Nombre</label><input class="fi" id="cfg-nuevo-emp-nombre" maxlength="30" placeholder="Ej: Juan"></div>
+        <div style="flex:1"><label class="fl" style="margin-top:0">Sueldo ($)</label><input class="fi" id="cfg-nuevo-emp-sueldo" type="number" min="0" step="0.01" placeholder="Opcional"></div>
+      </div>
+      <label class="fl">Cargo (opcional)</label><input class="fi" id="cfg-nuevo-emp-cargo" maxlength="24" placeholder="Ej: Vendedor">
+      <label class="fl">Frecuencia de pago</label>
+      <select class="fi" id="cfg-nuevo-emp-frec"><option value="semanal">Semanal</option><option value="quincenal" selected>Quincenal</option><option value="mensual">Mensual</option></select>
+      <button class="abtn abtn-gray" id="btn-guardar-emp" onclick="agregarPersonal()" style="margin-top:8px"><i class="ti ti-user-plus"></i> Agregar trabajador</button>
+      <button class="abtn abtn-gray" id="btn-cancelar-emp" onclick="cancelarEdicionPersonal()" style="margin-top:8px;display:none"><i class="ti ti-x"></i> Cancelar edición</button>
+    </div>`;
+  renderPersonal();
+}
 function renderClientes(){
   const cont=document.getElementById('cli-c'); if(!cont) return;
   const todos=clientesAgregados();
@@ -4175,21 +4213,6 @@ function renderAjustes(){
       <button class="abtn abtn-gray" onclick="agregarTasaExtra()" style="margin-top:8px"><i class="ti ti-plus"></i> Agregar tasa</button>
     </div>
 
-    <div class="stitle">Personal / Nómina</div>
-    <div class="card">
-      <div style="font-size:12.5px;color:var(--txm);margin-bottom:12px">Registra a tu personal. Luego, desde Caja, podrás pagarles y el sueldo entra solo como gasto operativo.</div>
-      <div id="cfg-personal"></div>
-      <div class="frow" style="margin-top:6px">
-        <div style="flex:2"><label class="fl" style="margin-top:0">Nombre</label><input class="fi" id="cfg-nuevo-emp-nombre" maxlength="30" placeholder="Ej: Juan"></div>
-        <div style="flex:1"><label class="fl" style="margin-top:0">Sueldo ($)</label><input class="fi" id="cfg-nuevo-emp-sueldo" type="number" min="0" step="0.01" placeholder="Opcional"></div>
-      </div>
-      <label class="fl">Cargo (opcional)</label><input class="fi" id="cfg-nuevo-emp-cargo" maxlength="24" placeholder="Ej: Vendedor">
-      <label class="fl">Frecuencia de pago</label>
-      <select class="fi" id="cfg-nuevo-emp-frec"><option value="semanal">Semanal</option><option value="quincenal" selected>Quincenal</option><option value="mensual">Mensual</option></select>
-      <button class="abtn abtn-gray" id="btn-guardar-emp" onclick="agregarPersonal()" style="margin-top:8px"><i class="ti ti-user-plus"></i> Agregar trabajador</button>
-      <button class="abtn abtn-gray" id="btn-cancelar-emp" onclick="cancelarEdicionPersonal()" style="margin-top:8px;display:none"><i class="ti ti-x"></i> Cancelar edición</button>
-    </div>
-
     <div class="stitle">Datos para cobrar (pago móvil)</div>
     <div class="card">
       <div style="font-size:13px;color:var(--txm);margin-bottom:12px">Estos datos quedan puestos automáticamente al registrar un pago móvil o transferencia. El encargado solo agrega la referencia y el banco del cliente.</div>
@@ -4295,7 +4318,6 @@ function renderAjustes(){
   `;
   pintarEstadoPush();
   renderTasasExtra();
-  renderPersonal();
 }
 
 function renderTasasExtra(){
@@ -4390,6 +4412,7 @@ async function pagarNomina(){
     registrarActividad('caja',`Pago de nómina: ${p.nombre}`,`-$${imp.toFixed(2)}`);
     toast('Pago registrado ✓');
     if(curPage==='caja') renderCaja();
+    if(curPage==='nomina') renderNomina();
     nominaMostrarRecibo(p, imp);
   }catch(e){/* apiCall ya mostró el error */}
   nominaGuardando=false;
