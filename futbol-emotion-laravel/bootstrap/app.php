@@ -13,7 +13,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
-            'auth.pin' => \App\Http\Middleware\AuthPin::class,
+            'auth.pin'     => \App\Http\Middleware\AuthPin::class,
+            'ensure.owner' => \App\Http\Middleware\EnsureOwner::class,
         ]);
 
         // Permitir cookies de sesión en las peticiones API
