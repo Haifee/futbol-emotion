@@ -316,6 +316,9 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
   /* Modales como diálogo centrado en PC (no hoja pegada abajo) */
   .mbg{align-items:center}
   .modal{border-radius:20px;max-width:560px;padding:24px 24px 26px;max-height:88vh}
+  #m-carrito .modal{max-width:960px}
+  #m-carrito .cart-cols{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start}
+  #m-carrito .cart-left>.stitle:first-child,#m-carrito .cart-right>.stitle:first-child{margin-top:0}
   .modal-handle{display:none}
 }
 </style>
@@ -580,6 +583,8 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="mtitle">Venta con varios productos <button class="mclose" onclick="closeM('m-carrito')"><i class="ti ti-x"></i></button></div>
+    <div class="cart-cols">
+    <div class="cart-left">
     <label class="fl">Tipo de venta</label>
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <button id="cart-tipo-tienda" onclick="carritoTipoSet('tienda')">Tienda física</button>
@@ -607,6 +612,8 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <div style="flex:1"><label class="fl">Precio ($ c/u)</label><input class="fi" id="cart-precio" type="number" min="0" step="0.01"></div>
     </div>
     <button class="abtn abtn-gray abtn-sm" onclick="carritoAgregarProducto()" style="margin-top:8px"><i class="ti ti-plus"></i> Agregar al carrito</button>
+    </div>
+    <div class="cart-right">
     <div class="stitle">Carrito</div>
     <div id="cart-items"></div>
     <div id="cart-desc-row" style="display:flex;gap:8px;align-items:center;margin-top:8px">
@@ -620,6 +627,8 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <div id="cart-resumen-pago"></div>
     <div style="font-size:11.5px;color:var(--txh);margin-top:8px;padding:0 2px"><i class="ti ti-info-circle"></i> En efectivo, escribe lo que te dio el cliente; el vuelto se calcula solo.</div>
     <button class="abtn abtn-g" id="cart-confirm" onclick="confirmarCarrito()" style="margin-top:14px;opacity:.4;pointer-events:none"><i class="ti ti-check"></i> Registrar venta</button>
+    </div>
+    </div>
   </div>
 </div>
 <div class="mbg" id="m-venta">
@@ -5077,8 +5086,8 @@ function renderMisVentas(){
         </div>
       </div>
       <div style="display:flex;gap:7px;margin-top:9px;justify-content:flex-end">
-        <button class="abtn abtn-gray abtn-sm" style="font-size:12px;margin-top:0;padding:7px 14px;flex:0 0 auto" onclick="abrirEditarVenta(${v.id})"><i class="ti ti-edit"></i> Editar</button>
-        <button class="abtn abtn-gray abtn-sm" style="font-size:12px;margin-top:0;padding:7px 14px;flex:0 0 auto;color:var(--r)" onclick="eliminarVenta(${v.id})"><i class="ti ti-trash"></i> Eliminar</button>
+        <button class="abtn abtn-gray abtn-sm" style="font-size:12px;margin-top:0;padding:7px 14px;flex:0 0 auto;width:auto" onclick="abrirEditarVenta(${v.id})"><i class="ti ti-edit"></i> Editar</button>
+        <button class="abtn abtn-gray abtn-sm" style="font-size:12px;margin-top:0;padding:7px 14px;flex:0 0 auto;width:auto;color:var(--r)" onclick="eliminarVenta(${v.id})"><i class="ti ti-trash"></i> Eliminar</button>
       </div>
     </div>`;
   };
