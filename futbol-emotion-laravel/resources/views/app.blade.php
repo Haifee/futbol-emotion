@@ -41,7 +41,7 @@ body.noche{
 html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--tx)}
 
 /* LOGIN */
-#ls{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;background:#071810}
+#ls{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;background:#071810;--bg:#f1f5f9;--card:#ffffff;--gray:#f8fafc;--grayb:#e2e8f0;--tx:#0f172a;--txm:#64748b;--txh:#94a3b8}
 .llogo{font-size:32px;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-1px;display:flex;align-items:center;gap:10px}
 .llogo-ico{display:none}
 .llogo span{color:#22c55e}
@@ -309,6 +309,8 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
   .stock-grid .card{margin-bottom:0}
   .acc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .acc-grid .bigbtn{margin-bottom:0}
+  .dash2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+  .dash2 .stitle:first-child{margin-top:0}
   .ventas-lista{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:10px;padding:10px}
   .ventas-lista .li{border-bottom:none;background:var(--gray);border-radius:12px;padding:12px}
   /* Modales como diálogo centrado en PC (no hoja pegada abajo) */
@@ -595,8 +597,11 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     </div>
     <div class="stitle">Agregar producto</div>
     <button class="abtn abtn-g abtn-sm" onclick="escanearParaCarrito()" style="margin-top:0;margin-bottom:8px"><i class="ti ti-scan"></i> Escanear código</button>
-    <select class="fi" id="cart-cam" onchange="carritoAutoPrecio()"></select>
-    <select class="fi" id="cart-talla" style="margin-top:8px"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option>10</option><option>12</option><option>14</option><option>16</option><option>U</option></select>
+    <input class="fi" id="cart-cam-search" placeholder="Buscar camiseta…" autocomplete="off" oninput="carritoBuscarCam()" onfocus="carritoBuscarCam()" onblur="setTimeout(()=>{const l=document.getElementById('cart-cam-list');if(l)l.style.display='none'},180)">
+    <div id="cart-cam-list" style="display:none;margin-top:4px;border:1.5px solid var(--grayb);border-radius:12px;overflow:hidden;max-height:230px;overflow-y:auto"></div>
+    <select class="fi" id="cart-cam" onchange="carritoAutoPrecio()" style="display:none"></select>
+    <select class="fi" id="cart-talla" style="margin-top:8px" onchange="carritoStockInfo()"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option>10</option><option>12</option><option>14</option><option>16</option><option>U</option></select>
+    <div id="cart-stock-info" style="font-size:12px;margin-top:6px"></div>
     <div style="display:flex;gap:8px;margin-top:8px">
       <div style="flex:1"><label class="fl">Cantidad</label><input class="fi" id="cart-cant" type="number" min="1" value="1"></div>
       <div style="flex:1"><label class="fl">Precio ($ c/u)</label><input class="fi" id="cart-precio" type="number" min="0" step="0.01"></div>
@@ -1466,6 +1471,7 @@ function escanearParaCarrito(){
       if(!r.encontrado){ toast('Código no registrado — asócialo primero desde Inventario'); return; }
       const cam=camisetas.find(c=>c.id===r.camiseta.id)||r.camiseta;
       document.getElementById('cart-cam').value=String(cam.id);
+      {const _sc=document.getElementById('cart-cam-search'); if(_sc)_sc.value=nombreProducto(cam);}
       carritoAutoPrecio();
       document.getElementById('cart-talla').value=r.talla;
       document.getElementById('cart-cant').value=1;
@@ -2217,11 +2223,12 @@ function renderHome(){
       ${alertas}
       <div class="stitle">Reposición sugerida</div>
       ${renderRepoCard()}
-      <div class="stitle">Top ventas</div>
+      <div class="dash2">
+      <div><div class="stitle">Top ventas</div>
       <div class="card">
         ${top.map(([eq,v],i)=>`<div class="li"><div class="liico ${i===0?'ig':i===1?'ia':'igr'}" style="font-size:15px;font-weight:800">${i+1}</div><div class="libody"><div class="liname">${eq}</div></div><div class="liright" style="font-weight:800;color:var(--g)">${fmt(v)}</div></div>`).join('')||'<div style="font-size:13px;color:var(--txm);padding:8px 0">Sin ventas registradas aún</div>'}
-      </div>
-      <div class="stitle">Últimas transacciones</div>
+      </div></div>
+      <div><div class="stitle">Últimas transacciones</div>
       <div class="card">
         ${[...transacciones].reverse().slice(0,4).map(t=>`
           <div class="li">
@@ -2229,6 +2236,7 @@ function renderHome(){
             <div class="libody"><div class="liname">${t.desc}</div><div class="lisub">${t.canal} · ${t.fecha}</div></div>
             <div class="liright" style="font-weight:800;color:${t.tipo==='ingreso'?'var(--g)':'var(--r)'}">${t.tipo==='ingreso'?'+':'-'}${fmt(t.imp)}</div>
           </div>`).join('')}
+      </div></div>
       </div>
 `;
   }
@@ -2651,6 +2659,7 @@ function abrirCarrito(){
   document.getElementById('cart-cliente-wrap').style.display='none';
   carritoTipoBotones();
   carritoAutoPrecio();
+  (function(){ const _f=camisetas[0]; const _s=document.getElementById('cart-cam-search'); if(_s)_s.value=_f?nombreProducto(_f):''; const _l=document.getElementById('cart-cam-list'); if(_l){_l.style.display='none';_l.innerHTML='';} carritoStockInfo(); })();
   carritoRenderItems();
   carritoRenderPagos();
   const _dv=document.getElementById('cart-desc-val'); if(_dv) _dv.value='';
@@ -2672,6 +2681,37 @@ function carritoTipoSet(t){
   document.getElementById('cart-cliente-wrap').style.display=(t==='online')?'block':'none';
   carritoTipoBotones(); carritoActualizarConfirm();
 }
+function carritoBuscarCam(){
+  const inp=document.getElementById('cart-cam-search'); const list=document.getElementById('cart-cam-list');
+  if(!inp||!list) return;
+  const res=filtrarCamisetas(inp.value).slice(0,10);
+  if(!res.length){ list.innerHTML='<div style="padding:10px 12px;font-size:13px;color:var(--txm)">Sin resultados</div>'; list.style.display='block'; return; }
+  list.innerHTML=res.map(c=>{
+    const tot=Object.values(c.tallas||{}).reduce((a,b)=>a+(+b||0),0);
+    const col=tot<=0?'var(--rd)':(tot<=3?'var(--ad)':'var(--gd)');
+    return `<div onmousedown="carritoSelCam(${c.id})" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--gray);display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-size:13.5px;font-weight:600">${nombreProducto(c)}</span><span style="font-size:11px;font-weight:800;color:${col};white-space:nowrap">${tot} UND</span></div>`;
+  }).join('');
+  list.style.display='block';
+}
+function carritoSelCam(id){
+  const sel=document.getElementById('cart-cam'); if(sel) sel.value=String(id);
+  const c=camisetas.find(x=>x.id===id);
+  const inp=document.getElementById('cart-cam-search'); if(inp&&c) inp.value=nombreProducto(c);
+  const list=document.getElementById('cart-cam-list'); if(list){ list.style.display='none'; list.innerHTML=''; }
+  carritoAutoPrecio();
+  carritoStockInfo();
+}
+function carritoStockInfo(){
+  const el=document.getElementById('cart-stock-info'); if(!el) return;
+  const sel=document.getElementById('cart-cam'); const c=sel?camisetas.find(x=>x.id===+sel.value):null;
+  const talla=document.getElementById('cart-talla').value;
+  if(!c){ el.innerHTML=''; return; }
+  const stock=(c.tallas&&c.tallas[talla])||0;
+  const ya=carritoEnCarrito(c.id,talla);
+  const disp=Math.max(0,stock-ya);
+  const col=disp<=0?'var(--rd)':(disp<=2?'var(--ad)':'var(--gd)');
+  el.innerHTML=`<i class="ti ti-stack-2" style="font-size:13px;color:${col}"></i> <b style="color:${col}">${disp}</b> <span style="color:var(--txm)">en existencia (talla ${talla})</span>${ya?` <span style="color:var(--txh)">· ${ya} en el carrito</span>`:''}`;
+}
 function carritoAutoPrecio(){
   const c=camisetas.find(x=>x.id===+document.getElementById('cart-cam').value);
   if(c && c.precio!=null) document.getElementById('cart-precio').value=(+c.precio).toFixed(2);
@@ -2689,7 +2729,7 @@ function carritoAgregarProducto(){
   if(ya+cant>stock){ toast(`Solo hay ${stock} UND en talla ${talla}${ya?` (ya tienes ${ya} en el carrito)`:''}`); return; }
   carrito.push({camId, equipo:nombreProducto(c), talla, cant, precioUnit:precio});
   document.getElementById('cart-cant').value=1;
-  carritoRenderItems(); carritoRenderPagos();
+  carritoRenderItems(); carritoRenderPagos(); carritoStockInfo();
 }
 function carritoQuitarProducto(i){ carrito.splice(i,1); carritoRenderItems(); carritoRenderPagos(); }
 function carritoTotal(){ return carrito.reduce((a,it)=>a+it.precioUnit*it.cant,0); }
