@@ -20,6 +20,8 @@ Route::post('/logout', [AuthController::class, 'logout']);
 Route::get('/me', [AuthController::class, 'me']);
 
 // ── RUTAS PROTEGIDAS (requieren sesión) ───────────────────────────────────────
+// Nota: 'ensure.owner' (candado de dueño) se aplica solo a las rutas sensibles
+// que el encargado NUNCA usa (aprobaciones, borrados, configuración, finanzas).
 Route::middleware('auth.pin')->group(function () {
 
     // Camisetas / Inventario
@@ -42,8 +44,8 @@ Route::middleware('auth.pin')->group(function () {
     // Pedidos a proveedores
     Route::get('/pedidos',            [PedidoController::class, 'index']);
     Route::post('/pedidos',           [PedidoController::class, 'store']);
-    Route::put('/pedidos/{id}/aprobar',  [PedidoController::class, 'aprobar']);
-    Route::put('/pedidos/{id}/rechazar', [PedidoController::class, 'rechazar']);
+    Route::put('/pedidos/{id}/aprobar',  [PedidoController::class, 'aprobar'])->middleware('ensure.owner');
+    Route::put('/pedidos/{id}/rechazar', [PedidoController::class, 'rechazar'])->middleware('ensure.owner');
     Route::put('/pedidos/{id}/recibido', [PedidoController::class, 'marcarRecibido']);
 
     // Envíos
@@ -55,19 +57,19 @@ Route::middleware('auth.pin')->group(function () {
     // Devoluciones
     Route::get('/devoluciones',       [DevolucionController::class, 'index']);
     Route::post('/devoluciones',      [DevolucionController::class, 'store']);
-    Route::put('/devoluciones/{id}/aprobar',   [DevolucionController::class, 'aprobar']);
-    Route::put('/devoluciones/{id}/rechazar',  [DevolucionController::class, 'rechazar']);
-    Route::put('/devoluciones/{id}/completar', [DevolucionController::class, 'completar']);
+    Route::put('/devoluciones/{id}/aprobar',   [DevolucionController::class, 'aprobar'])->middleware('ensure.owner');
+    Route::put('/devoluciones/{id}/rechazar',  [DevolucionController::class, 'rechazar'])->middleware('ensure.owner');
+    Route::put('/devoluciones/{id}/completar', [DevolucionController::class, 'completar'])->middleware('ensure.owner');
 
     // Transacciones / Finanzas
     Route::get('/transacciones',      [TransaccionController::class, 'index']);
     Route::post('/transacciones',     [TransaccionController::class, 'store']);
     Route::get('/transacciones/cierre', [TransaccionController::class, 'cierre']);
-    Route::delete('/transacciones/{id}', [TransaccionController::class, 'destroy']);
+    Route::delete('/transacciones/{id}', [TransaccionController::class, 'destroy'])->middleware('ensure.owner');
 
     Route::get('/config',  [ConfigController::class, 'index']);
-    Route::post('/config', [ConfigController::class, 'update']);
-    Route::post('/config/tasa-bcv', [ConfigController::class, 'tasaBcv']);
+    Route::post('/config', [ConfigController::class, 'update'])->middleware('ensure.owner');
+    Route::post('/config/tasa-bcv', [ConfigController::class, 'tasaBcv'])->middleware('ensure.owner');
 
     Route::get('/push/clave',       [PushController::class, 'clavePublica']);
     Route::post('/push/suscribir',  [PushController::class, 'suscribir']);
@@ -79,19 +81,19 @@ Route::middleware('auth.pin')->group(function () {
     Route::get('/cierres/estado',    [CierreController::class, 'estado']);
     Route::get('/cierres/mensuales', [CierreController::class, 'mensuales']);
     Route::get('/cierres/dia/{fecha}',[CierreController::class, 'resumenDia']);
-    Route::delete('/cierres/{id}',   [CierreController::class, 'destroy']);
+    Route::delete('/cierres/{id}',   [CierreController::class, 'destroy'])->middleware('ensure.owner');
 
     // Actividad / Notificaciones (historial compartido entre encargado y dueño)
     Route::get('/actividad',          [ActividadController::class, 'index']);
     Route::post('/actividad',         [ActividadController::class, 'store']);
     Route::post('/actividad/vistas',  [ActividadController::class, 'marcarVistas']);
-    Route::delete('/actividad/{id}',  [ActividadController::class, 'destroy']);
-    Route::delete('/actividad',       [ActividadController::class, 'limpiar']);
+    Route::delete('/actividad/{id}',  [ActividadController::class, 'destroy'])->middleware('ensure.owner');
+    Route::delete('/actividad',       [ActividadController::class, 'limpiar'])->middleware('ensure.owner');
 
     // Migración de datos
     Route::post('/migrar',            [MigracionController::class, 'importar']);
 
     // Borrado de datos (reinicio, solo dueño)
-    Route::post('/datos/borrar',      [\App\Http\Controllers\DatosController::class, 'borrar']);
+    Route::post('/datos/borrar',      [\App\Http\Controllers\DatosController::class, 'borrar'])->middleware('ensure.owner');
 
 });
