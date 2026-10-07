@@ -9,10 +9,9 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- PDF (jsPDF + autotable), Excel (xlsx) y lector QR (html5-qrcode) se cargan
+     bajo demanda la primera vez que se usan, para que la app abra mas rapido.
+     Ver cargarScript()/asegurar* mas abajo. -->
 <style>
 :root{
   --g:#16a34a;--gl:#dcfce7;--gm:#22c55e;--gd:#15803d;--gx:#bbf7d0;
@@ -1281,16 +1280,46 @@ async function syncVenta(data){
   else sd('ventas',ventas);
 }
 
+// ── CARGA DIFERIDA DE LIBRERÍAS PESADAS ──────────────────────────
+// PDF, Excel y el lector de codigos solo se descargan la primera vez que se
+// usan. Cada URL se carga una sola vez (se memoriza en _libs).
+const _libs={};
+function cargarScript(url){
+  if(_libs[url]) return _libs[url];
+  _libs[url]=new Promise((resolve,reject)=>{
+    const el=document.createElement('script');
+    el.src=url; el.async=true;
+    el.onload=()=>resolve();
+    el.onerror=()=>{ delete _libs[url]; reject(new Error('No se pudo cargar '+url)); };
+    document.head.appendChild(el);
+  });
+  return _libs[url];
+}
+function asegurarXLSX(){
+  if(window.XLSX) return Promise.resolve();
+  return cargarScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+}
+async function asegurarJsPDF(){
+  await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
+}
+function asegurarQR(){
+  if(window.Html5Qrcode) return Promise.resolve();
+  return cargarScript('https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js');
+}
+
 // ── ESCÁNER DE CÓDIGO DE BARRAS ───────────────────────────────────────────────
 let scannerActivo=null, scanCallback=null, pendingCodigo=null, pendingTalla=null, impEditadoManual=false;
 let scanContinuo=false, ultimoCodigo=null, ultimoScanTs=0, contadorSesion=0;
 
-function abrirScanner(cb, continuo=false){
+async function abrirScanner(cb, continuo=false){
   scanCallback=cb;
   scanContinuo=continuo; ultimoCodigo=null; ultimoScanTs=0; contadorSesion=0;
   document.getElementById('scan-manual').value='';
   document.getElementById('scan-status').textContent='Iniciando cámara…';
   openM('m-scan');
+  try{ await asegurarQR(); }
+  catch(e){ document.getElementById('scan-status').textContent='⚠ No se pudo cargar el lector. Revisa tu conexión o escribe el código a mano abajo.'; return; }
   const config={
     fps:10,
     qrbox:{width:260,height:150},
@@ -3518,10 +3547,11 @@ function renderNomina(){
     </div>`;
   renderPersonal();
 }
-function exportarClientes(){
+async function exportarClientes(){
   const lista=clientesAgregados();
   if(!lista.length){ toast('No hay clientes para exportar'); return; }
   try{
+    await asegurarXLSX();
     const filas=[['Nombre','Cédula','Teléfono','Compras','Total gastado ($)','Última compra','Lo que compra']]
       .concat(lista.map(c=>[c.nombre, c.cedula||'', c.telefono||'', c.compras, +(+c.total).toFixed(2), c.ultima||'', c.prendas.slice(0,5).join(' · ')]));
     const ws=XLSX.utils.aoa_to_sheet(filas);
@@ -3882,9 +3912,10 @@ async function anularCierre(id,fecha){
   }catch(e){ toast(e.message||'No se pudo anular'); }
 }
 
-function exportarCierres(){
+async function exportarCierres(){
   if(!cierresCaja.length){toast('No hay cierres para exportar');return}
   try{
+    await asegurarXLSX();
     const wb=XLSX.utils.book_new();
     // Hoja 1: Cierres diarios
     const filas=[['Fecha','Cerró','Ingresos','Gastos','Beneficio','Ventas','Cobrado $','Cobrado Bs']]
@@ -4153,8 +4184,8 @@ async function exportarReporte(formato){
   }
   const nombre='futbol-emotion_'+exportPeriodo+'_'+hoy();
   try{
-    if(formato==='pdf') generarPDF(d,nombre);
-    else generarExcel(d,nombre);
+    if(formato==='pdf'){ await asegurarJsPDF(); generarPDF(d,nombre); }
+    else { await asegurarXLSX(); generarExcel(d,nombre); }
     closeM('m-export');
     toast('Reporte descargado ✓');
   }catch(e){
