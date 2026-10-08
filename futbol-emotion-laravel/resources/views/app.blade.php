@@ -180,6 +180,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 .mtitle{font-size:18px;font-weight:800;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
 .cart-kpis{display:none}
 .cart-volver{display:none}
+.cart-hoy{display:none}
 .mclose{background:var(--gray);border:none;font-size:20px;color:var(--txm);cursor:pointer;display:flex;align-items:center;padding:7px;border-radius:10px}
 .mclose:active{background:var(--grayb)}
 
@@ -330,6 +331,13 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
   #m-carrito .cart-kpis{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:440px;margin-bottom:22px}
   #m-carrito .cart-kpis .mc{min-height:76px;padding:14px 16px}
   #m-carrito .cart-kpis .mcv{font-size:22px}
+  #m-carrito .cart-hoy{display:block;margin-top:24px;border-top:1px solid var(--grayb);padding-top:20px}
+  #m-carrito .cart-hoy-head{font-size:12.5px;font-weight:800;color:var(--txm);text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;display:flex;align-items:center;gap:7px}
+  #m-carrito .cart-hoy-grid{display:grid;grid-template-columns:300px 1fr;gap:22px;align-items:start}
+  #m-carrito .cart-hoy-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  #m-carrito .chs{background:var(--gray);border-radius:14px;padding:14px 16px}
+  #m-carrito .chs-l{font-size:10.5px;font-weight:700;color:var(--txm);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+  #m-carrito .chs-v{font-size:21px;font-weight:800;color:var(--tx)}
   .modal-handle{display:none}
 }
 </style>
@@ -643,6 +651,16 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <div style="font-size:11.5px;color:var(--txh);margin-top:8px;padding:0 2px"><i class="ti ti-info-circle"></i> En efectivo, escribe lo que te dio el cliente; el vuelto se calcula solo.</div>
     <button class="abtn abtn-g" id="cart-confirm" onclick="confirmarCarrito()" style="margin-top:14px;opacity:.4;pointer-events:none"><i class="ti ti-check"></i> Registrar venta</button>
     </div>
+    </div>
+    <div class="cart-hoy" id="cart-hoy">
+      <div class="cart-hoy-head"><i class="ti ti-receipt-2"></i> Movimiento de hoy</div>
+      <div class="cart-hoy-grid">
+        <div class="cart-hoy-stats">
+          <div class="chs"><div class="chs-l">Ventas hoy</div><div class="chs-v" id="cart-hoy-num">0</div></div>
+          <div class="chs"><div class="chs-l">Vendido hoy</div><div class="chs-v" id="cart-hoy-total">$0.00</div></div>
+        </div>
+        <div class="cart-hoy-list" id="cart-hoy-list"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -2722,6 +2740,7 @@ function abrirCarrito(){
   poblarVueltoMonedas();
   const _vm=document.getElementById('vuelto-moneda'); if(_vm) _vm.value='usd';
   calcularVuelto();
+  carritoRenderHoy();
   openM('m-carrito');
 }
 function carritoTipoBotones(){
@@ -2796,7 +2815,7 @@ function carritoPagado(){ return carritoPagos.reduce((a,p)=>a+pagoEnUsd(p),0); }
 function carritoRenderItems(){
   const cont=document.getElementById('cart-items');
   carritoActualizarKPIs();
-  if(!carrito.length){ cont.innerHTML='<div style="text-align:center;color:var(--txm);padding:12px;font-size:13px">Aún no has agregado productos</div>'; carritoActualizarConfirm(); return; }
+  if(!carrito.length){ cont.innerHTML='<div style="text-align:center;color:var(--txm);padding:26px 12px;font-size:13px"><i class="ti ti-shopping-cart" style="font-size:30px;opacity:.45;display:block;margin-bottom:8px"></i>Aún no has agregado productos</div>'; carritoActualizarConfirm(); return; }
   cont.innerHTML=`<div class="card" style="padding:4px 12px">${carrito.map((it,i)=>`<div class="li">
     <div class="libody"><div class="liname">${it.equipo} · ${it.talla}</div><div class="lisub">${it.cant} × ${fmt(it.precioUnit)}</div></div>
     <div class="liright" style="display:flex;align-items:center;gap:12px"><b style="color:var(--g)">${fmt(it.precioUnit*it.cant)}</b><button onclick="carritoQuitarProducto(${i})" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:17px;line-height:1"><i class="ti ti-trash"></i></button></div>
@@ -2814,6 +2833,19 @@ function carritoActualizarKPIs(){
   const unidades=carrito.reduce((a,x)=>a+(+x.cant||0),0);
   if(it) it.textContent=unidades;
   if(tt) tt.textContent=fmt(carritoTotalCobrar());
+}
+function carritoRenderHoy(){
+  const numEl=document.getElementById('cart-hoy-num'), totEl=document.getElementById('cart-hoy-total'), listEl=document.getElementById('cart-hoy-list');
+  if(!numEl&&!listEl) return;
+  const h=hoy();
+  const vh=ventas.filter(v=>v.fecha===h);
+  const total=vh.reduce((a,v)=>a+(+v.imp||0),0);
+  if(numEl) numEl.textContent=vh.length;
+  if(totEl) totEl.textContent=fmt(total);
+  if(listEl){
+    if(!vh.length){ listEl.innerHTML='<div style="font-size:13px;color:var(--txm);padding:8px 2px">A\u00fan no hay ventas hoy</div>'; return; }
+    listEl.innerHTML=vh.slice(-5).reverse().map(v=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:10px;background:var(--gray);margin-bottom:7px"><span style="font-size:13px;font-weight:600;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.equipo||'Venta'}${v.talla?' \u00b7 '+v.talla:''}${v.cant>1?' \u00d7'+v.cant:''}</span><b style="color:var(--g);font-size:13.5px;white-space:nowrap;margin-left:10px">${fmt(v.imp)}</b></div>`).join('');
+  }
 }
 function carritoAgregarPago(){
   const restante=+(carritoTotalCobrar()-carritoPagado()).toFixed(2);
