@@ -178,6 +178,8 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 .modal{background:var(--card);border-radius:28px 28px 0 0;padding:22px 20px 36px;width:100%;max-width:520px;max-height:92vh;overflow-y:auto}
 .modal-handle{width:40px;height:4px;background:var(--grayb);border-radius:2px;margin:0 auto 18px}
 .mtitle{font-size:18px;font-weight:800;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+.cart-kpis{display:none}
+.cart-volver{display:none}
 .mclose{background:var(--gray);border:none;font-size:20px;color:var(--txm);cursor:pointer;display:flex;align-items:center;padding:7px;border-radius:10px}
 .mclose:active{background:var(--grayb)}
 
@@ -318,6 +320,16 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
   #m-carrito .modal{max-width:960px}
   #m-carrito .cart-cols{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start}
   #m-carrito .cart-left>.stitle:first-child,#m-carrito .cart-right>.stitle:first-child{margin-top:0}
+  /* Paso 2: venta a pantalla completa estilo POS en PC */
+  #m-carrito.mbg{background:var(--bg);backdrop-filter:none;align-items:stretch;justify-content:center;padding:0}
+  #m-carrito .modal{max-width:1240px;width:100%;max-height:100vh;height:100vh;border-radius:0;padding:24px 34px 36px;overflow-y:auto}
+  #m-carrito .mtitle{justify-content:flex-start;gap:14px}
+  #m-carrito .cart-title-txt{font-size:20px}
+  #m-carrito .mclose{display:none}
+  #m-carrito .cart-volver{display:inline-flex;align-items:center;gap:6px;background:var(--gray);border:none;border-radius:9px;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:700;color:var(--tx)}
+  #m-carrito .cart-kpis{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:440px;margin-bottom:22px}
+  #m-carrito .cart-kpis .mc{min-height:76px;padding:14px 16px}
+  #m-carrito .cart-kpis .mcv{font-size:22px}
   .modal-handle{display:none}
 }
 </style>
@@ -581,7 +593,11 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 <div class="mbg" id="m-carrito">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="mtitle">Venta con varios productos <button class="mclose" onclick="closeM('m-carrito')"><i class="ti ti-x"></i></button></div>
+    <div class="mtitle"><button class="cart-volver" onclick="closeM('m-carrito')"><i class="ti ti-arrow-left"></i> Volver</button><span class="cart-title-txt">Venta con varios productos</span> <button class="mclose" onclick="closeM('m-carrito')"><i class="ti ti-x"></i></button></div>
+    <div class="cart-kpis" id="cart-kpis">
+      <div class="mc mc-b"><div class="mcl">Productos</div><div class="mcv" id="cart-kpi-items">0</div><i class="ti ti-shopping-bag mc-ico"></i></div>
+      <div class="mc mc-g"><div class="mcl">Total carrito</div><div class="mcv" id="cart-kpi-total">$0.00</div><i class="ti ti-cash mc-ico"></i></div>
+    </div>
     <div class="cart-cols">
     <div class="cart-left">
     <label class="fl">Tipo de venta</label>
@@ -2779,6 +2795,7 @@ function pagoEnUsd(p){ const m=METODOS_PAGO[p.metodo]; const val=+p.monto||0; if
 function carritoPagado(){ return carritoPagos.reduce((a,p)=>a+pagoEnUsd(p),0); }
 function carritoRenderItems(){
   const cont=document.getElementById('cart-items');
+  carritoActualizarKPIs();
   if(!carrito.length){ cont.innerHTML='<div style="text-align:center;color:var(--txm);padding:12px;font-size:13px">Aún no has agregado productos</div>'; carritoActualizarConfirm(); return; }
   cont.innerHTML=`<div class="card" style="padding:4px 12px">${carrito.map((it,i)=>`<div class="li">
     <div class="libody"><div class="liname">${it.equipo} · ${it.talla}</div><div class="lisub">${it.cant} × ${fmt(it.precioUnit)}</div></div>
@@ -2790,6 +2807,13 @@ function carritoRenderItems(){
       return `<div class="li" style="border-top:2px solid var(--grayb)"><div class="libody"><div class="liname">Total</div></div><div class="liright"><b style="font-size:18px">${fmt(carritoTotal())}</b></div></div>`; })()}
   </div>`;
   carritoActualizarConfirm();
+}
+function carritoActualizarKPIs(){
+  const it=document.getElementById('cart-kpi-items'), tt=document.getElementById('cart-kpi-total');
+  if(!it&&!tt) return;
+  const unidades=carrito.reduce((a,x)=>a+(+x.cant||0),0);
+  if(it) it.textContent=unidades;
+  if(tt) tt.textContent=fmt(carritoTotalCobrar());
 }
 function carritoAgregarPago(){
   const restante=+(carritoTotalCobrar()-carritoPagado()).toFixed(2);
