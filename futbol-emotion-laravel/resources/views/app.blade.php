@@ -2741,7 +2741,7 @@ function abrirCarrito(){
   document.getElementById('cart-cliente-wrap').style.display='none';
   carritoTipoBotones();
   carritoAutoPrecio();
-  (function(){ const _f=camisetas[0]; const _s=document.getElementById('cart-cam-search'); if(_s)_s.value=_f?nombreProducto(_f):''; const _l=document.getElementById('cart-cam-list'); if(_l){_l.style.display='none';_l.innerHTML='';} carritoStockInfo(); })();
+  (function(){ const _sel=document.getElementById('cart-cam'); if(_sel)_sel.selectedIndex=-1; const _s=document.getElementById('cart-cam-search'); if(_s)_s.value=''; const _p=document.getElementById('cart-precio'); if(_p)_p.value=''; const _l=document.getElementById('cart-cam-list'); if(_l){_l.style.display='none';_l.innerHTML='';} carritoStockInfo(); })();
   carritoRenderItems();
   carritoRenderPagos();
   const _dv=document.getElementById('cart-desc-val'); if(_dv) _dv.value='';
