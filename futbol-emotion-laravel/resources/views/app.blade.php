@@ -1466,18 +1466,20 @@ async function confirmarSumarStock(){
   if(cant<1){toast('La cantidad debe ser al menos 1');return}
   const i=camisetas.findIndex(c=>c.id===id);
   if(i<0){toast('Camiseta no encontrada');return}
+  // Optimista: aplicar al instante y sincronizar por detrás
   camisetas[i].tallas[talla]=(camisetas[i].tallas[talla]||0)+cant;
   if(!MODO_SERVIDOR) sd('camisetas',camisetas);
-  try{
-    await syncCamisetas('stock',camisetas[i].tallas,id);
-  }catch(e){
-    camisetas[i].tallas[talla]-=cant; // revertir si el servidor falló
-    return;
-  }
   registrarActividad('stock',`Entrada por escaneo: ${camisetas[i].equipo} ${camisetas[i].tipo} Talla ${talla}`,`+${cant} UND`);
   closeM('m-scan-add');
   toast(`✓ +${cant} UND · ${camisetas[i].equipo} ${talla}: ${camisetas[i].tallas[talla]} UND`);
   if(curPage==='stock') renderStock();
+  if(MODO_SERVIDOR){
+    syncCamisetas('stock',camisetas[i].tallas,id).catch(e=>{
+      camisetas[i].tallas[talla]-=cant; // revertir si el servidor falló
+      if(curPage==='stock') renderStock();
+      toast('⚠ No se pudo guardar la entrada — revisa tu conexión');
+    });
+  }
 }
 async function confirmarAsociarCodigo(){
   const camId=+document.getElementById('as-cam').value;
@@ -2569,38 +2571,46 @@ async function saveNuevaCamiseta(){
   };
   const editId=+document.getElementById('nc-id').value;
   const payload={equipo:data.equipo,categoria:data.categoria,temporada:data.temp,tipo:data.tipo,tallas:data.tallas,stock_minimo:data.min,proveedor_id:data.prov,precio:data.precio};
-  try{
-    if(editId){
-      const i=camisetas.findIndex(c=>c.id===editId);
-      if(i>=0) camisetas[i]={...camisetas[i],...data};
-      if(!MODO_SERVIDOR) sd('camisetas',camisetas);
-      await syncCamisetas('update',payload,editId);
-      toast(esOtro?'Producto actualizado ✓':'Camiseta actualizada ✓');
-    } else {
-      if(MODO_SERVIDOR){
-        const creada=await syncCamisetas('add',payload);
-        data.id=creada.id;
-      } else {
-        data.id=ids.c++;
-      }
-      camisetas.push(data);
-      if(!MODO_SERVIDOR) sd('camisetas',camisetas);
-      registrarActividad('stock',esOtro?`Nuevo producto: ${equipo} (${categoria})`:`Nueva camiseta: ${equipo} ${data.tipo}`,esOtro?'':`${data.temp}`);
-      // Si veníamos de un escaneo, asociar el código automáticamente
-      if(pendingCodigo && MODO_SERVIDOR){
-        try{
-          await apiCall('POST','/camisetas/barcode',{codigo:pendingCodigo,camiseta_id:data.id,talla:pendingTalla||'M'});
-          toast(`${equipo} añadida ✓ Código asociado a talla ${pendingTalla||'M'}`);
-        }catch(e){
-          toast(`${equipo} añadida ✓ pero el código no se pudo asociar`);
-        }
-        pendingCodigo=null; pendingTalla=null;
-      } else {
-        toast(`${equipo} añadida al inventario ✓`);
-      }
-    }
+  if(editId){
+    // Editar — optimista: aplica local, cierra y muestra al instante; sincroniza por detrás
+    const i=camisetas.findIndex(c=>c.id===editId);
+    const _prev = i>=0 ? JSON.parse(JSON.stringify(camisetas[i])) : null;
+    if(i>=0) camisetas[i]={...camisetas[i],...data};
+    if(!MODO_SERVIDOR) sd('camisetas',camisetas);
     closeM('m-nueva-cam');
-    renderStock();
+    toast(esOtro?'Producto actualizado ✓':'Camiseta actualizada ✓');
+    if(curPage==='stock') renderStock();
+    if(MODO_SERVIDOR){
+      syncCamisetas('update',payload,editId).catch(e=>{
+        if(i>=0 && _prev) camisetas[i]=_prev;
+        if(curPage==='stock') renderStock();
+        toast('⚠ No se pudo guardar el cambio — revisa tu conexión');
+      });
+    }
+    return;
+  }
+  try{
+    if(MODO_SERVIDOR){
+      const creada=await syncCamisetas('add',payload);
+      data.id=creada.id;
+    } else {
+      data.id=ids.c++;
+    }
+    camisetas.push(data);
+    if(!MODO_SERVIDOR) sd('camisetas',camisetas);
+    registrarActividad('stock',esOtro?`Nuevo producto: ${equipo} (${categoria})`:`Nueva camiseta: ${equipo} ${data.tipo}`,esOtro?'':`${data.temp}`);
+    closeM('m-nueva-cam');
+    if(curPage==='stock') renderStock();
+    // La asociación del código va por detrás (no bloquea el guardado)
+    if(pendingCodigo && MODO_SERVIDOR){
+      const _cod=pendingCodigo, _id=data.id, _tal=pendingTalla||'M';
+      apiCall('POST','/camisetas/barcode',{codigo:_cod,camiseta_id:_id,talla:_tal})
+        .then(()=>toast(`${equipo} añadida ✓ Código asociado a talla ${_tal}`))
+        .catch(()=>toast(`${equipo} añadida ✓ pero el código no se pudo asociar`));
+      pendingCodigo=null; pendingTalla=null;
+    } else {
+      toast(`${equipo} añadida al inventario ✓`);
+    }
   }catch(e){
     toast('No se pudo guardar: '+e.message);
   }
