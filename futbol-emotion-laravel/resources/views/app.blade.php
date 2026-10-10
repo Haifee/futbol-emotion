@@ -625,7 +625,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     </div>
     <div class="stitle">Agregar producto</div>
     <button class="abtn abtn-g abtn-sm" onclick="escanearParaCarrito()" style="margin-top:0;margin-bottom:8px"><i class="ti ti-scan"></i> Escanear código</button>
-    <input class="fi" id="cart-cam-search" placeholder="Buscar camiseta…" autocomplete="off" oninput="carritoBuscarCam()" onfocus="carritoBuscarCam()" onblur="setTimeout(()=>{const l=document.getElementById('cart-cam-list');if(l)l.style.display='none'},180)">
+    <div style="position:relative"><i class="ti ti-search" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--txh);font-size:17px;pointer-events:none"></i><input class="fi" id="cart-cam-search" placeholder="Buscar camiseta…" autocomplete="off" oninput="carritoBuscarCam()" onfocus="carritoBuscarCam()" onblur="setTimeout(()=>{const l=document.getElementById('cart-cam-list');if(l)l.style.display='none'},180)" style="padding-left:40px"></div>
     <div id="cart-cam-list" style="display:none;margin-top:4px;border:1.5px solid var(--grayb);border-radius:12px;overflow:hidden;max-height:230px;overflow-y:auto"></div>
     <select class="fi" id="cart-cam" onchange="carritoAutoPrecio()" style="display:none"></select>
     <select class="fi" id="cart-talla" style="margin-top:8px" onchange="carritoStockInfo()"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option>10</option><option>12</option><option>14</option><option>16</option><option>U</option></select>
