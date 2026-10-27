@@ -3294,6 +3294,7 @@ function renderCaja(){
 
   function bloqueCompacto(titulo,icono,color,data,periodo,clave){
     const nv=data.vFis.length+data.vOnl.length;
+    const mg=data.ing>0?Math.round(data.neto/data.ing*100):0;
     return `
       <div class="card" style="border-left:4px solid ${color};margin-bottom:10px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -3303,11 +3304,12 @@ function renderCaja(){
           </div>
           <button onclick="abrirExport('${clave}')" style="background:var(--gray);border:none;border-radius:9px;padding:6px 10px;cursor:pointer;font-size:12px;font-weight:700;color:var(--txm);display:${role==='owner'?'flex':'none'};align-items:center;gap:5px"><i class="ti ti-download" style="font-size:14px"></i> Exportar</button>
         </div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px">
-          <div><span style="color:var(--txm)">Ingresos</span> <b style="color:var(--g)">${fmt(data.ing)}</b></div>
-          <div><span style="color:var(--txm)">Gastos</span> <b style="color:var(--r)">${fmt(data.gas)}</b></div>
-          <div><span style="color:var(--txm)">Beneficio</span> <b style="color:var(--p)">${fmt(data.neto)}</b></div>
-          <div><span style="color:var(--txm)">Ventas</span> <b>${nv}</b></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px">
+          <div style="background:var(--gl);border-radius:9px;padding:9px 11px"><div style="font-size:10px;font-weight:700;color:var(--txm);text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px">Ingresos</div><div style="font-size:16px;font-weight:800;color:var(--g)">${fmt(data.ing)}</div></div>
+          <div style="background:var(--rl);border-radius:9px;padding:9px 11px"><div style="font-size:10px;font-weight:700;color:var(--txm);text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px">Gastos</div><div style="font-size:16px;font-weight:800;color:var(--r)">${fmt(data.gas)}</div></div>
+          <div style="background:var(--pl);border-radius:9px;padding:9px 11px"><div style="font-size:10px;font-weight:700;color:var(--txm);text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px">Beneficio</div><div style="font-size:16px;font-weight:800;color:var(--p)">${fmt(data.neto)}</div></div>
+          <div style="background:var(--gray);border-radius:9px;padding:9px 11px"><div style="font-size:10px;font-weight:700;color:var(--txm);text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px">Margen</div><div style="font-size:16px;font-weight:800;color:var(--tx)">${mg}%</div></div>
+          <div style="background:var(--gray);border-radius:9px;padding:9px 11px"><div style="font-size:10px;font-weight:700;color:var(--txm);text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px">Ventas</div><div style="font-size:16px;font-weight:800;color:var(--tx)">${nv}</div></div>
         </div>
       </div>`;
   }
