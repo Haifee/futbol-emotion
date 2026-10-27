@@ -1432,21 +1432,23 @@ function renderTasasExtra(){
   const cont=document.getElementById('cfg-tasas-extra'); if(!cont) return;
   const lista=tasasExtra();
   cont.innerHTML = lista.length ? lista.map(t=>`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;background:var(--gray);border-radius:10px;padding:8px 12px">
-      <div style="flex:1"><div style="font-size:13px;font-weight:800">${t.nombre}</div><div style="font-size:11px;color:var(--txm)">${(parseFloat(String(t.valor).replace(',','.'))||0).toLocaleString('es-VE',{minimumFractionDigits:2})} Bs/$</div></div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:800">${t.nombre}${t.moneda?' <span style="font-size:10px;font-weight:700;color:var(--gd);background:var(--gl);padding:1px 6px;border-radius:6px">moneda</span>':''}</div><div style="font-size:11px;color:var(--txm)">${(parseFloat(String(t.valor).replace(',','.'))||0).toLocaleString('es-VE',{minimumFractionDigits:2})} ${t.moneda?(t.nombre+' por $'):'Bs/$'}</div></div>
       <button onclick="borrarTasaExtra('${t.id}')" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:18px"><i class="ti ti-trash"></i></button>
     </div>`).join('') : '<div style="font-size:12px;color:var(--txm);margin-bottom:6px">No tienes tasas personalizadas todavía.</div>';
 }
 async function agregarTasaExtra(){
   const nombre=(document.getElementById('cfg-nueva-tasa-nombre').value||'').trim();
   const valor=parseFloat((document.getElementById('cfg-nueva-tasa-valor').value||'').replace(',','.'))||0;
+  const esMoneda=!!(document.getElementById('cfg-nueva-tasa-moneda')||{}).checked;
   if(!nombre){ toast('Ponle un nombre a la tasa'); return; }
-  if(valor<=0){ toast('Pon un valor válido (Bs por $)'); return; }
+  if(valor<=0){ toast(esMoneda?('Pon cuántos '+nombre+' por $'):'Pon un valor válido (Bs por $)'); return; }
   const lista=tasasExtra();
   if(lista.length>=4){ toast('Máximo 4 tasas personalizadas'); return; }
-  lista.push({id:'x'+Math.random().toString(36).slice(2,6), nombre:nombre.slice(0,14), valor:valor.toFixed(4), moneda:false});
+  lista.push({id:'x'+Math.random().toString(36).slice(2,6), nombre:nombre.slice(0,14), valor:valor.toFixed(4), moneda:esMoneda});
   await guardarTasasExtra(lista);
   document.getElementById('cfg-nueva-tasa-nombre').value='';
   document.getElementById('cfg-nueva-tasa-valor').value='';
+  {const _m=document.getElementById('cfg-nueva-tasa-moneda'); if(_m)_m.checked=false; const _l=document.getElementById('cfg-nueva-tasa-lbl'); if(_l)_l.textContent='Bs por $'; const _v=document.getElementById('cfg-nueva-tasa-valor'); if(_v)_v.placeholder='Ej: 900';}
 }
 async function borrarTasaExtra(id){
   const lista=tasasExtra().filter(t=>t.id!==id);
@@ -2675,7 +2677,7 @@ function carritoAgregarProducto(){
 }
 function carritoQuitarProducto(i){ carrito.splice(i,1); carritoRenderItems(); carritoRenderPagos(); }
 function carritoTotal(){ return carrito.reduce((a,it)=>a+it.precioUnit*it.cant,0); }
-function pagoEnUsd(p){ const m=METODOS_PAGO[p.metodo]; const val=+p.monto||0; if(m&&m.bs){ const t=tasaActual(); return t>0? val/t : 0; } return val; }
+function pagoEnUsd(p){ const m=METODOS_PAGO[p.metodo]; const val=+p.monto||0; if(p.metodo==='efectivo_otra'){ const t=tasaValor(p.tasaExtraId); return t>0? val/t : 0; } if(m&&m.bs){ const t=tasaActual(); return t>0? val/t : 0; } return val; }
 function carritoPagado(){ return carritoPagos.reduce((a,p)=>a+pagoEnUsd(p),0); }
 function carritoRenderItems(){
   const cont=document.getElementById('cart-items');
@@ -2694,7 +2696,7 @@ function carritoAgregarPago(){
   carritoRenderPagos();
 }
 function carritoQuitarPago(i){ carritoPagos.splice(i,1); carritoRenderPagos(); }
-function carritoSetPagoMetodo(i,m){ carritoPagos[i].metodo=m; const otros=carritoPagos.reduce((a,p,idx)=>idx===i?a:a+pagoEnUsd(p),0); const restUsd=Math.max(0,+(carritoTotal()-otros).toFixed(2)); const met=METODOS_PAGO[m]; carritoPagos[i].monto=(met&&met.bs)? +(restUsd*tasaActual()).toFixed(2) : restUsd; carritoRenderPagos(); }
+function carritoSetPagoMetodo(i,value){ const p=carritoPagos[i]; if(String(value).indexOf('otra:')===0){ p.metodo='efectivo_otra'; p.tasaExtraId=String(value).slice(5); } else { p.metodo=value; delete p.tasaExtraId; } const otros=carritoPagos.reduce((a,pp,idx)=>idx===i?a:a+pagoEnUsd(pp),0); const restUsd=Math.max(0,+(carritoTotal()-otros).toFixed(2)); const met=METODOS_PAGO[p.metodo]; if(p.metodo==='efectivo_otra'){ const t=tasaValor(p.tasaExtraId); p.monto=t>0?+(restUsd*t).toFixed(2):0; } else if(met&&met.bs){ p.monto=+(restUsd*tasaActual()).toFixed(2); } else { p.monto=restUsd; } carritoRenderPagos(); }
 function carritoSetTasa(k){ if(tasaValor(k)<=0){toast('Esa tasa no está configurada (Ajustes)');return} tasaElegida=k; carritoRenderPagos(); }
 function carritoSetPagoMonto(i,v){ carritoPagos[i].monto=+v||0; carritoRenderResumen(); carritoActualizarConfirm(); }
 function carritoRenderPagos(){
@@ -2709,13 +2711,16 @@ function carritoRenderPagos(){
     }).join('')+'</div>';
   }
   cont.innerHTML=tasaHtml+carritoPagos.map((p,i)=>{
-    const m=METODOS_PAGO[p.metodo]; const esBs=m&&m.bs;
-    const opts=Object.entries(METODOS_PAGO).map(([k,mm])=>`<option value="${k}" ${k===p.metodo?'selected':''}>${mm.label}</option>`).join('');
-    const equiv=esBs?`<div style="font-size:10.5px;color:var(--txm);margin-top:2px;text-align:right">≈ ${fmt(pagoEnUsd(p))}</div>`:'';
+    const m=METODOS_PAGO[p.metodo]; const esBs=m&&m.bs; const esOtra=p.metodo==='efectivo_otra';
+    const exOtra=esOtra?tasasExtra().find(t=>t.id===p.tasaExtraId):null;
+    const opts=Object.entries(METODOS_PAGO).filter(([k])=>k!=='efectivo_otra').map(([k,mm])=>`<option value="${k}" ${k===p.metodo?'selected':''}>${mm.label}</option>`).join('')
+      +tasasExtra().filter(t=>t.moneda).map(t=>`<option value="otra:${t.id}" ${(esOtra&&p.tasaExtraId===t.id)?'selected':''}>Efectivo ${t.nombre}</option>`).join('');
+    const equiv=(esBs||esOtra)?`<div style="font-size:10.5px;color:var(--txm);margin-top:2px;text-align:right">≈ ${fmt(pagoEnUsd(p))}</div>`:'';
+    const ph=esBs?'Bs':(esOtra?(exOtra?exOtra.nombre:'Pesos'):'$');
     return `<div style="margin-bottom:8px">
       <div style="display:flex;gap:8px;align-items:center">
         <select class="fi" style="flex:1" onchange="carritoSetPagoMetodo(${i},this.value)">${opts}</select>
-        <input class="fi" style="width:104px" type="number" min="0" step="0.01" value="${p.monto}" placeholder="${esBs?'Bs':'$'}" oninput="carritoSetPagoMonto(${i},this.value)">
+        <input class="fi" style="width:104px" type="number" min="0" step="0.01" value="${p.monto}" placeholder="${ph}" oninput="carritoSetPagoMonto(${i},this.value)">
         <button onclick="carritoQuitarPago(${i})" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:18px"><i class="ti ti-x"></i></button>
       </div>${equiv}
     </div>`;
@@ -2748,7 +2753,7 @@ async function confirmarCarrito(){
     const payload={
       lineas: carrito.map(it=>({camiseta_id:it.camId, equipo:it.equipo, talla:it.talla, cantidad:it.cant, importe:+(it.precioUnit*it.cant).toFixed(2)})),
       canal, cliente,
-      pagos: carritoPagos.map(p=>{ const met=METODOS_PAGO[p.metodo]; const o={metodo:p.metodo, monto:+(+p.monto).toFixed(2)}; if(met&&met.bs){ o.tasa=tasaActual(); o.tasa_tipo=tasaElegida; } return o; })
+      pagos: carritoPagos.map(p=>{ const met=METODOS_PAGO[p.metodo]; const o={metodo:p.metodo, monto:+(+p.monto).toFixed(2)}; if(p.metodo==='efectivo_otra'){ const ex=tasasExtra().find(t=>t.id===p.tasaExtraId); o.moneda=ex?ex.nombre:'Otra'; o.tasa=tasaValor(p.tasaExtraId); } else if(met&&met.bs){ o.tasa=tasaActual(); o.tasa_tipo=tasaElegida; } return o; })
     };
     const resp = await apiCall('POST','/ventas/carrito',payload);
     if(resp && resp.ventas){
@@ -3878,8 +3883,9 @@ function renderAjustes(){
       <div id="cfg-tasas-extra"></div>
       <div class="frow" style="margin-top:6px">
         <div style="flex:2"><label class="fl" style="margin-top:0">Nombre</label><input class="fi" id="cfg-nueva-tasa-nombre" maxlength="14" placeholder="Ej: Paralelo"></div>
-        <div style="flex:1"><label class="fl" style="margin-top:0">Bs por $</label><input class="fi" id="cfg-nueva-tasa-valor" type="number" min="0" step="0.0001" placeholder="Ej: 900"></div>
+        <div style="flex:1"><label class="fl" style="margin-top:0" id="cfg-nueva-tasa-lbl">Bs por $</label><input class="fi" id="cfg-nueva-tasa-valor" type="number" min="0" step="0.0001" placeholder="Ej: 900"></div>
       </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;color:var(--txm);cursor:pointer"><input type="checkbox" id="cfg-nueva-tasa-moneda" onchange="document.getElementById('cfg-nueva-tasa-lbl').textContent=this.checked?'Por $ (ej. pesos)':'Bs por $';document.getElementById('cfg-nueva-tasa-valor').placeholder=this.checked?'Ej: 4000':'Ej: 900'" style="width:16px;height:16px"> Es otra moneda (ej. Pesos) — se cobra como «Efectivo [nombre]»</label>
       <button class="abtn abtn-gray" onclick="agregarTasaExtra()" style="margin-top:8px"><i class="ti ti-plus"></i> Agregar tasa</button>
     </div>
 
