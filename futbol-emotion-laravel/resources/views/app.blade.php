@@ -3612,8 +3612,24 @@ function generarPDF(d,nombre){
   doc.setTextColor(120,120,120); doc.setFontSize(8);
   doc.text('Generado: '+new Date().toLocaleString('es'),14,32);
 
+  // Recuadros de color (resumen de un vistazo)
+  const _cards=[
+    {lab:'INGRESOS', val:'$'+d.ing.toFixed(2), rgb:[22,163,74]},
+    {lab:'GASTOS', val:'$'+d.gas.toFixed(2), rgb:[220,38,38]},
+    {lab:'BENEFICIO', val:'$'+d.neto.toFixed(2), rgb:[60,60,209]},
+    {lab:'VENTAS', val:''+d.vts.length, rgb:[37,99,235]},
+  ];
+  {const _mX=14,_gap=4,_tW=210-_mX*2,_cw=(_tW-_gap*(_cards.length-1))/_cards.length,_cy=38,_ch=22;
+   _cards.forEach((c,i)=>{ const x=_mX+i*(_cw+_gap);
+     doc.setFillColor(c.rgb[0],c.rgb[1],c.rgb[2]); doc.roundedRect(x,_cy,_cw,_ch,2,2,'F');
+     doc.setTextColor(255,255,255);
+     doc.setFontSize(7.5); doc.setFont(undefined,'bold'); doc.text(c.lab,x+4,_cy+8);
+     doc.setFontSize(13); doc.setFont(undefined,'bold'); doc.text(c.val,x+4,_cy+17);
+   });}
+  doc.setTextColor(0,0,0); doc.setFont(undefined,'normal');
+
   doc.autoTable({
-    startY:36,
+    startY:68,
     head:[['Concepto','Valor']],
     body:[
       ['Ingresos','$'+d.ing.toFixed(2)],
