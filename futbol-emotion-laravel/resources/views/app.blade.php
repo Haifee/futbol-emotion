@@ -558,8 +558,10 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     </div>
     <div class="stitle">Agregar producto</div>
     <button class="abtn abtn-g abtn-sm" onclick="escanearParaCarrito()" style="margin-top:0;margin-bottom:8px"><i class="ti ti-scan"></i> Escanear código</button>
-    <select class="fi" id="cart-cam" onchange="carritoAutoPrecio()"></select>
-    <select class="fi" id="cart-talla" style="margin-top:8px"><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option>10</option><option>12</option><option>14</option><option>16</option><option>U</option></select>
+    <div style="position:relative"><i class="ti ti-search" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--txh);font-size:17px;pointer-events:none"></i><input class="fi" id="cart-cam-search" placeholder="Buscar camiseta…" autocomplete="off" oninput="carritoBuscarCam()" onfocus="carritoBuscarCam()" onblur="setTimeout(()=>{const l=document.getElementById('cart-cam-list');if(l)l.style.display='none'},180)" style="padding-left:40px"></div>
+    <div id="cart-cam-list" style="display:none;margin-top:4px;border:1.5px solid var(--grayb);border-radius:12px;overflow:hidden;max-height:230px;overflow-y:auto"></div>
+    <select class="fi" id="cart-cam" onchange="carritoAutoPrecio()" style="display:none"></select>
+    <select class="fi" id="cart-talla" style="margin-top:8px"></select>
     <div style="display:flex;gap:8px;margin-top:8px">
       <div style="flex:1"><label class="fl">Cantidad</label><input class="fi" id="cart-cant" type="number" min="1" value="1"></div>
       <div style="flex:1"><label class="fl">Precio ($ c/u)</label><input class="fi" id="cart-precio" type="number" min="0" step="0.01"></div>
@@ -1366,6 +1368,8 @@ function escanearParaCarrito(){
       if(!r.encontrado){ toast('Código no registrado — asócialo primero desde Inventario'); return; }
       const cam=camisetas.find(c=>c.id===r.camiseta.id)||r.camiseta;
       document.getElementById('cart-cam').value=String(cam.id);
+      {const _s=document.getElementById('cart-cam-search'); if(_s)_s.value=nombreProducto(cam);}
+      carritoRenderTallaOpts(cam, r.talla);
       carritoAutoPrecio();
       document.getElementById('cart-talla').value=r.talla;
       document.getElementById('cart-cant').value=1;
@@ -2559,6 +2563,10 @@ function abrirCarrito(){
   document.getElementById('cart-cant').value=1;
   document.getElementById('cart-cliente').value='';
   document.getElementById('cart-cliente-wrap').style.display='none';
+  {const _s=document.getElementById('cart-cam-search'); if(_s)_s.value='';}
+  {const _l=document.getElementById('cart-cam-list'); if(_l){_l.style.display='none';_l.innerHTML='';}}
+  {const _sc=document.getElementById('cart-cam'); if(_sc)_sc.selectedIndex=-1;}
+  carritoRenderTallaOpts(null);
   carritoTipoBotones();
   carritoAutoPrecio();
   carritoRenderItems();
@@ -2579,6 +2587,37 @@ function carritoTipoSet(t){
 function carritoAutoPrecio(){
   const c=camisetas.find(x=>x.id===+document.getElementById('cart-cam').value);
   if(c && c.precio!=null) document.getElementById('cart-precio').value=(+c.precio).toFixed(2);
+}
+function carritoBuscarCam(){
+  const inp=document.getElementById('cart-cam-search'); const list=document.getElementById('cart-cam-list');
+  if(!inp||!list) return;
+  const res=filtrarCamisetas(inp.value).slice(0,10);
+  if(!res.length){ list.innerHTML='<div style="padding:10px 12px;font-size:13px;color:var(--txm)">Sin resultados</div>'; list.style.display='block'; return; }
+  list.innerHTML=res.map(c=>{
+    const tot=Object.values(c.tallas||{}).reduce((a,b)=>a+(+b||0),0);
+    const col=tot<=0?'var(--rd)':(tot<=3?'var(--ad)':'var(--gd)');
+    return `<div onmousedown="carritoSelCam(${c.id})" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--gray);display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-size:13.5px;font-weight:600">${nombreProducto(c)}</span><span style="font-size:11px;font-weight:800;color:${col};white-space:nowrap">${tot} UND</span></div>`;
+  }).join('');
+  list.style.display='block';
+}
+function carritoRenderTallaOpts(c,mantener){
+  const sel=document.getElementById('cart-talla'); if(!sel) return;
+  const tallas=c?tallasDe(c):['S','M','L','XL','XXL'];
+  const cur=mantener||sel.value;
+  sel.innerHTML=tallas.map(t=>{
+    const st=c?(c.tallas[t]||0):0;
+    const lbl=(t==='U'?'Única':t)+(c?(st>0?` · ${st} und`:' · agotado'):'');
+    return `<option value="${t}">${lbl}</option>`;
+  }).join('');
+  if(tallas.includes(cur)) sel.value=cur; else if(tallas.length) sel.value=tallas[0];
+}
+function carritoSelCam(id){
+  const sel=document.getElementById('cart-cam'); if(sel) sel.value=String(id);
+  const c=camisetas.find(x=>x.id===id);
+  const inp=document.getElementById('cart-cam-search'); if(inp&&c) inp.value=nombreProducto(c);
+  const list=document.getElementById('cart-cam-list'); if(list){ list.style.display='none'; list.innerHTML=''; }
+  carritoRenderTallaOpts(c);
+  carritoAutoPrecio();
 }
 function carritoEnCarrito(camId,talla){ return carrito.filter(it=>it.camId===camId&&it.talla===talla).reduce((a,it)=>a+it.cant,0); }
 function carritoAgregarProducto(){
@@ -3630,13 +3669,9 @@ function generarPDF(d,nombre){
 
   doc.autoTable({
     startY:68,
-    head:[['Concepto','Valor']],
+    head:[['Detalle','Valor']],
     body:[
-      ['Ingresos','$'+d.ing.toFixed(2)],
-      ['Gastos','$'+d.gas.toFixed(2)],
-      ['Beneficio neto','$'+d.neto.toFixed(2)],
-      ['Margen',d.margen+'%'],
-      ['Ventas del período',''+d.vts.length],
+      ['Margen de ganancia',d.margen+'%'],
     ],
     theme:'grid', headStyles:{fillColor:verde}, styles:{fontSize:9},
     columnStyles:{1:{halign:'right',fontStyle:'bold'}},
@@ -3645,17 +3680,17 @@ function generarPDF(d,nombre){
   if(d.vts.length){
     doc.autoTable({
       startY:doc.lastAutoTable.finalY+8,
-      head:[['Fecha','Producto','Talla','Cant.','Cliente','Pago','Ref.','Importe']],
+      head:[['Fecha','Producto','Talla','Cant.','Canal','Cliente','Pago','Ref.','Importe']],
       body:d.vts.map(v=>{
         const p=(v.pagos&&v.pagos[0])||null;
         const met=p?(METODOS_PAGO[p.metodo]?.label||p.metodo):'—';
         const ref=p?(p.referencia||p.confirmacion||p.id_orden||p.ref_receptor||''):'';
         const bs=(p&&p.moneda==='VES')?`\n${fmtBs(parseFloat(p.monto))}`:'';
-        return [v.fecha,v.equipo,v.talla||'—',v.cant,v.cliente||'—',met+bs,ref,'$'+v.imp.toFixed(2)];
+        return [v.fecha,v.equipo,v.talla||'—',v.cant,v.canal||'—',v.cliente||'—',met+bs,ref,'$'+v.imp.toFixed(2)];
       }),
-      foot:[['','','','','','','TOTAL','$'+d.vts.reduce((s,v)=>s+v.imp,0).toFixed(2)]],
+      foot:[['','','','','','','','TOTAL','$'+d.vts.reduce((s,v)=>s+v.imp,0).toFixed(2)]],
       theme:'striped', headStyles:{fillColor:verde}, footStyles:{fillColor:[240,240,240],textColor:[0,0,0],fontStyle:'bold'},
-      styles:{fontSize:7.5}, columnStyles:{7:{halign:'right'}},
+      styles:{fontSize:7.5}, columnStyles:{8:{halign:'right'}},
     });
 
     // Resumen por método de pago
@@ -3676,13 +3711,16 @@ function generarPDF(d,nombre){
     });
   }
 
-  if(d.txs.length){
+  // Solo GASTOS, en su propio cuadro (para ver en qué se gastó)
+  const _gastos=d.txs.filter(t=>t.tipo==='gasto');
+  if(_gastos.length){
     doc.autoTable({
       startY:doc.lastAutoTable.finalY+8,
-      head:[['Fecha','Tipo','Descripción','Canal','Importe']],
-      body:d.txs.map(t=>[t.fecha,t.tipo==='ingreso'?'Ingreso':'Gasto',t.desc,t.canal,(t.tipo==='ingreso'?'+':'-')+'$'+t.imp.toFixed(2)]),
-      theme:'striped', headStyles:{fillColor:verde},
-      styles:{fontSize:8}, columnStyles:{4:{halign:'right'}},
+      head:[['Fecha','Descripción','Categoría','Importe']],
+      body:_gastos.map(t=>[t.fecha,t.desc,t.canal,'-$'+t.imp.toFixed(2)]),
+      foot:[['','','TOTAL GASTOS','-$'+_gastos.reduce((s,t)=>s+t.imp,0).toFixed(2)]],
+      theme:'striped', headStyles:{fillColor:[220,38,38]}, footStyles:{fillColor:[240,240,240],textColor:[0,0,0],fontStyle:'bold'},
+      styles:{fontSize:8}, columnStyles:{3:{halign:'right'}},
     });
   }
 
