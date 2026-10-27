@@ -1557,14 +1557,27 @@ function setMetodoPago(k){
 
 function ventasHoyPorMoneda(){
   const h=hoy();
-  let bs=0, divisas=0, sinReg=0;
+  let bs=0, divisas=0, pesos=0, sinReg=0;
   ventas.filter(v=>v.fecha===h).forEach(v=>{
-    const p=(v.pagos&&v.pagos[0])||null;
-    if(!p){ sinReg+=v.imp; return; }
-    if(p.moneda==='VES') bs+=parseFloat(p.monto)||0;
-    else divisas+=v.imp;
+    const pagos=(v.pagos&&v.pagos.length)?v.pagos:null;
+    if(!pagos){ sinReg+=(+v.imp||0); return; }
+    pagos.forEach(p=>{
+      const mon=String(p.moneda||'').toLowerCase();
+      if(mon==='ves') bs+=parseFloat(p.monto)||0;
+      else if(mon.includes('peso')) pesos+=parseFloat(p.monto)||0;
+      else divisas+=pagoEnUsd(p);
+    });
   });
-  return {bs,divisas,sinReg};
+  return {bs,divisas,pesos,sinReg};
+}
+function cardsMonedaHoy(){
+  const m=ventasHoyPorMoneda();
+  const card=(cls,ic,lab,val,sub)=>`<div class="mc ${cls}" style="padding:12px 13px;min-height:72px"><i class="ti ${ic} mc-ico" style="font-size:24px"></i><div class="mcl">${lab}</div><div class="mcv" style="font-size:15px">${val}</div><div class="mcs" style="font-size:9.5px">${sub}</div></div>`;
+  return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+    ${card('mc-g','ti-cash','Dólares',fmt(m.divisas),'$, Zelle…')}
+    ${card('mc-cyan','ti-businessplan','Bolívares',fmtBs(m.bs),'PM, PDV, Bs')}
+    ${card('mc-a','ti-cash-banknote','Pesos',(m.pesos||0).toLocaleString('es-CO')+' Ps','efectivo Ps')}
+  </div>`;
 }
 function importeVentaActual(){
   // El importe puede estar en el campo de stock (v-imp) o en el de venta libre (v-imp-libre)
@@ -2144,10 +2157,7 @@ function renderHome(){
         <div class="mc mc-b"><i class="ti ti-truck mc-ico"></i><div class="mcl">Envíos activos</div><div class="mcv">${envActivos}</div></div>
       </div>
       <div class="stitle">Ventas de hoy</div>
-      <div class="mgrid">
-        <div class="mc mc-g"><i class="ti ti-cash mc-ico"></i><div class="mcl">En divisas ($)</div><div class="mcv">${fmt(ventasHoyPorMoneda().divisas)}</div><div class="mcs">efectivo $, Zelle, Binance…</div></div>
-        <div class="mc mc-cyan"><i class="ti ti-businessplan mc-ico"></i><div class="mcl">En bolívares</div><div class="mcv" style="font-size:19px">${fmtBs(ventasHoyPorMoneda().bs)}</div><div class="mcs">pago móvil, PDV, efectivo Bs</div></div>
-      </div>
+      ${cardsMonedaHoy()}
       <div class="stitle">Alertas</div>
       ${alertas}
       <div class="stitle">Reposición sugerida</div>
