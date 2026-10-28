@@ -4615,8 +4615,8 @@ function renderMisVentas(){
         </div>
       </div>
       <div style="display:flex;gap:7px;margin-top:9px;justify-content:flex-end">
-        <button class="abtn abtn-gray abtn-sm" style="font-size:12px;margin-top:0;padding:7px 14px;flex:0 0 auto" onclick="abrirEditarVenta(${v.id})"><i class="ti ti-edit"></i> Editar</button>
-        <button class="abtn abtn-gray abtn-sm" style="font-size:12px;margin-top:0;padding:7px 14px;flex:0 0 auto;color:var(--r)" onclick="eliminarVenta(${v.id})"><i class="ti ti-trash"></i> Eliminar</button>
+        <button class="abtn abtn-gray abtn-sm" style="font-size:12px;margin-top:0;padding:7px 14px;flex:0 0 auto;width:auto" onclick="abrirEditarVenta(${v.id})"><i class="ti ti-edit"></i> Editar</button>
+        <button class="abtn abtn-gray abtn-sm" style="font-size:12px;margin-top:0;padding:7px 14px;flex:0 0 auto;width:auto;color:var(--r)" onclick="eliminarVenta(${v.id})"><i class="ti ti-trash"></i> Eliminar</button>
       </div>
     </div>`;
   };
