@@ -2755,7 +2755,7 @@ function carritoRenderPagos(){
   const hayBs=carritoPagos.some(p=>METODOS_PAGO[p.metodo]&&METODOS_PAGO[p.metodo].bs);
   let tasaHtml='';
   if(hayBs){
-    const ops=[{k:'bcv',l:'BCV'},{k:'euro',l:'Euro'},{k:'binance',l:'Binance'}];
+    const ops=tasasDisponibles().map(o=>({k:o.k,l:o.label.replace('Dólar ','').replace(' BCV','')}));
     tasaHtml='<div style="font-size:11px;color:var(--txm);margin-bottom:4px">Tasa para los pagos en Bs:</div><div style="display:flex;gap:6px;margin-bottom:10px">'+ops.map(o=>{
       const val=tasaValor(o.k), act=tasaElegida===o.k, dis=val<=0;
       return `<button type="button" ${dis?'disabled':''} onclick="carritoSetTasa('${o.k}')" style="flex:1;padding:5px 3px;border-radius:8px;cursor:${dis?'not-allowed':'pointer'};font-size:11px;font-weight:800;border:2px solid ${act?'var(--gd)':'var(--gm)'};background:${act?'var(--gd)':'#fff'};color:${act?'#fff':'var(--gd)'};opacity:${dis?.5:1}">${o.l}<br><span style="font-size:9px;font-weight:600">${val>0?val.toLocaleString('es-VE'):'—'}</span></button>`;
