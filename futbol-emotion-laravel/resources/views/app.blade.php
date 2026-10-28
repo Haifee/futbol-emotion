@@ -2778,19 +2778,37 @@ function carritoRenderPagos(){
   }).join('');
   carritoRenderResumen(); carritoActualizarConfirm();
 }
+function esEfectivoMetodo(k){ return k==='efectivo_usd'||k==='efectivo_bs'||k==='efectivo_otra'; }
+function carritoEstadoPago(){
+  const total=carritoTotal();
+  let electUsd=0, cashRecUsd=0, hayBsEfec=false;
+  carritoPagos.forEach(p=>{ if(esEfectivoMetodo(p.metodo)){ cashRecUsd+=pagoEnUsd(p); if(p.metodo==='efectivo_bs') hayBsEfec=true; } else electUsd+=pagoEnUsd(p); });
+  const restanteTrasElect=Math.max(0,+(total-electUsd).toFixed(2));
+  const efectivoAplicado=Math.min(cashRecUsd,restanteTrasElect);
+  const pagado=+(electUsd+efectivoAplicado).toFixed(2);
+  const falta=+(total-pagado).toFixed(2);
+  const vuelto=+(cashRecUsd-restanteTrasElect).toFixed(2);
+  const electSobra=+(electUsd-total).toFixed(2);
+  return {total, electUsd, cashRecUsd, recibido:+(electUsd+cashRecUsd).toFixed(2), pagado, falta:falta>0.009?falta:0, vuelto:vuelto>0.009?vuelto:0, electSobra:electSobra>0.009?electSobra:0, cubierto:(falta<=0.009&&electSobra<=0.009), efectivoAplicado, hayBsEfec};
+}
 function carritoRenderResumen(){
-  const total=carritoTotal(), pagado=carritoPagado(), dif=+(total-pagado).toFixed(2);
+  const st=carritoEstadoPago();
   let msg,color;
-  if(Math.abs(dif)<0.01){ msg='✓ Pago completo'; color='var(--g)'; }
-  else if(dif>0){ msg=`Faltan ${fmt(dif)}`; color='var(--ad)'; }
-  else { msg=`Sobran ${fmt(-dif)}`; color='var(--r)'; }
-  document.getElementById('cart-resumen-pago').innerHTML=`<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:12.5px;padding:8px 2px"><span style="color:var(--txm)">Total ${fmt(total)} · Pagado ${fmt(pagado)}</span><b style="color:${color}">${msg}</b></div>`;
+  if(st.electSobra>0){ msg=`Pago electrónico de más: ${fmt(st.electSobra)} — revísalo`; color='var(--r)'; }
+  else if(st.falta>0){ msg=`Faltan ${fmt(st.falta)}`; color='var(--ad)'; }
+  else { msg='✓ Pago completo'; color='var(--g)'; }
+  let html=`<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:12.5px;padding:8px 2px"><span style="color:var(--txm)">Total ${fmt(st.total)} · Recibido ${fmt(st.recibido)}</span><b style="color:${color}">${msg}</b></div>`;
+  if(st.vuelto>0){
+    const enBs = (st.hayBsEfec && tasaActual()>0) ? `<div style="font-size:13px;color:var(--gd);opacity:.85;margin-top:2px">o ${(st.vuelto*tasaActual()).toLocaleString('es-VE',{maximumFractionDigits:2})} Bs</div>` : '';
+    html+=`<div style="background:var(--gl);border:2px solid var(--gm);border-radius:12px;padding:10px 12px;text-align:center;margin-top:2px"><div style="font-size:12px;font-weight:800;color:var(--gd)">VUELTO A ENTREGAR</div><div style="font-size:24px;font-weight:800;color:var(--gd)">${fmt(st.vuelto)}</div>${enBs}</div>`;
+  }
+  const el=document.getElementById('cart-resumen-pago'); if(el) el.innerHTML=html;
 }
 function carritoActualizarConfirm(){
   const btn=document.getElementById('cart-confirm'); if(!btn) return;
   const total=carritoTotal();
   const clienteOk = carritoTipo==='tienda' || (carritoTipo==='online' && document.getElementById('cart-cliente').value.trim());
-  const ok = carrito.length>0 && total>0 && carritoPagos.length>0 && (carritoPagado() >= total-0.05) && !!carritoTipo && clienteOk;
+  const ok = carrito.length>0 && total>0 && carritoPagos.length>0 && carritoEstadoPago().cubierto && !!carritoTipo && clienteOk;
   btn.style.opacity=ok?'1':'.4';
   btn.style.pointerEvents=ok?'auto':'none';
 }
