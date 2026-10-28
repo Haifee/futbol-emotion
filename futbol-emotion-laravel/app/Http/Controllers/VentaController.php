@@ -218,6 +218,7 @@ class VentaController extends Controller
             $idsVentas = [];
             $total     = 0;
             $descItems = [];
+            $criticos  = [];
 
             foreach ($lineas as $ln) {
                 $camId   = $ln['camiseta_id'] ?? null;
@@ -250,6 +251,12 @@ class VentaController extends Controller
                         ], 409);
                     }
                     $equipoNombre = $camiseta->equipo . ' ' . $camiseta->tipo . ' ' . $camiseta->temporada;
+
+                    // Aviso de stock crítico (por cada línea del carrito)
+                    $nuevoStock = DB::table('camisetas')->where('id', $camId)->value($col);
+                    if ($nuevoStock !== null && $nuevoStock <= 2) {
+                        $criticos[] = ($camiseta->equipo . ' ' . $camiseta->tipo) . ' talla ' . $tallaNorm . ': quedan ' . $nuevoStock . ' UND';
+                    }
                 }
 
                 $id = DB::table('ventas')->insertGetId([
@@ -301,6 +308,23 @@ class VentaController extends Controller
             DB::commit();
 
             $ventas = DB::table('ventas')->whereIn('id', $idsVentas)->orderBy('id')->get();
+
+            // ── Notificaciones push (un fallo aquí NUNCA debe afectar la venta) ──
+            try {
+                $actor   = $request->input('_rol') === 'owner' ? 'owner' : 'manager';
+                $nLineas = count($lineas);
+                $cuerpo  = $nLineas > 1
+                    ? ($nLineas . ' productos · $' . number_format($total, 2))
+                    : (($descItems[0] ?? 'Producto') . ' · $' . number_format($total, 2));
+                PushService::evento('venta', $actor, 'Nueva venta 💰', $cuerpo);
+
+                foreach ($criticos as $txtCritico) {
+                    PushService::evento('stock_critico', 'nadie', 'Stock crítico ⚠️', $txtCritico);
+                }
+            } catch (\Throwable $e) {
+                // silencioso a propósito
+            }
+
             return response()->json([
                 'ventas'       => $ventas,
                 'numero_venta' => $numeroVenta,
