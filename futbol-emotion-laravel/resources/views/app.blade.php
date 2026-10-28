@@ -2748,7 +2748,14 @@ function carritoAgregarPago(){
 }
 function carritoQuitarPago(i){ carritoPagos.splice(i,1); carritoRenderPagos(); }
 function carritoSetPagoMetodo(i,value){ const p=carritoPagos[i]; if(String(value).indexOf('otra:')===0){ p.metodo='efectivo_otra'; p.tasaExtraId=String(value).slice(5); } else { p.metodo=value; delete p.tasaExtraId; } const otros=carritoPagos.reduce((a,pp,idx)=>idx===i?a:a+pagoEnUsd(pp),0); const restUsd=Math.max(0,+(carritoTotal()-otros).toFixed(2)); const met=METODOS_PAGO[p.metodo]; if(p.metodo==='efectivo_otra'){ const t=tasaValor(p.tasaExtraId); p.monto=t>0?+(restUsd*t).toFixed(2):0; } else if(met&&met.bs){ p.monto=+(restUsd*tasaActual()).toFixed(2); } else { p.monto=restUsd; } carritoRenderPagos(); }
-function carritoSetTasa(k){ if(tasaValor(k)<=0){toast('Esa tasa no está configurada (Ajustes)');return} tasaElegida=k; carritoRenderPagos(); }
+function carritoSetTasa(k){
+  if(tasaValor(k)<=0){toast('Esa tasa no está configurada (Ajustes)');return}
+  const usds = carritoPagos.map(q=>pagoEnUsd(q));
+  tasaElegida=k;
+  const tNew=tasaActual();
+  carritoPagos.forEach((q,idx)=>{ const m=METODOS_PAGO[q.metodo]; if(m&&m.bs && tNew>0){ q.monto=+(usds[idx]*tNew).toFixed(2); } });
+  carritoRenderPagos();
+}
 function carritoSetPagoMonto(i,v){ carritoPagos[i].monto=+v||0; carritoRenderResumen(); carritoActualizarConfirm(); }
 function carritoRenderPagos(){
   const cont=document.getElementById('cart-pagos');
