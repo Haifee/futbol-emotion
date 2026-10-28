@@ -563,7 +563,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <select class="fi" id="cart-cam" onchange="carritoAutoPrecio()" style="display:none"></select>
     <select class="fi" id="cart-talla" style="margin-top:8px"></select>
     <div style="display:flex;gap:8px;margin-top:8px">
-      <div style="flex:1"><label class="fl">Cantidad</label><input class="fi" id="cart-cant" type="number" min="1" value="1"></div>
+      <div style="flex:1"><label class="fl">Cantidad</label><input class="fi" id="cart-cant" type="number" min="1" value="1" oninput="carritoPrecioMulti()"></div>
       <div style="flex:1"><label class="fl">Precio por unidad</label>
       <div style="display:flex;gap:6px">
         <div style="flex:1"><div style="font-size:10px;color:var(--txm);font-weight:700;margin-bottom:2px">$</div><input class="fi" id="cart-precio" type="number" min="0" step="0.01" placeholder="$" oninput="carritoPrecioMulti()"></div>
@@ -571,7 +571,8 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
         <div style="flex:1"><div style="font-size:10px;color:var(--txm);font-weight:700;margin-bottom:2px">Pesos</div><input class="fi" id="cart-precio-ps" type="text" inputmode="numeric" placeholder="Ps" oninput="carritoPrecioDesdePs(this.value)" style="color:var(--gd);font-weight:700"></div>
       </div></div>
     </div>
-    <button class="abtn abtn-gray abtn-sm" onclick="carritoAgregarProducto()" style="margin-top:8px"><i class="ti ti-plus"></i> Agregar al carrito</button>
+    <div id="cart-precio-total" style="font-size:12.5px;color:var(--gd);font-weight:800;margin-top:8px;min-height:16px;text-align:right"></div>
+    <button class="abtn abtn-gray abtn-sm" onclick="carritoAgregarProducto()" style="margin-top:4px"><i class="ti ti-plus"></i> Agregar al carrito</button>
     <div class="stitle">Carrito</div>
     <div id="cart-items"></div>
     <div class="stitle">Pago dividido</div>
@@ -2651,6 +2652,9 @@ function carritoPrecioMulti(){
   const tb=tasaActual(), tp=tasaPesosValor();
   const bs=document.getElementById('cart-precio-bs'); if(bs&&document.activeElement!==bs) bs.value=(p>0&&tb>0)?(p*tb).toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
   const ps=document.getElementById('cart-precio-ps'); if(ps&&document.activeElement!==ps) ps.value=(p>0&&tp>0)?Math.round(p*tp).toLocaleString('es-CO'):'';
+  const cant=+((document.getElementById('cart-cant')||{}).value)||1;
+  const el=document.getElementById('cart-precio-total');
+  if(el){ if(p>0){ const tot=p*cant; const parts=[fmt(tot)]; if(tb>0) parts.push(fmtBs(tot*tb)); if(tp>0) parts.push(Math.round(tot*tp).toLocaleString('es-CO')+' Ps'); el.innerHTML=`Total (${cant} und): ${parts.join(' · ')}`; } else { el.innerHTML=''; } }
 }
 function carritoPrecioDesdeBs(v){ const tb=tasaActual(); if(!(tb>0)) return; const bs=parseFloat(String(v).replace(/\./g,'').replace(',','.'))||0; const p=tb>0?bs/tb:0; const pi=document.getElementById('cart-precio'); if(pi) pi.value=p>0?p.toFixed(2):''; carritoPrecioMulti(); }
 function carritoPrecioDesdePs(v){ const tp=tasaPesosValor(); if(!(tp>0)) return; const ps=parseFloat(String(v).replace(/\./g,'').replace(/,/g,''))||0; const p=tp>0?ps/tp:0; const pi=document.getElementById('cart-precio'); if(pi) pi.value=p>0?p.toFixed(2):''; carritoPrecioMulti(); }
