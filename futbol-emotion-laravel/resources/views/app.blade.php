@@ -575,6 +575,10 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <button class="abtn abtn-gray abtn-sm" onclick="carritoAgregarProducto()" style="margin-top:4px"><i class="ti ti-plus"></i> Agregar al carrito</button>
     <div class="stitle">Carrito</div>
     <div id="cart-items"></div>
+    <div id="cart-p2-row" onclick="carritoTogglePrecio2()" style="display:flex;gap:10px;align-items:center;margin-top:10px;padding:11px 13px;border:1.5px solid var(--grayb);border-radius:12px;cursor:pointer;user-select:none">
+      <div id="cart-p2-sw" style="width:40px;height:23px;border-radius:999px;background:var(--grayb);position:relative;flex:none;transition:background .15s"><div id="cart-p2-dot" style="width:19px;height:19px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div></div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:800">Cobrar con Precio 2</div><div style="font-size:11px;color:var(--txm)">Precio con descuento / oferta</div></div>
+    </div>
     <div class="stitle">Pago dividido</div>
     <div id="cart-pagos"></div>
     <button class="abtn abtn-gray abtn-sm" onclick="carritoAgregarPago()" style="margin-top:6px"><i class="ti ti-plus"></i> Agregar método de pago</button>
@@ -873,6 +877,8 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 
     <label class="fl">Precio de venta sugerido ($) — opcional</label>
     <input class="fi" id="nc-precio" type="number" min="0" step="0.01" placeholder="Se autocompleta al vender, siempre editable">
+    <label class="fl">Precio 2 — con descuento ($) <span style="color:var(--txh);font-weight:600">(opcional)</span></label>
+    <input class="fi" id="nc-precio2" type="number" min="0" step="0.01" placeholder="Precio de oferta / efectivo">
 
     <input type="hidden" id="nc-id">
     <button class="abtn abtn-g" onclick="saveNuevaCamiseta()"><i class="ti ti-check"></i> Guardar en inventario</button>
@@ -2397,6 +2403,7 @@ function abrirNuevaCamiseta(){
   document.getElementById('nc-temp').value='24/25';
   document.getElementById('nc-min').value='5';
   document.getElementById('nc-precio').value='';
+  {const _p2=document.getElementById('nc-precio2'); if(_p2)_p2.value='';}
   document.getElementById('nc-id').value='';
   document.getElementById('nc-btn-borrar').style.display='none';
   TALLAS_TODAS.forEach(t=>document.getElementById('nc-'+t).value=0);
@@ -2422,6 +2429,7 @@ function editarCamiseta(id){
   document.getElementById('nc-temp').value=c.temp;
   document.getElementById('nc-min').value=c.min;
   document.getElementById('nc-precio').value=c.precio!=null?c.precio:'';
+  {const _p2=document.getElementById('nc-precio2'); if(_p2)_p2.value=(c.precio2!=null?c.precio2:'');}
   document.getElementById('nc-id').value=c.id;
   document.getElementById('nc-btn-borrar').style.display='flex';
   TALLAS_TODAS.forEach(t=>document.getElementById('nc-'+t).value=c.tallas[t]||0);
@@ -2451,6 +2459,7 @@ async function saveNuevaCamiseta(){
   if(esOtro) TALLAS.forEach(t=>tallas[t]=0); // producto sin tallas: solo U
   else tallas['U']=0; // camiseta: sin talla única
   const precioVal=document.getElementById('nc-precio').value;
+  const precio2Val=(document.getElementById('nc-precio2')||{}).value||'';
   const data={
     equipo,
     categoria,
@@ -2460,9 +2469,10 @@ async function saveNuevaCamiseta(){
     min:+document.getElementById('nc-min').value||5,
     prov:+document.getElementById('nc-prov').value||1,
     precio:precioVal!==''?+precioVal:null,
+    precio2:precio2Val!==''?+precio2Val:null,
   };
   const editId=+document.getElementById('nc-id').value;
-  const payload={equipo:data.equipo,categoria:data.categoria,temporada:data.temp,tipo:data.tipo,tallas:data.tallas,stock_minimo:data.min,proveedor_id:data.prov,precio:data.precio};
+  const payload={equipo:data.equipo,categoria:data.categoria,temporada:data.temp,tipo:data.tipo,tallas:data.tallas,stock_minimo:data.min,proveedor_id:data.prov,precio:data.precio,precio2:data.precio2};
   try{
     if(editId){
       const i=camisetas.findIndex(c=>c.id===editId);
@@ -2612,7 +2622,7 @@ let carritoTipo=null; // 'tienda' | 'online'
 let carritoGuardando=false;
 
 function abrirCarrito(){
-  carrito=[]; carritoPagos=[]; carritoTipo=null;
+  carrito=[]; carritoPagos=[]; carritoTipo=null; carritoPrecio2=false;
   const sel=document.getElementById('cart-cam');
   sel.innerHTML=camisetas.length
     ? camisetas.map(c=>`<option value="${c.id}">${nombreProducto(c)}</option>`).join('')
@@ -2624,6 +2634,7 @@ function abrirCarrito(){
   {const _l=document.getElementById('cart-cam-list'); if(_l){_l.style.display='none';_l.innerHTML='';}}
   {const _sc=document.getElementById('cart-cam'); if(_sc)_sc.selectedIndex=-1;}
   carritoRenderTallaOpts(null);
+  carritoP2UI();
   carritoTipoBotones();
   carritoAutoPrecio();
   carritoRenderItems();
@@ -2641,9 +2652,20 @@ function carritoTipoSet(t){
   document.getElementById('cart-cliente-wrap').style.display=(t==='online')?'block':'none';
   carritoTipoBotones(); carritoActualizarConfirm();
 }
+let carritoPrecio2=false;
+function carritoP2UI(){
+  const sw=document.getElementById('cart-p2-sw'), dot=document.getElementById('cart-p2-dot');
+  if(sw) sw.style.background=carritoPrecio2?'var(--g)':'var(--grayb)';
+  if(dot) dot.style.left=carritoPrecio2?'19px':'2px';
+}
+function carritoReprecio(){
+  carrito.forEach(it=>{ const c=camisetas.find(x=>x.id===it.camId); if(c){ it.precioUnit=(carritoPrecio2&&c.precio2!=null)?+c.precio2:(c.precio!=null?+c.precio:it.precioUnit); } });
+  carritoRenderItems(); carritoRenderPagos();
+}
+function carritoTogglePrecio2(){ carritoPrecio2=!carritoPrecio2; carritoP2UI(); carritoAutoPrecio(); carritoReprecio(); }
 function carritoAutoPrecio(){
   const c=camisetas.find(x=>x.id===+document.getElementById('cart-cam').value);
-  if(c && c.precio!=null) document.getElementById('cart-precio').value=(+c.precio).toFixed(2);
+  if(c){ const pp=(carritoPrecio2&&c.precio2!=null)?+c.precio2:(c.precio!=null?+c.precio:null); if(pp!=null) document.getElementById('cart-precio').value=pp.toFixed(2); }
   carritoPrecioMulti();
 }
 function tasaPesosValor(){ const t=tasasExtra().find(x=>x.moneda && String(x.nombre).toLowerCase().includes('peso')); return t?(parseFloat(String(t.valor).replace(',','.'))||0):0; }
