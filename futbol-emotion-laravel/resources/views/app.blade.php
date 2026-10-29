@@ -368,6 +368,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <div class="page" id="page-aprobar"><div id="apr-c"></div></div>
     <div class="page" id="page-fin"><div id="fin-c"></div></div>
     <div class="page" id="page-nomina"><div id="nom-c"></div></div>
+    <div class="page" id="page-mas"><div id="mas-c"></div></div>
     <div class="page" id="page-verstock"><div id="vs-c"></div></div>
     <div class="page" id="page-misventas"><div id="mv-c"></div></div>
     <div class="page" id="page-caja"><div id="caja-c"></div></div>
@@ -1158,7 +1159,7 @@ function buildNav(){
   const nav=document.getElementById('bnav');
   const tabs=role==='manager'
     ?[{id:'home',icon:'ti-home',label:'Inicio'},{id:'misventas',icon:'ti-cash',label:'Ventas'},{id:'pedido',icon:'ti-clipboard-list',label:'Pedir'},{id:'stock',icon:'ti-shirt',label:'Stock'},{id:'caja',icon:'ti-report-money',label:'Caja'}]
-    :[{id:'home',icon:'ti-home',label:'Inicio'},{id:'misventas',icon:'ti-cash',label:'Ventas'},{id:'stock',icon:'ti-shirt',label:'Stock'},{id:'pedido',icon:'ti-clipboard-list',label:'Pedir'},{id:'caja',icon:'ti-report-money',label:'Caja'}];
+    :[{id:'home',icon:'ti-home',label:'Inicio'},{id:'misventas',icon:'ti-cash',label:'Ventas'},{id:'stock',icon:'ti-shirt',label:'Stock'},{id:'pedido',icon:'ti-clipboard-list',label:'Pedir'},{id:'caja',icon:'ti-report-money',label:'Caja'},{id:'mas',icon:'ti-dots',label:'Más'}];
   nav.innerHTML=tabs.map(t=>`<button class="ni" id="ni-${t.id}" onclick="goTo('${t.id}')"><i class="ti ${t.icon}"></i><span>${t.label}</span></button>`).join('');
   // Historial y Ajustes pasan al encabezado (solo dueño)
   document.getElementById('hdr-hist').style.display=role==='owner'?'flex':'none';
@@ -1181,7 +1182,7 @@ function goTo(p){
   document.querySelectorAll('.ni').forEach(x=>x.classList.remove('active'));
   const pg=document.getElementById('page-'+p);if(pg)pg.classList.add('active');
   const ni=document.getElementById('ni-'+p);if(ni)ni.classList.add('active');
-  ({home:renderHome,pedido:renderPedido,stock:renderStock,envios:renderEnvios,dev:renderDev,ventas:renderVentas,misventas:renderMisVentas,aprobar:renderAprobar,fin:renderFin,nomina:renderNomina,verstock:renderVerStock,caja:renderCaja,ajustes:renderAjustes,historial:renderHistorial})[p]?.();
+  ({home:renderHome,pedido:renderPedido,stock:renderStock,envios:renderEnvios,dev:renderDev,ventas:renderVentas,misventas:renderMisVentas,aprobar:renderAprobar,fin:renderFin,nomina:renderNomina,mas:renderMas,verstock:renderVerStock,caja:renderCaja,ajustes:renderAjustes,historial:renderHistorial})[p]?.();
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -3378,6 +3379,30 @@ function renderVerStock(){
 }
 
 // ── FINANZAS (dueño) ──────────────────────────────────────────────────────────
+function abrirInversion(){
+  var ti=document.getElementById('tx-tipo'); if(ti) ti.value='gasto';
+  if(typeof toggleTxTipo==='function') toggleTxTipo();
+  var d=document.getElementById('tx-desc'); if(d) d.value='';
+  var im=document.getElementById('tx-imp'); if(im) im.value='';
+  var c=document.getElementById('tx-cat'); if(c) c.value='Inversión (mercancía)';
+  var t=document.getElementById('tx-title'); if(t) t.textContent='Registrar inversión';
+  openM('m-tx');
+}
+function renderMas(){
+  const cont=document.getElementById('mas-c'); if(!cont) return;
+  const invMes=transacciones.filter(t=>esInversion(t)&&String(t.fecha||'').slice(0,7)===hoy().slice(0,7)).reduce((s,t)=>s+(t.imp||0),0);
+  const pend=(typeof nominaPendientes==='function')?nominaPendientes().length:0;
+  const item=(oc,icon,bg,color,title,sub)=>`<button class="bigbtn" onclick="${oc}"><div class="bbico" style="background:${bg};color:${color}"><i class="ti ${icon}"></i></div><div><div class="bbtitle">${title}</div><div class="bbsub">${sub}</div></div><i class="ti ti-chevron-right" style="color:var(--txh);margin-left:auto;font-size:19px"></i></button>`;
+  cont.innerHTML=`
+    <div style="font-size:19px;font-weight:800;margin-bottom:3px">Más opciones</div>
+    <div style="font-size:13px;color:var(--txm);margin-bottom:14px">Gestión y finanzas</div>
+    <div class="acc-grid">
+      ${item("goTo('nomina')",'ti-wallet','var(--gl)','var(--g)','Personal y nómina',pend>0?('Toca pagar a '+pend+' '+(pend>1?'trabajadores':'trabajador')):'Tu equipo y sus pagos')}
+      ${item("abrirInversion()",'ti-building-warehouse','var(--al)','var(--a)','Registrar inversión',invMes>0?('Este mes: '+fmt(invMes)):'Compra de mercancía / productos')}
+      ${item("goTo('fin')",'ti-chart-bar','var(--bl)','var(--b)','Finanzas','Ingresos, gastos y movimientos')}
+      ${item("goTo('ajustes')",'ti-settings','var(--gray)','var(--txm)','Ajustes','Tasas, datos de cobro, proveedores…')}
+    </div>`;
+}
 function esInversion(t){ return t && t.tipo==='gasto' && (t.canal==='Inversión (mercancía)' || t.canal==='Inversión'); }
 function renderFin(){
   const cont=document.getElementById('fin-c');
@@ -3432,8 +3457,7 @@ function renderFin(){
           <div class="liright" style="font-weight:800;color:${t.tipo==='ingreso'?'var(--g)':'var(--r)'}">${t.tipo==='ingreso'?'+':'-'}${fmt(t.imp)}</div>
         </div>`).join('')}
     </div>
-    <button class="abtn abtn-g" onclick="openM('m-tx')"><i class="ti ti-plus"></i> Registrar movimiento</button>
-    <button class="abtn abtn-gray" onclick="goTo('nomina')" style="margin-top:8px"><i class="ti ti-wallet"></i> Personal y nómina</button>`;
+    <button class="abtn abtn-g" onclick="openM('m-tx')"><i class="ti ti-plus"></i> Registrar movimiento</button>`;
 }
 /* ── PERSONAL Y NÓMINA (portado de Max Telas) ── */
 function personalLista(){ try{ const a=JSON.parse(CONFIG.personal||'[]'); return (Array.isArray(a)?a:[]).map(p=>({id:p.i||p.id, nombre:p.n||p.nombre, cargo:p.c||p.cargo||'', sueldo:parseFloat(p.s!=null?p.s:p.sueldo)||0, frecuencia:p.f||p.frecuencia||'quincenal', desde:p.d||p.desde||''})).filter(p=>p.id&&p.nombre); }catch(e){ return []; } }
