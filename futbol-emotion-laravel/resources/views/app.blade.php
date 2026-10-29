@@ -367,6 +367,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <div class="page" id="page-ventas"><div id="ven-c"></div></div>
     <div class="page" id="page-aprobar"><div id="apr-c"></div></div>
     <div class="page" id="page-fin"><div id="fin-c"></div></div>
+    <div class="page" id="page-nomina"><div id="nom-c"></div></div>
     <div class="page" id="page-verstock"><div id="vs-c"></div></div>
     <div class="page" id="page-misventas"><div id="mv-c"></div></div>
     <div class="page" id="page-caja"><div id="caja-c"></div></div>
@@ -796,7 +797,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     <label class="fl">Descripción</label><input class="fi" id="tx-desc" placeholder="Ej: Bolsas para la tienda, pago de luz…">
     <div class="frow">
       <div><label class="fl">Importe ($)</label><input class="fi" id="tx-imp" type="number" min="0" step="0.01" placeholder="0.00"></div>
-      <div id="tx-cat-wrap"><label class="fl">Categoría</label><select class="fi" id="tx-cat"><option>Mercancía</option><option>Servicios</option><option>Transporte</option><option>Local</option><option>Otros</option></select></div>
+      <div id="tx-cat-wrap"><label class="fl">Categoría</label><select class="fi" id="tx-cat"><option>Mercancía</option><option>Inversión (mercancía)</option><option>Servicios</option><option>Transporte</option><option>Local</option><option>Otros</option></select></div>
       <div id="tx-canal-wrap" style="display:none"><label class="fl">Canal</label><select class="fi" id="tx-canal"><option>Tienda física</option><option>Instagram</option><option>WhatsApp</option><option>Web</option><option>Otro</option></select></div>
     </div>
     <button class="abtn abtn-g" onclick="saveTx()" id="tx-save-btn"><i class="ti ti-check"></i> Guardar</button>
@@ -827,6 +828,15 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 </div>
 
 <!-- MODAL: NUEVA CAMISETA EN INVENTARIO -->
+<!-- MODAL: NÓMINA -->
+<div class="mbg" id="m-nomina">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="mtitle"><span>Pagar al personal</span> <button class="mclose" onclick="closeM('m-nomina')"><i class="ti ti-x"></i></button></div>
+    <div id="nomina-body"></div>
+  </div>
+</div>
+
 <div class="mbg" id="m-nueva-cam">
   <div class="modal">
     <div class="modal-handle"></div>
@@ -1171,7 +1181,7 @@ function goTo(p){
   document.querySelectorAll('.ni').forEach(x=>x.classList.remove('active'));
   const pg=document.getElementById('page-'+p);if(pg)pg.classList.add('active');
   const ni=document.getElementById('ni-'+p);if(ni)ni.classList.add('active');
-  ({home:renderHome,pedido:renderPedido,stock:renderStock,envios:renderEnvios,dev:renderDev,ventas:renderVentas,misventas:renderMisVentas,aprobar:renderAprobar,fin:renderFin,verstock:renderVerStock,caja:renderCaja,ajustes:renderAjustes,historial:renderHistorial})[p]?.();
+  ({home:renderHome,pedido:renderPedido,stock:renderStock,envios:renderEnvios,dev:renderDev,ventas:renderVentas,misventas:renderMisVentas,aprobar:renderAprobar,fin:renderFin,nomina:renderNomina,verstock:renderVerStock,caja:renderCaja,ajustes:renderAjustes,historial:renderHistorial})[p]?.();
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -3368,10 +3378,12 @@ function renderVerStock(){
 }
 
 // ── FINANZAS (dueño) ──────────────────────────────────────────────────────────
+function esInversion(t){ return t && t.tipo==='gasto' && (t.canal==='Inversión (mercancía)' || t.canal==='Inversión'); }
 function renderFin(){
   const cont=document.getElementById('fin-c');
   const ing=transacciones.filter(t=>t.tipo==='ingreso').reduce((s,t)=>s+t.imp,0);
   const gas=transacciones.filter(t=>t.tipo==='gasto').reduce((s,t)=>s+t.imp,0);
+  const inv=transacciones.filter(esInversion).reduce((s,t)=>s+t.imp,0);
   const neto=ing-gas;
   const margen=ing>0?Math.round(neto/ing*100):0;
 
@@ -3386,7 +3398,8 @@ function renderFin(){
   cont.innerHTML=`
     <div class="mgrid">
       <div class="mc mc-g"><i class="ti ti-trending-up mc-ico"></i><div class="mcl">Ingresos</div><div class="mcv">${fmt(ing)}</div></div>
-      <div class="mc mc-r"><i class="ti ti-trending-down mc-ico"></i><div class="mcl">Gastos</div><div class="mcv">${fmt(gas)}</div></div>
+      <div class="mc mc-r"><i class="ti ti-trending-down mc-ico"></i><div class="mcl">Gastos${inv>0?' oper.':''}</div><div class="mcv">${fmt(inv>0?gas-inv:gas)}</div></div>
+      ${inv>0?`<div class="mc mc-a"><i class="ti ti-building-warehouse mc-ico"></i><div class="mcl">Inversión</div><div class="mcv">${fmt(inv)}</div></div>`:''}
       <div class="mc"><div class="mcl">Beneficio neto</div><div class="mcv" style="color:var(--p)">${fmt(neto)}</div></div>
       <div class="mc"><div class="mcl">Margen</div><div class="mcv">${margen}%</div></div>
     </div>
@@ -3419,8 +3432,200 @@ function renderFin(){
           <div class="liright" style="font-weight:800;color:${t.tipo==='ingreso'?'var(--g)':'var(--r)'}">${t.tipo==='ingreso'?'+':'-'}${fmt(t.imp)}</div>
         </div>`).join('')}
     </div>
-    <button class="abtn abtn-g" onclick="openM('m-tx')"><i class="ti ti-plus"></i> Registrar movimiento</button>`;
+    <button class="abtn abtn-g" onclick="openM('m-tx')"><i class="ti ti-plus"></i> Registrar movimiento</button>
+    <button class="abtn abtn-gray" onclick="goTo('nomina')" style="margin-top:8px"><i class="ti ti-wallet"></i> Personal y nómina</button>`;
 }
+/* ── PERSONAL Y NÓMINA (portado de Max Telas) ── */
+function personalLista(){ try{ const a=JSON.parse(CONFIG.personal||'[]'); return (Array.isArray(a)?a:[]).map(p=>({id:p.i||p.id, nombre:p.n||p.nombre, cargo:p.c||p.cargo||'', sueldo:parseFloat(p.s!=null?p.s:p.sueldo)||0, frecuencia:p.f||p.frecuencia||'quincenal', desde:p.d||p.desde||''})).filter(p=>p.id&&p.nombre); }catch(e){ return []; } }
+function nominaPagadoMes(nombre){ const m=hoy().slice(0,7); return transacciones.filter(t=>t.tipo==='gasto'&&t.canal==='Sueldos'&&String(t.desc||'').includes(': '+nombre)&&String(t.fecha||'').slice(0,7)===m).reduce((x,t)=>x+(t.imp||0),0); }
+const NOM_PERIODO={semanal:7,quincenal:15,mensual:30};
+function nominaUltimoPago(nombre){ const ps=transacciones.filter(t=>t.tipo==='gasto'&&t.canal==='Sueldos'&&String(t.desc||'').includes(': '+nombre)).map(t=>t.fecha).filter(Boolean).sort(); return ps.length?ps[ps.length-1]:null; }
+function nominaDiasDesde(fch){ try{ const d=Math.floor((Date.now()-new Date(fch+'T00:00:00').getTime())/86400000); return d<0?0:d; }catch(e){ return 0; } }
+function nominaPendientes(){ return personalLista().map(p=>{ const per=NOM_PERIODO[p.frecuencia]||15; const ult=nominaUltimoPago(p.nombre); const ref=ult||p.desde||hoy(); const dias=nominaDiasDesde(ref); return {p,dias,per,vence:dias>=per}; }).filter(x=>x.vence); }
+function renderNomina(){
+  const cont=document.getElementById('nom-c'); if(!cont) return;
+  const m=hoy().slice(0,7);
+  const pagosMes=(transacciones||[]).filter(t=>t.tipo==='gasto'&&t.canal==='Sueldos'&&String(t.fecha||'').slice(0,7)===m);
+  const totMes=pagosMes.reduce((s,t)=>s+(t.imp||0),0);
+  const pend=nominaPendientes();
+  cont.innerHTML=`
+    <button onclick="goTo('home')" style="background:var(--gray);border:none;border-radius:9px;padding:7px 12px;cursor:pointer;font-size:13px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:5px;margin-bottom:12px"><i class="ti ti-arrow-left"></i> Volver</button>
+    <div style="font-size:19px;font-weight:800;margin-bottom:3px">Personal y nómina</div>
+    <div style="font-size:13px;color:var(--txm);margin-bottom:14px">Tu equipo y sus pagos</div>
+    ${pend.length?`<div class="abox abox-a" style="cursor:pointer;margin-bottom:14px" onclick="abrirNomina()"><i class="ti ti-alarm"></i><div><div class="abox-title">Toca pagar a ${pend.length} trabajador${pend.length>1?'es':''}</div><div class="abox-sub">${pend.map(x=>`${x.p.nombre} · ${x.dias}d (${x.p.frecuencia})`).join(' · ')}</div></div><i class="ti ti-chevron-right" style="color:var(--a);margin-left:auto;font-size:20px"></i></div>`:''}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="mc mc-r"><div class="mcl">Pagado este mes</div><div class="mcv">${fmt(totMes)}</div></div>
+      <div class="mc mc-b"><div class="mcl">Pagos</div><div class="mcv">${pagosMes.length}</div></div>
+    </div>
+    <button class="abtn abtn-g" onclick="abrirNomina()" style="margin-bottom:18px"><i class="ti ti-cash"></i> Pagar al personal</button>
+    <div class="stitle">Personal</div>
+    <div class="card">
+      <div style="font-size:12.5px;color:var(--txm);margin-bottom:12px">Registra a tu equipo. Al pagarles, el sueldo entra solo como gasto operativo.</div>
+      <div id="cfg-personal"></div>
+      <div class="frow" style="margin-top:6px">
+        <div style="flex:2"><label class="fl" style="margin-top:0">Nombre</label><input class="fi" id="cfg-nuevo-emp-nombre" maxlength="30" placeholder="Ej: Juan"></div>
+        <div style="flex:1"><label class="fl" style="margin-top:0">Sueldo ($)</label><input class="fi" id="cfg-nuevo-emp-sueldo" type="number" min="0" step="0.01" placeholder="Opcional"></div>
+      </div>
+      <label class="fl">Cargo (opcional)</label><input class="fi" id="cfg-nuevo-emp-cargo" maxlength="24" placeholder="Ej: Vendedor">
+      <label class="fl">Frecuencia de pago</label>
+      <select class="fi" id="cfg-nuevo-emp-frec"><option value="semanal">Semanal</option><option value="quincenal" selected>Quincenal</option><option value="mensual">Mensual</option></select>
+      <button class="abtn abtn-gray" id="btn-guardar-emp" onclick="agregarPersonal()" style="margin-top:8px"><i class="ti ti-user-plus"></i> Agregar trabajador</button>
+      <button class="abtn abtn-gray" id="btn-cancelar-emp" onclick="cancelarEdicionPersonal()" style="margin-top:8px;display:none"><i class="ti ti-x"></i> Cancelar edición</button>
+    </div>`;
+  renderPersonal();
+}
+let nominaEmpleadoSel='';
+function abrirNomina(){
+  const lista=personalLista();
+  const cont=document.getElementById('nomina-body');
+  if(!lista.length){
+    cont.innerHTML=`<div style="text-align:center;padding:12px 4px">
+      <i class="ti ti-users" style="font-size:40px;color:var(--txh)"></i>
+      <p style="font-size:13.5px;color:var(--txm);margin:10px 0 14px">Todavía no tienes personal registrado. Agrégalo en «Personal y nómina» para poder pagarle.</p>
+      <button class="abtn abtn-g" onclick="closeM('m-nomina');goTo('nomina')"><i class="ti ti-users"></i> Ir a Personal y nómina</button>
+    </div>`;
+    openM('m-nomina'); return;
+  }
+  nominaEmpleadoSel=lista[0].id;
+  cont.innerHTML=`
+    <label class="fl" style="margin-top:0">Trabajador</label>
+    <select class="fi" id="nom-emp" onchange="nominaSelEmpleado()">${lista.map(p=>`<option value="${p.id}">${p.nombre}${p.cargo?' · '+p.cargo:''}</option>`).join('')}</select>
+    <div id="nom-info" style="font-size:12px;color:var(--txm);margin:9px 0 2px"></div>
+    <label class="fl">Periodo del pago</label>
+    <select class="fi" id="nom-periodo"><option value="semanal">Semanal</option><option value="quincenal">Quincenal</option><option value="mensual">Mensual</option></select>
+    <label class="fl">Monto a pagar ($)</label>
+    <input class="fi" id="nom-monto" type="number" min="0" step="0.01" placeholder="0.00">
+    <div style="font-size:11.5px;color:var(--txh);margin-top:4px">Puedes cambiar el monto si es un adelanto o pago parcial.</div>
+    <button class="abtn abtn-g" onclick="pagarNomina()" id="nom-save-btn" style="margin-top:14px"><i class="ti ti-cash"></i> Registrar pago</button>`;
+  nominaSelEmpleado();
+  openM('m-nomina');
+}
+function nominaSelEmpleado(){
+  const lista=personalLista();
+  const id=document.getElementById('nom-emp').value;
+  nominaEmpleadoSel=id;
+  const p=lista.find(x=>x.id===id); if(!p) return;
+  document.getElementById('nom-monto').value=p.sueldo>0?p.sueldo:'';
+  {const _pe=document.getElementById('nom-periodo'); if(_pe)_pe.value=p.frecuencia||'quincenal';}
+  const pagado=nominaPagadoMes(p.nombre);
+  document.getElementById('nom-info').innerHTML=`Sueldo base: <b>${p.sueldo>0?fmt(p.sueldo):'—'}</b>${pagado>0?` · Este mes le has pagado <b>${fmt(pagado)}</b>`:''}`;
+}
+let nominaGuardando=false;
+async function pagarNomina(){
+  if(nominaGuardando) return;
+  const lista=personalLista();
+  const p=lista.find(x=>x.id===nominaEmpleadoSel);
+  if(!p){ toast('Elige un trabajador'); return; }
+  const imp=+document.getElementById('nom-monto').value;
+  if(!(imp>0)){ toast('⚠️ El monto debe ser mayor que 0'); return; }
+  const periodo=(document.getElementById('nom-periodo')||{}).value||p.frecuencia||'quincenal';
+  const periodoLbl={semanal:'Semanal',quincenal:'Quincenal',mensual:'Mensual'}[periodo]||periodo;
+  const desc='Nómina '+periodoLbl+': '+p.nombre+(p.cargo?' · '+p.cargo:'');
+  const canal='Sueldos';
+  nominaGuardando=true;
+  try{
+    if(MODO_SERVIDOR){
+      const r=await apiCall('POST','/transacciones',{tipo:'gasto',descripcion:desc,importe:imp,canal});
+      transacciones.push({id:r.id,tipo:'gasto',desc,imp,canal,fecha:r.fecha,venta_id:null});
+    }else{
+      transacciones.push({id:ids.tx++,tipo:'gasto',desc,imp,canal,fecha:hoy(),venta_id:null});
+      sd('transacciones',transacciones);
+    }
+    registrarActividad('caja',`Pago de nómina (${periodoLbl}): ${p.nombre}`,`-$${imp.toFixed(2)}`);
+    toast('Pago registrado ✓');
+    if(curPage==='caja') renderCaja();
+    if(curPage==='nomina') renderNomina();
+    nominaMostrarRecibo(p, imp, periodoLbl);
+  }catch(e){/* apiCall ya mostró el error */}
+  nominaGuardando=false;
+}
+let ultimoRecibo='';
+function nominaMostrarRecibo(p, imp, periodoLbl){
+  const fechaTxt=new Date().toLocaleDateString('es-VE');
+  const reciboTxt=`🧾 RECIBO DE PAGO\n${'Fútbol Emotion'}\n————————————\nTrabajador: ${p.nombre}${p.cargo?' · '+p.cargo:''}\nConcepto: Pago de nómina${periodoLbl?' ('+periodoLbl+')':''}\nMonto: ${fmt(imp)}\nFecha: ${fechaTxt}\n————————————\n¡Gracias por tu trabajo!`;
+  ultimoRecibo=reciboTxt;
+  const cont=document.getElementById('nomina-body'); if(!cont) return;
+  cont.innerHTML=`
+    <div style="text-align:center;padding:4px 2px">
+      <div style="width:56px;height:56px;border-radius:50%;background:var(--gl);display:flex;align-items:center;justify-content:center;margin:0 auto 10px"><i class="ti ti-check" style="font-size:30px;color:var(--gd)"></i></div>
+      <div style="font-size:16px;font-weight:800;margin-bottom:2px">Pago registrado</div>
+      <div style="font-size:13px;color:var(--txm);margin-bottom:14px">${p.nombre} · ${fmt(imp)}</div>
+      <div style="background:var(--gray);border-radius:12px;padding:14px 16px;text-align:left;font-size:12.5px;line-height:1.75;white-space:pre-wrap;margin-bottom:14px">${reciboTxt.replace(/</g,'&lt;')}</div>
+      <button class="abtn abtn-g" onclick="compartirTexto(ultimoRecibo)"><i class="ti ti-brand-whatsapp"></i> Compartir recibo</button>
+      <button class="abtn abtn-gray" onclick="closeM('m-nomina')" style="margin-top:8px"><i class="ti ti-check"></i> Listo</button>
+    </div>`;
+}
+async function compartirTexto(texto){
+  try{ if(navigator.share){ await navigator.share({text:texto}); return; } }
+  catch(e){ if(e&&e.name==='AbortError') return; }
+  try{ window.open('https://wa.me/?text='+encodeURIComponent(texto),'_blank'); }catch(e){}
+}
+function renderPersonal(){
+  const cont=document.getElementById('cfg-personal'); if(!cont) return;
+  const lista=personalLista();
+  cont.innerHTML = lista.length ? lista.map(p=>`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;background:var(--gray);border-radius:10px;padding:8px 12px">
+      <div style="flex:1"><div style="font-size:13px;font-weight:800">${p.nombre}${p.cargo?` <span style="font-weight:600;color:var(--txm)">· ${p.cargo}</span>`:''}</div><div style="font-size:11px;color:var(--txm)">${p.sueldo>0?'Sueldo: '+fmt(p.sueldo):'Sin sueldo fijo'} · ${({semanal:'Semanal',quincenal:'Quincenal',mensual:'Mensual'}[p.frecuencia]||'Quincenal')}</div></div>
+      <button onclick="editarPersonal('${p.id}')" style="background:none;border:none;color:var(--bd);cursor:pointer;font-size:18px"><i class="ti ti-edit"></i></button>
+      <button onclick="borrarPersonal('${p.id}')" style="background:none;border:none;color:var(--r);cursor:pointer;font-size:18px"><i class="ti ti-trash"></i></button>
+    </div>`).join('') : '<div style="font-size:12px;color:var(--txm);margin-bottom:6px">Todavía no tienes personal registrado.</div>';
+}
+let editandoPersonalId='';
+function editarPersonal(id){
+  const p=personalLista().find(x=>x.id===id); if(!p) return;
+  editandoPersonalId=id;
+  document.getElementById('cfg-nuevo-emp-nombre').value=p.nombre;
+  document.getElementById('cfg-nuevo-emp-cargo').value=p.cargo||'';
+  document.getElementById('cfg-nuevo-emp-sueldo').value=p.sueldo>0?p.sueldo:'';
+  const fs=document.getElementById('cfg-nuevo-emp-frec'); if(fs) fs.value=p.frecuencia||'quincenal';
+  const b=document.getElementById('btn-guardar-emp'); if(b) b.innerHTML='<i class="ti ti-check"></i> Guardar cambios';
+  const c=document.getElementById('btn-cancelar-emp'); if(c) c.style.display='';
+  const n=document.getElementById('cfg-nuevo-emp-nombre'); if(n){ n.focus(); n.scrollIntoView({behavior:'smooth',block:'center'}); }
+}
+function cancelarEdicionPersonal(){
+  editandoPersonalId='';
+  const n=document.getElementById('cfg-nuevo-emp-nombre'); if(n) n.value='';
+  const c1=document.getElementById('cfg-nuevo-emp-cargo'); if(c1) c1.value='';
+  const su=document.getElementById('cfg-nuevo-emp-sueldo'); if(su) su.value='';
+  const fs=document.getElementById('cfg-nuevo-emp-frec'); if(fs) fs.value='quincenal';
+  const b=document.getElementById('btn-guardar-emp'); if(b) b.innerHTML='<i class="ti ti-user-plus"></i> Agregar trabajador';
+  const c=document.getElementById('btn-cancelar-emp'); if(c) c.style.display='none';
+}
+async function agregarPersonal(){
+  const nombre=(document.getElementById('cfg-nuevo-emp-nombre').value||'').trim();
+  const cargo=(document.getElementById('cfg-nuevo-emp-cargo').value||'').trim();
+  const sueldo=parseFloat((document.getElementById('cfg-nuevo-emp-sueldo').value||'').replace(',','.'))||0;
+  const frec=((document.getElementById('cfg-nuevo-emp-frec')||{}).value)||'quincenal';
+  if(!nombre){ toast('Ponle el nombre del trabajador'); return; }
+  const lista=personalLista();
+  if(editandoPersonalId){
+    const p=lista.find(x=>x.id===editandoPersonalId);
+    if(p){ p.nombre=nombre.slice(0,30); p.cargo=cargo.slice(0,24); p.sueldo=sueldo.toFixed(2); p.frecuencia=frec; }
+    await guardarPersonal(lista);
+  }else{
+    if(lista.length>=20){ toast('Máximo 20 trabajadores'); return; }
+    lista.push({id:'e'+Math.random().toString(36).slice(2,6), nombre:nombre.slice(0,30), cargo:cargo.slice(0,24), sueldo:sueldo.toFixed(2), frecuencia:frec, desde:hoy()});
+    await guardarPersonal(lista);
+  }
+  cancelarEdicionPersonal();
+}
+async function borrarPersonal(id){
+  const p=personalLista().find(x=>x.id===id);
+  if(p && !confirm(`¿Eliminar a ${p.nombre} del personal? (no borra los pagos ya registrados)`)) return;
+  const lista=personalLista().filter(x=>x.id!==id);
+  await guardarPersonal(lista);
+}
+async function guardarPersonal(lista){
+  const compact=lista.map(p=>({i:p.id, n:String(p.nombre).slice(0,30), c:String(p.cargo||'').slice(0,24), s:p.sueldo, f:p.frecuencia||'quincenal', d:p.desde||''}));
+  const json=JSON.stringify(compact);
+  try{
+    if(MODO_SERVIDOR) await apiCall('POST','/config',{personal:json});
+    CONFIG.personal=json;
+    toast('Personal actualizado ✓');
+    renderPersonal();
+    registrarActividad('ajuste','Personal / nómina actualizado','');
+  }catch(e){ toast('No se pudo guardar'); }
+}
+
 function abrirTx(tipo='gasto'){
   document.getElementById('tx-desc').value='';
   document.getElementById('tx-imp').value='';
@@ -3599,7 +3804,7 @@ function renderCaja(){
       </button>`:''}
     </div>
     <button class="abtn abtn-gray" onclick="abrirCalcBs()" style="margin-bottom:18px"><i class="ti ti-calculator"></i> Calculadora de bolívares</button>
-    ${(role==='owner'&&!historialCompleto)?`<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;background:var(--gl)"><div style="font-size:12.5px;color:var(--txm);line-height:1.4"><i class="ti ti-clock-hour-4"></i> Mostrando los últimos ${MESES_CARGA_INICIAL} meses. Los reportes de meses viejos se cargan solos al exportar.</div><button onclick="cargarHistorialCompletoUI()" style="flex:none;background:var(--tx);color:#fff;border:none;border-radius:9px;padding:8px 12px;cursor:pointer;font-size:12px;font-weight:700;white-space:nowrap">Cargar todo</button></div>`:''}
+    ${(role==='owner'&&!historialCompleto)?`<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;background:var(--gl)"><div style="font-size:12.5px;color:var(--txm);line-height:1.4"><i class="ti ti-clock-hour-4"></i> Mostrando los últimos ${MESES_CARGA_INICIAL} meses. Los reportes de meses viejos se cargan solos al exportar.</div><button onclick="cargarHistorialCompletoUI()" style="flex:none;background:#334155;color:#fff;border:none;border-radius:9px;padding:8px 12px;cursor:pointer;font-size:12px;font-weight:700;white-space:nowrap">Cargar todo</button></div>`:''}
     ${bloqueResumen('Cierre del día','ti-sun','var(--g)',dia,hoyStr,'dia')}
     ${bloqueCompacto('Cierre de la semana','ti-calendar-week','var(--b)',sem,`${inicioSemStr} → ${hoyStr}`,'sem')}
     ${bloqueCompacto('Cierre del mes','ti-calendar-month','var(--p)',mes,inicioMesStr.slice(0,7),'mes')}
@@ -3616,7 +3821,7 @@ function renderCaja(){
         </div>`).join('')||'<div style="font-size:13px;color:var(--txm);text-align:center;padding:10px">Sin movimientos aún</div>'}
     </div>
 
-    <button class="abtn abtn-g" onclick="abrirCierreCaja()" style="margin-top:16px;background:var(--tx)"><i class="ti ti-lock-check"></i> Cerrar caja del día</button>
+    <button class="abtn abtn-g" onclick="abrirCierreCaja()" style="margin-top:16px;background:#334155"><i class="ti ti-lock-check"></i> Cerrar caja del día</button>
     ${cierresMensuales.length?`<div class="stitle">Meses cerrados</div><div class="card">${cierresMensuales.slice(0,12).map(m=>{
       const [a,me]=m.mes.split('-');
       const meses=['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
